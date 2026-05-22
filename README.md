@@ -86,3 +86,4 @@ Detalhes da arquitetura ficam em `docs/clean-architecture.md`.
 
 
 Porta http://127.0.0.1:8083/
+Desenvolvedor Responsalvel: Vinicius Moreira
