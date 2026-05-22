@@ -17,7 +17,7 @@ on:
   push:
     branches:
       - main
-      - master
+      - develop
     paths:
       - ".github/workflows/microservices-ci.yml"
       - "docker-compose.yml"
