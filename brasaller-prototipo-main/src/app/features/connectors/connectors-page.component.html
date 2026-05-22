@@ -1,0 +1,31 @@
+<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+  @for (connector of facade.connectors(); track connector.key) {
+    <p-card>
+      <ng-template pTemplate="header">
+        <div class="flex items-start justify-between border-b border-slate-100 p-5">
+          <div>
+            <h2 class="text-lg font-bold">{{ connector.name }}</h2>
+            <p class="text-xs uppercase tracking-wider text-slate-400">{{ connector.type }} v{{ connector.version }}</p>
+          </div>
+          <p-tag [value]="connector.active ? 'Ativo' : 'Inativo'" [severity]="connector.active ? 'success' : 'secondary'" />
+        </div>
+      </ng-template>
+
+      <p class="min-h-16 text-sm leading-6 text-slate-600">{{ connector.description }}</p>
+
+      <div class="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span class="text-sm font-semibold text-slate-700">Conector habilitado</span>
+        <p-toggleswitch
+          [ngModel]="connector.active"
+          [disabled]="facade.isReadOnly()"
+          (onChange)="facade.toggleConnector(connector.key, connector.active)"
+          pTooltip="Ativar ou desativar modulo"
+        />
+      </div>
+    </p-card>
+  } @empty {
+    <p-card styleClass="md:col-span-2 xl:col-span-3">
+      <p class="text-center text-slate-500">Nenhum modulo conector cadastrado.</p>
+    </p-card>
+  }
+</div>

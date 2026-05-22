@@ -1,0 +1,218 @@
+<div class="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
+  <aside class="app-sidebar hidden lg:flex">
+    <header class="sidebar-brand">
+      <span class="brand-mark">B</span>
+      <div>
+        <strong>BraSeller</strong>
+        <span>Modular Core</span>
+      </div>
+    </header>
+
+    <section class="tenant-panel">
+      <div class="tenant-identity">
+        <p-avatar icon="pi pi-building" shape="circle" styleClass="tenant-avatar" />
+        <div class="min-w-0">
+          <strong>{{ facade.tenant()?.name }}</strong>
+          <span>{{ facade.tenant()?.email }}</span>
+        </div>
+      </div>
+
+      <div class="tenant-role-field">
+        <span>Perfil de acesso</span>
+        <p-select
+          [options]="roleOptions"
+          [ngModel]="facade.tenant()?.role"
+          (ngModelChange)="facade.switchRole($any($event))"
+          optionLabel="label"
+          optionValue="value"
+          size="small"
+          styleClass="sidebar-role-select"
+        />
+      </div>
+    </section>
+
+    <nav class="sidebar-nav" aria-label="Navegacao principal">
+      <span class="sidebar-section-label">Operacao</span>
+      @for (item of navItems; track item.section) {
+        <button
+          type="button"
+          class="sidebar-nav-item"
+          [class.sidebar-nav-item-active]="currentSection() === item.section"
+          [routerLink]="sectionRoutes[item.section]"
+        >
+          <i [class]="item.icon"></i>
+          <span>{{ item.label }}</span>
+        </button>
+      }
+    </nav>
+
+    <section class="connector-panel">
+      <span class="sidebar-section-label">Status dos modulos</span>
+      <div class="connector-list">
+        <button type="button" class="connector-row" (click)="goTo('connectors')">
+          <span><i class="connector-dot" [class.connector-dot-active]="facade.tenant()?.mlConnected"></i> Mercado Livre</span>
+          <p-tag [value]="facade.tenant()?.mlConnected ? 'Ativo' : 'Offline'" [severity]="facade.tenant()?.mlConnected ? 'success' : 'secondary'" styleClass="sidebar-mini-tag" />
+        </button>
+        <button type="button" class="connector-row" (click)="goTo('connectors')">
+          <span><i class="connector-dot" [class.connector-dot-active]="facade.tenant()?.shopeeConnected"></i> Shopee</span>
+          <p-tag [value]="facade.tenant()?.shopeeConnected ? 'Ativo' : 'Offline'" [severity]="facade.tenant()?.shopeeConnected ? 'success' : 'secondary'" styleClass="sidebar-mini-tag" />
+        </button>
+        <button type="button" class="connector-row" (click)="goTo('connectors')">
+          <span><i class="connector-dot" [class.connector-dot-active]="facade.tenant()?.amazonConnected"></i> Amazon</span>
+          <p-tag [value]="facade.tenant()?.amazonConnected ? 'Ativo' : 'Offline'" [severity]="facade.tenant()?.amazonConnected ? 'success' : 'secondary'" styleClass="sidebar-mini-tag" />
+        </button>
+      </div>
+    </section>
+
+    <section class="billing-panel">
+      <div class="billing-header">
+        <span>Plano SaaS</span>
+        <p-tag [value]="facade.tenant()?.trialDaysLeft ? 'Trial' : 'Ativo'" severity="info" styleClass="sidebar-plan-tag" />
+      </div>
+      <strong>BraSeller {{ facade.tenant()?.plan }}</strong>
+      <div class="billing-meter">
+        <span>Uso de API Core</span>
+        <span>Estavel</span>
+      </div>
+      <p-progressBar [value]="facade.tenant()?.plan === 'Agencia' ? 90 : facade.tenant()?.plan === 'Pro' ? 65 : 35" [showValue]="false" styleClass="sidebar-progress" />
+      <p-button label="Mudar plano" icon="pi pi-star" severity="secondary" [outlined]="true" size="small" styleClass="sidebar-plan-button" (onClick)="facade.upgradeDialogVisible.set(true)" />
+    </section>
+  </aside>
+
+  <main class="flex min-w-0 flex-1 flex-col">
+    <p-toolbar styleClass="rounded-none border-0 border-b border-slate-200 bg-white px-4 py-3">
+      <ng-template pTemplate="start">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-wider text-slate-400">BraSeller Portal</p>
+          <h1 class="flex flex-wrap items-center gap-2 text-xl font-bold">
+            {{ sectionTitles[currentSection()] }}
+            <p-tag [value]="facade.getRoleLabel(facade.tenant()?.role || 'seller')" severity="secondary" />
+          </h1>
+        </div>
+      </ng-template>
+
+      <ng-template pTemplate="end">
+        <div class="flex items-center gap-2">
+          <span class="hidden md:block">
+            <input pInputText [formControl]="$any(facade.filterForm.controls.search)" placeholder="Pesquisar pedido, comprador, NF" class="w-64" />
+          </span>
+
+          <p-button
+            icon="pi pi-refresh"
+            label="Sincronizar"
+            [loading]="facade.loadingSync()"
+            [disabled]="facade.isReadOnly()"
+            severity="secondary"
+            (onClick)="facade.syncAll()"
+          />
+
+          <p-button icon="pi pi-bell" severity="secondary" [outlined]="true" [badge]="facade.unreadNotifications() ? facade.unreadNotifications().toString() : undefined" (onClick)="notifications.toggle($event)" />
+          <p-popover #notifications>
+            <div class="w-80">
+              <div class="mb-3 flex items-center justify-between">
+                <strong>Alertas</strong>
+                <p-button label="Limpar" severity="danger" [text]="true" size="small" (onClick)="facade.clearNotifications()" />
+              </div>
+              @if (!facade.notifications().length) {
+                <p class="py-6 text-center text-sm text-slate-500">Nenhuma notificacao recente.</p>
+              }
+              <div class="max-h-80 divide-y divide-slate-100 overflow-auto">
+                @for (notification of facade.notifications(); track notification.id) {
+                  <button type="button" class="w-full p-3 text-left hover:bg-slate-50" (click)="facade.markAsRead(notification.id)">
+                    <div class="flex items-center justify-between gap-2">
+                      <strong class="text-sm">{{ notification.title }}</strong>
+                      <p-tag [value]="notification.type" [severity]="notification.type === 'danger' ? 'danger' : notification.type === 'warning' ? 'warn' : notification.type === 'success' ? 'success' : 'info'" />
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">{{ notification.message }}</p>
+                    <span class="mt-2 block text-xs text-slate-400">{{ notification.date | date:'dd/MM HH:mm' }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+          </p-popover>
+
+          <p-select
+            [options]="zoomOptions"
+            [ngModel]="uiZoom()"
+            (ngModelChange)="uiZoom.set($any($event))"
+            optionLabel="label"
+            optionValue="value"
+            size="small"
+            styleClass="zoom-select hidden xl:flex"
+          />
+
+          <p-button icon="pi pi-sign-out" severity="secondary" [text]="true" pTooltip="Sair" (onClick)="facade.logout()" />
+        </div>
+      </ng-template>
+    </p-toolbar>
+
+    <section class="min-h-0 flex-1 overflow-auto p-4 md:p-6">
+      @if (facade.isReadOnly()) {
+        <p-message severity="info" text="Perfil de contador ativo: operacao em modo somente leitura para auditoria e exportacao." styleClass="mb-4" />
+      }
+
+      <router-outlet />
+    </section>
+  </main>
+</div>
+
+<p-dialog
+  [modal]="true"
+  [visible]="facade.upgradeDialogVisible()"
+  (visibleChange)="facade.upgradeDialogVisible.set($event)"
+  [draggable]="false"
+  [resizable]="false"
+  [closable]="false"
+  [style]="{width: 'min(96vw, 650px)'}"
+  styleClass="license-upgrade-dialog"
+  maskStyleClass="license-upgrade-mask"
+>
+  <div class="license-modal">
+    <header class="license-header">
+      <div>
+        <h2>Upgrade de Licenca BraSeller</h2>
+        <p>Selecione um plano profissional para acoplar os conectores Shopee e Amazon.</p>
+      </div>
+      <p-button icon="pi pi-times" severity="secondary" [text]="true" rounded="true" ariaLabel="Fechar" (onClick)="facade.upgradeDialogVisible.set(false)" />
+    </header>
+
+    <section class="license-plans">
+      @for (plan of licensePlans; track plan.name) {
+        <article class="license-plan" [class.license-plan-pro]="plan.variant === 'pro'" [class.license-plan-corporate]="plan.variant === 'corporate'">
+          @if (plan.recommended) {
+            <span class="recommended-badge">Recomendado</span>
+          }
+
+          <p class="plan-name">{{ plan.name }}</p>
+          <div class="plan-price">
+            <span>R$</span>
+            <strong>{{ plan.price }}</strong>
+            <small>/mes</small>
+          </div>
+          <p class="plan-description">{{ plan.description }}</p>
+
+          <ul class="plan-features">
+            @for (feature of plan.features; track feature.label) {
+              <li [class.disabled-feature]="!feature.enabled">
+                <i [class]="feature.enabled ? 'pi pi-check' : 'pi pi-times'"></i>
+                <span>{{ feature.label }}</span>
+              </li>
+            }
+          </ul>
+
+          <p-button
+            [label]="plan.action"
+            [severity]="plan.variant === 'basic' ? 'secondary' : undefined"
+            [outlined]="plan.variant === 'basic'"
+            styleClass="plan-action"
+            (onClick)="facade.confirmUpgrade(plan.plan)"
+          />
+        </article>
+      }
+    </section>
+
+    <footer class="license-footer">
+      <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="facade.upgradeDialogVisible.set(false)" />
+    </footer>
+  </div>
+</p-dialog>

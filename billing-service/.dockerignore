@@ -1,0 +1,9 @@
+.git/
+.idea/
+.quarkus/
+.certs/
+target/
+*.iml
+*.log
+.env
+src/main/docker/

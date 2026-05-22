@@ -1,0 +1,319 @@
+name: brasaller
+
+x-service-env: &service-env
+  QUARKUS_PROFILE: prod
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4200}
+  LOG_JSON: ${LOG_JSON:-true}
+  HTTP_ACCESS_LOG_ENABLED: ${HTTP_ACCESS_LOG_ENABLED:-true}
+  JAVA_MAX_MEM_RATIO: ${JAVA_MAX_MEM_RATIO:-75}
+  DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-2}
+  DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-16}
+  DB_ACQUISITION_TIMEOUT: ${DB_ACQUISITION_TIMEOUT:-5S}
+  FLYWAY_MIGRATE_AT_START: ${FLYWAY_MIGRATE_AT_START:-true}
+  SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+  AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-brasaller-auth}
+  AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-brasaller-platform}
+  AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-only-change-me-please-32-bytes-minimum}
+  AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
+  AUTH_REFRESH_TOKEN_TTL_SECONDS: ${AUTH_REFRESH_TOKEN_TTL_SECONDS:-604800}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-dev-internal-token-change-me}
+
+x-service-healthcheck: &service-healthcheck
+  test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/q/health/ready >/dev/null || exit 1"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 45s
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  mem_limit: 512m
+  cpus: 0.75
+  healthcheck: *service-healthcheck
+  networks:
+    - brasaller-net
+
+x-postgres-defaults: &postgres-defaults
+  image: postgres:17-alpine
+  restart: unless-stopped
+  shm_size: 128mb
+  mem_limit: 512m
+  cpus: 0.75
+  environment:
+    POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 20s
+  networks:
+    - brasaller-net
+
+services:
+  gateway-api-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${GATEWAY_DB_NAME:-gateway_api}
+      POSTGRES_USER: ${GATEWAY_DB_USERNAME:-gateway_api}
+      POSTGRES_PASSWORD: ${GATEWAY_DB_PASSWORD:-gateway_api_password}
+    ports:
+      - "${GATEWAY_DB_PORT:-5432}:5432"
+    volumes:
+      - gateway-api-postgres-data:/var/lib/postgresql/data
+
+  core-service-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${CORE_DB_NAME:-core_service}
+      POSTGRES_USER: ${CORE_DB_USERNAME:-core_service}
+      POSTGRES_PASSWORD: ${CORE_DB_PASSWORD:-core_service_password}
+    ports:
+      - "${CORE_DB_PORT:-5433}:5432"
+    volumes:
+      - core-service-postgres-data:/var/lib/postgresql/data
+
+  billing-service-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${BILLING_DB_NAME:-billing_service}
+      POSTGRES_USER: ${BILLING_DB_USERNAME:-billing_service}
+      POSTGRES_PASSWORD: ${BILLING_DB_PASSWORD:-billing_service_password}
+    ports:
+      - "${BILLING_DB_PORT:-5434}:5432"
+    volumes:
+      - billing-service-postgres-data:/var/lib/postgresql/data
+
+  notification-service-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${NOTIFICATION_DB_NAME:-notification_service}
+      POSTGRES_USER: ${NOTIFICATION_DB_USERNAME:-notification_service}
+      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_service_password}
+    ports:
+      - "${NOTIFICATION_DB_PORT:-5435}:5432"
+    volumes:
+      - notification-service-postgres-data:/var/lib/postgresql/data
+
+  user-service-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${USER_DB_NAME:-user_service}
+      POSTGRES_USER: ${USER_DB_USERNAME:-user_service}
+      POSTGRES_PASSWORD: ${USER_DB_PASSWORD:-user_service_password}
+    ports:
+      - "${USER_DB_PORT:-5436}:5432"
+    volumes:
+      - user-service-postgres-data:/var/lib/postgresql/data
+
+  auth-service-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_service}
+      POSTGRES_USER: ${AUTH_DB_USERNAME:-auth_service}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-auth_service_password}
+    ports:
+      - "${AUTH_DB_PORT:-5437}:5432"
+    volumes:
+      - auth-service-postgres-data:/var/lib/postgresql/data
+
+  gateway-api:
+    <<: *service-defaults
+    image: brasaller/gateway-api:local
+    build:
+      context: ./gateway-api
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${GATEWAY_DB_USERNAME:-gateway_api}
+      DB_PASSWORD: ${GATEWAY_DB_PASSWORD:-gateway_api_password}
+      DB_JDBC_URL: jdbc:postgresql://gateway-api-postgres:5432/${GATEWAY_DB_NAME:-gateway_api}
+      CORE_SERVICE_URL: http://core-service:8080
+      BILLING_SERVICE_URL: http://billing-service:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service:8080
+      USER_SERVICE_URL: http://user-service:8080
+      AUTH_SERVICE_URL: http://auth-service:8080
+    depends_on:
+      gateway-api-postgres:
+        condition: service_healthy
+    ports:
+      - "${GATEWAY_API_PORT:-8080}:8080"
+
+  core-service:
+    <<: *service-defaults
+    image: brasaller/core-service:local
+    build:
+      context: ./core-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${CORE_DB_USERNAME:-core_service}
+      DB_PASSWORD: ${CORE_DB_PASSWORD:-core_service_password}
+      DB_JDBC_URL: jdbc:postgresql://core-service-postgres:5432/${CORE_DB_NAME:-core_service}
+    depends_on:
+      core-service-postgres:
+        condition: service_healthy
+    ports:
+      - "${CORE_SERVICE_PORT:-8081}:8080"
+
+  billing-service:
+    <<: *service-defaults
+    image: brasaller/billing-service:local
+    build:
+      context: ./billing-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${BILLING_DB_USERNAME:-billing_service}
+      DB_PASSWORD: ${BILLING_DB_PASSWORD:-billing_service_password}
+      DB_JDBC_URL: jdbc:postgresql://billing-service-postgres:5432/${BILLING_DB_NAME:-billing_service}
+    depends_on:
+      billing-service-postgres:
+        condition: service_healthy
+    ports:
+      - "${BILLING_SERVICE_PORT:-8082}:8080"
+
+  notification-service:
+    <<: *service-defaults
+    image: brasaller/notification-service:local
+    build:
+      context: ./notification-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-notification_service}
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_service_password}
+      DB_JDBC_URL: jdbc:postgresql://notification-service-postgres:5432/${NOTIFICATION_DB_NAME:-notification_service}
+    depends_on:
+      notification-service-postgres:
+        condition: service_healthy
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8083}:8080"
+
+  user-service:
+    <<: *service-defaults
+    image: brasaller/user-service:local
+    build:
+      context: ./user-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${USER_DB_USERNAME:-user_service}
+      DB_PASSWORD: ${USER_DB_PASSWORD:-user_service_password}
+      DB_JDBC_URL: jdbc:postgresql://user-service-postgres:5432/${USER_DB_NAME:-user_service}
+    depends_on:
+      user-service-postgres:
+        condition: service_healthy
+    ports:
+      - "${USER_SERVICE_PORT:-8084}:8080"
+
+  auth-service:
+    <<: *service-defaults
+    image: brasaller/auth-service:local
+    build:
+      context: ./auth-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${AUTH_DB_USERNAME:-auth_service}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth_service_password}
+      DB_JDBC_URL: jdbc:postgresql://auth-service-postgres:5432/${AUTH_DB_NAME:-auth_service}
+      USER_SERVICE_URL: http://user-service:8080
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-not-configured}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8085/auth/oauth/google/callback}
+    depends_on:
+      auth-service-postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    ports:
+      - "${AUTH_SERVICE_PORT:-8085}:8080"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      gateway-api:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - brasaller-net
+
+  grafana:
+    image: grafana/grafana-oss:12.1.1
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.50
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_LOG_MODE: console
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - brasaller-net
+
+networks:
+  brasaller-net:
+    driver: bridge
+
+volumes:
+  gateway-api-postgres-data:
+  core-service-postgres-data:
+  billing-service-postgres-data:
+  notification-service-postgres-data:
+  user-service-postgres-data:
+  auth-service-postgres-data:
+  grafana-data:

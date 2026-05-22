@@ -1,0 +1,16 @@
+# Workspace
+.idea/
+*.iml
+.vscode/
+
+# Local env
+.env
+*.log
+
+# Maven
+target/
+**/target/
+
+# Docker and OS noise
+.DS_Store
+Thumbs.db

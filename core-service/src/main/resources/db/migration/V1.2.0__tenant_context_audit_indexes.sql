@@ -1,0 +1,2 @@
+CREATE INDEX idx_tenant_context_audit_tenant_created_at ON tenant_context_audit(tenant_id, created_at);
+CREATE INDEX idx_tenant_context_audit_user_created_at ON tenant_context_audit(user_id, created_at);

@@ -1,0 +1,235 @@
+<section class="orders-feature">
+  <div class="orders-filter-panel">
+    <form class="orders-filter-grid" [formGroup]="facade.filterForm">
+      <div class="field-block">
+        <span>Filtrar canal</span>
+        <p-select [options]="platformOptions" optionLabel="label" optionValue="value" formControlName="platform" styleClass="orders-select" />
+      </div>
+
+      <div class="field-block">
+        <span>Status lancamento</span>
+        <p-select [options]="statusOptions" optionLabel="label" optionValue="value" formControlName="status" styleClass="orders-select" />
+      </div>
+
+      <label class="field-block search-field">
+        Pesquisa textual
+        <span class="search-input-wrap">
+          <i class="pi pi-search"></i>
+          <input pInputText formControlName="search" placeholder="Nome do comprador, ID, nota fiscal..." />
+        </span>
+      </label>
+
+      <p-button label="Reset" icon="pi pi-filter-slash" severity="secondary" [outlined]="true" size="small" styleClass="reset-button" (onClick)="facade.clearFilters()" />
+    </form>
+  </div>
+
+  <div class="orders-actions-row">
+    <div>
+      <h2>Resultado dos registros consolidado</h2>
+      <p>Total localizado: {{ facade.orders().length }} lancamentos fiscais disponiveis.</p>
+    </div>
+
+    <div class="orders-actions">
+      <p-button label="Lancamento Manual (Sem API)" icon="pi pi-plus-circle" severity="success" [disabled]="facade.isReadOnly()" styleClass="manual-action" (onClick)="facade.openManualOrder()" />
+      <p-button label="CSV" icon="pi pi-download" severity="secondary" [outlined]="true" styleClass="export-action" (onClick)="facade.exportCSV()" />
+      <p-button label="Excel" icon="pi pi-download" severity="secondary" [outlined]="true" styleClass="export-action" (onClick)="facade.exportExcel()" />
+      <p-button label="Contador PDF" icon="pi pi-file-pdf" styleClass="pdf-action" (onClick)="facade.exportPDFContador()" />
+    </div>
+  </div>
+
+  <div class="orders-table-shell">
+    <p-table [value]="facade.orders()" [paginator]="true" [rows]="12" [rowsPerPageOptions]="[12, 25, 50]" [tableStyle]="{'min-width': '58rem'}" styleClass="fiscal-table">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>ID Pedido / Canal</th>
+          <th>Data do Lancamento</th>
+          <th>Cliente / Comprador</th>
+          <th>Nota Fiscal (NF-e)</th>
+          <th class="text-right">Valor Bruto (A)</th>
+          <th class="text-right">Taxa Retida (B)</th>
+          <th class="text-right">Valor Liquido (A-B)</th>
+          <th>Status</th>
+          <th class="text-center">Acao</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-order>
+        <tr>
+          <td>
+            <div class="order-id-cell">
+              <span class="channel-dot"></span>
+              <div>
+                <strong>{{ order.order_id }}</strong>
+                <small>{{ facade.getPlatformName(order.platform) }}</small>
+              </div>
+            </div>
+          </td>
+          <td>
+            <strong class="table-primary">{{ order.date | date:'dd MMM, yyyy HH:mm':'':'pt-BR' }}</strong>
+            <small class="table-secondary">{{ order.payment_method }}</small>
+          </td>
+          <td>{{ order.buyer_name }}</td>
+          <td><span class="invoice-pill">{{ order.invoice_number || 'SEM-NF' }}</span></td>
+          <td class="text-right money-gross">{{ order.gross_value | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</td>
+          <td class="text-right money-fee">{{ order.platform_fee | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</td>
+          <td class="text-right money-net">{{ order.net_value | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</td>
+          <td><p-tag [value]="getStatusLabel(order.status)" [severity]="facade.getStatusSeverity(order.status)" styleClass="status-tag" /></td>
+          <td class="text-center">
+            <p-button label="Dossie" severity="secondary" [outlined]="true" size="small" styleClass="dossier-button" (onClick)="facade.openOrder(order)" />
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="9" class="py-8 text-center text-slate-500">Nenhum lancamento encontrado.</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+</section>
+
+<p-dialog
+  header="Detalhes do lancamento"
+  [modal]="true"
+  [visible]="facade.orderDialogVisible()"
+  (visibleChange)="facade.orderDialogVisible.set($event)"
+  [style]="{width: '48rem'}"
+>
+  @let order = facade.selectedOrder();
+  @if (order) {
+    <div class="grid gap-4">
+      <div class="grid gap-3 md:grid-cols-3">
+        <p-card>
+          <p class="text-sm text-slate-500">Pedido</p>
+          <strong>{{ order.order_id }}</strong>
+        </p-card>
+        <p-card>
+          <p class="text-sm text-slate-500">Canal</p>
+          <strong>{{ facade.getPlatformName(order.platform) }}</strong>
+        </p-card>
+        <p-card>
+          <p class="text-sm text-slate-500">Nota fiscal</p>
+          <strong>{{ order.invoice_number || 'Sem NF' }}</strong>
+        </p-card>
+      </div>
+
+      <p-table [value]="order.items">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>Item</th>
+            <th class="text-right">Qtd.</th>
+            <th class="text-right">Unitario</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-item>
+          <tr>
+            <td>{{ item.name }}</td>
+            <td class="text-right">{{ item.qty }}</td>
+            <td class="text-right">{{ item.unit_price | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </div>
+  }
+</p-dialog>
+
+<p-dialog
+  [modal]="true"
+  [visible]="facade.manualDialogVisible()"
+  (visibleChange)="facade.manualDialogVisible.set($event)"
+  [draggable]="false"
+  [resizable]="false"
+  [closable]="false"
+  [showHeader]="false"
+  [style]="{width: 'min(94vw, 520px)'}"
+  styleClass="manual-order-dialog"
+  maskStyleClass="manual-order-mask"
+>
+  <form class="manual-order-form" [formGroup]="facade.manualForm" (ngSubmit)="facade.submitManualOrder()">
+    <header class="manual-dialog-header">
+      <div class="manual-title-row">
+        <span class="manual-plus"><i class="pi pi-plus"></i></span>
+        <div>
+          <h2>Novo Lancamento Manual</h2>
+          <p>Importacao avulsa para canais sem API (fase 4 - expansao)</p>
+        </div>
+      </div>
+      <p-button icon="pi pi-times" severity="secondary" [text]="true" rounded="true" ariaLabel="Fechar" (onClick)="facade.manualDialogVisible.set(false)" />
+    </header>
+
+    <div class="manual-fields">
+      <section class="manual-section">
+        <span class="manual-section-title">Dados da venda</span>
+        <label class="manual-field full">
+          Nome do comprador *
+          <input pInputText formControlName="buyer_name" placeholder="Ex: Silvio Santos" />
+        </label>
+
+        <label class="manual-field full">
+          Descricao / Produto *
+          <input pInputText formControlName="item_name" placeholder="Ex: Lote Camisetas Bras" />
+        </label>
+      </section>
+
+      <section class="manual-section">
+        <span class="manual-section-title">Valores e documento</span>
+        <div class="manual-two-cols">
+          <div class="manual-field">
+            <span>Quantidade *</span>
+            <p-inputNumber formControlName="qty" [min]="1" styleClass="w-full" inputStyleClass="w-full" />
+          </div>
+          <div class="manual-field">
+            <span>Preco unitario (R$) *</span>
+            <p-inputNumber formControlName="unit_price" mode="decimal" locale="pt-BR" [min]="0" styleClass="w-full" inputStyleClass="w-full" />
+          </div>
+        </div>
+
+        <div class="manual-two-cols">
+          <div class="manual-field">
+            <span>Taxas retidas (R$)</span>
+            <p-inputNumber formControlName="platform_fee" mode="decimal" locale="pt-BR" [min]="0" styleClass="w-full" inputStyleClass="w-full" />
+          </div>
+          <label class="manual-field">
+            Numero nota fiscal
+            <input pInputText formControlName="invoice_number" placeholder="Ex: NF-7890" />
+          </label>
+        </div>
+      </section>
+
+      <section class="manual-section">
+        <span class="manual-section-title">Pagamento e status</span>
+        <div class="manual-two-cols">
+          <div class="manual-field">
+            <span>Modo de pagamento</span>
+            <p-select [options]="paymentOptions" optionLabel="label" optionValue="value" formControlName="payment_method" styleClass="w-full" />
+          </div>
+          <div class="manual-field">
+            <span>Status fiscal</span>
+            <p-select [options]="statusOptions.slice(1)" optionLabel="label" optionValue="value" formControlName="status" styleClass="w-full" />
+          </div>
+        </div>
+      </section>
+
+      <div class="manual-summary">
+        <div>
+          <span>Faturamento Bruto:</span>
+          <strong>{{ getManualGrossValue() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong>
+        </div>
+        <div>
+          <span>Taxas Ajustadas:</span>
+          <strong class="negative">- {{ getManualFeeValue() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong>
+        </div>
+        <div class="net-row">
+          <span>Liquido Estimado:</span>
+          <strong>{{ getManualNetValue() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <footer class="manual-footer">
+      <p-button type="button" label="Voltar" severity="secondary" [outlined]="true" styleClass="manual-back" (onClick)="facade.manualDialogVisible.set(false)" />
+      <p-button type="submit" label="Salvar Lancamento" styleClass="manual-save" [disabled]="facade.manualForm.invalid" />
+    </footer>
+  </form>
+</p-dialog>
