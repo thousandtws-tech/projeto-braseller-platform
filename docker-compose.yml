@@ -144,6 +144,16 @@ services:
     depends_on:
       gateway-api-postgres:
         condition: service_healthy
+      core-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
     ports:
       - "${GATEWAY_API_PORT:-8080}:8080"
 

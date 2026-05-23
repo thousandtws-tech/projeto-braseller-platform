@@ -1,0 +1,82 @@
+package com.example.infrastructure.client;
+
+import com.example.application.dto.DownstreamRequest;
+import com.example.application.dto.GatewayResponse;
+import com.example.application.exception.DownstreamServiceUnavailableException;
+import com.example.application.port.out.DownstreamServiceClient;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.ProcessingException;
+import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriBuilder;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+@ApplicationScoped
+public class RestClientDownstreamServiceClient implements DownstreamServiceClient {
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+            "connection",
+            "content-length",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade"
+    );
+
+    @RestClient
+    DownstreamRestClient restClient;
+
+    @Override
+    public GatewayResponse exchange(DownstreamRequest request) {
+        URI targetUri = buildTargetUri(request);
+        try (Response response = send(request, targetUri)) {
+            return new GatewayResponse(
+                    response.getStatus(),
+                    response.hasEntity() ? response.readEntity(String.class) : "",
+                    copyResponseHeaders(response.getStringHeaders())
+            );
+        } catch (ProcessingException exception) {
+            throw new DownstreamServiceUnavailableException(
+                    request.route().serviceName(),
+                    exception
+            );
+        }
+    }
+
+    private Response send(DownstreamRequest request, URI targetUri) {
+        String target = targetUri.toString();
+        return switch (request.method()) {
+            case "GET" -> restClient.get(target);
+            case "POST" -> restClient.post(target, request.body());
+            case "PUT" -> restClient.put(target, request.body());
+            case "PATCH" -> restClient.patch(target, request.body());
+            case "DELETE" -> restClient.delete(target);
+            default -> throw new IllegalStateException("Unsupported HTTP method already validated: " + request.method());
+        };
+    }
+
+    private URI buildTargetUri(DownstreamRequest request) {
+        UriBuilder builder = UriBuilder.fromUri(request.route().baseUri() + request.downstreamPath());
+        request.queryParameters().forEach((name, values) -> values.forEach(value -> builder.queryParam(name, value)));
+        return builder.build();
+    }
+
+    private Map<String, List<String>> copyResponseHeaders(MultivaluedMap<String, String> headers) {
+        Map<String, List<String>> copiedHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        headers.forEach((name, values) -> {
+            if (!HOP_BY_HOP_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+                copiedHeaders.put(name, List.copyOf(values));
+            }
+        });
+        return copiedHeaders;
+    }
+}

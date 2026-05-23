@@ -1,62 +1,62 @@
 # gateway-api
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Gateway HTTP dos microservices BraSeller usando Quarkus REST e Quarkus REST Client.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Rotas publicas
 
-## Running the application in dev mode
+| Gateway | Downstream |
+| --- | --- |
+| `GET /api` | Lista as rotas configuradas |
+| `/api/auth/**` | `auth-service` em `/auth/**` |
+| `/api/users/**` | `user-service` em `/users/**` |
+| `/api/core/**` | `core-service` em `/core/**` |
+| `/api/billing/**` | `billing-service` em `/billing/**` |
+| `/api/notifications/**` | `notification-service` em `/notifications/**` |
 
-You can run your application in dev mode that enables live coding using:
+O gateway repassa `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept` e `Content-Type`. Endpoints internos do `user-service`, como `/users/internal/**`, ficam bloqueados no gateway.
 
-```shell script
+## Configuracao
+
+```properties
+AUTH_SERVICE_URL=http://localhost:8085
+USER_SERVICE_URL=http://localhost:8084
+CORE_SERVICE_URL=http://localhost:8081
+BILLING_SERVICE_URL=http://localhost:8082
+NOTIFICATION_SERVICE_URL=http://localhost:8083
+GATEWAY_DOWNSTREAM_CONNECT_TIMEOUT_MS=2000
+GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS=8000
+```
+
+No Compose, essas URLs apontam para os nomes dos servicos na rede Docker. Em dev mode, os defaults usam as portas locais do README raiz.
+
+## Swagger UI
+
+O Swagger UI do gateway fica em:
+
+```text
+http://localhost:8080/q/swagger-ui
+```
+
+Ele abre com a spec do `gateway-api` e inclui um seletor para as specs dos microservices:
+
+```properties
+AUTH_SERVICE_OPENAPI_URL=http://localhost:8085/q/openapi
+USER_SERVICE_OPENAPI_URL=http://localhost:8084/q/openapi
+CORE_SERVICE_OPENAPI_URL=http://localhost:8081/q/openapi
+BILLING_SERVICE_OPENAPI_URL=http://localhost:8082/q/openapi
+NOTIFICATION_SERVICE_OPENAPI_URL=http://localhost:8083/q/openapi
+```
+
+Essas URLs precisam ser acessiveis pelo navegador, por isso usam `localhost` no ambiente local mesmo quando o gateway roda em container.
+
+## Desenvolvimento
+
+```shell
 ./mvnw quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+## Testes
 
-## Packaging and running the application
-
-The application can be packaged using:
-
-```shell script
-./mvnw package
+```shell
+./mvnw test
 ```
-
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
-
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/gateway-api-1.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Provided Code
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
