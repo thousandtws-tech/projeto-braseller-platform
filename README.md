@@ -33,6 +33,18 @@ Claims padrao do JWT: `tenant_id`, `user_id`, `email`, `roles` e `groups`. Os pa
 
 Em ambientes fora de desenvolvimento, troque obrigatoriamente `AUTH_JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, senhas dos bancos e credenciais do Grafana.
 
+## Gateway API
+
+O `gateway-api` publica a fachada HTTP em `/api` e encaminha chamadas para os microservices por Quarkus REST Client:
+
+- `/api/auth/**` -> `auth-service` em `/auth/**`.
+- `/api/users/**` -> `user-service` em `/users/**`, com `/users/internal/**` bloqueado no gateway.
+- `/api/core/**` -> `core-service` em `/core/**`.
+- `/api/billing/**` -> `billing-service` em `/billing/**`.
+- `/api/notifications/**` -> `notification-service` em `/notifications/**`.
+
+Headers propagados: `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept` e `Content-Type`. As URLs downstream usam `AUTH_SERVICE_URL`, `USER_SERVICE_URL`, `CORE_SERVICE_URL`, `BILLING_SERVICE_URL` e `NOTIFICATION_SERVICE_URL`; no Compose elas ja apontam para a rede interna Docker.
+
 ## Verificacao local
 
 ```powershell
@@ -62,6 +74,8 @@ Links locais pelo Compose:
 - Notification Service: `http://localhost:8083/q/swagger-ui`
 - User Service: `http://localhost:8084/q/swagger-ui`
 - Auth Service: `http://localhost:8085/q/swagger-ui`
+
+O Swagger UI do Gateway API tambem mostra um seletor com as specs dos microservices. As URLs desse seletor sao configuradas por `AUTH_SERVICE_OPENAPI_URL`, `USER_SERVICE_OPENAPI_URL`, `CORE_SERVICE_OPENAPI_URL`, `BILLING_SERVICE_OPENAPI_URL` e `NOTIFICATION_SERVICE_OPENAPI_URL`; por padrao elas usam `localhost` porque quem baixa as specs e o navegador.
 
 Em producao, faca o build com `SWAGGER_UI_ENABLED=false` e mantenha `/q/openapi` disponivel apenas conforme a politica de rede/seguranca do ambiente.
 

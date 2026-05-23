@@ -2,7 +2,7 @@ name: brasaller
 
 x-service-env: &service-env
   QUARKUS_PROFILE: prod
-  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4200}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4200,https://app.apidog.com}
   LOG_JSON: ${LOG_JSON:-true}
   HTTP_ACCESS_LOG_ENABLED: ${HTTP_ACCESS_LOG_ENABLED:-true}
   JAVA_MAX_MEM_RATIO: ${JAVA_MAX_MEM_RATIO:-75}
@@ -143,6 +143,16 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8080
     depends_on:
       gateway-api-postgres:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      auth-service:
         condition: service_healthy
     ports:
       - "${GATEWAY_API_PORT:-8080}:8080"
