@@ -13,7 +13,7 @@ Gateway HTTP dos microservices BraSeller usando Quarkus REST e Quarkus REST Clie
 | `/api/billing/**` | `billing-service` em `/billing/**` |
 | `/api/notifications/**` | `notification-service` em `/notifications/**` |
 
-O gateway repassa `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept` e `Content-Type`. Endpoints internos do `user-service`, como `/users/internal/**`, ficam bloqueados no gateway.
+O gateway repassa `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept` e `Content-Type`. Endpoints internos do `user-service`, como `/users/internal/**`, e eventos internos do `notification-service`, como `/notifications/events/**`, ficam bloqueados no gateway.
 
 ## Configuracao
 
@@ -24,10 +24,10 @@ CORE_SERVICE_URL=http://localhost:8081
 BILLING_SERVICE_URL=http://localhost:8082
 NOTIFICATION_SERVICE_URL=http://localhost:8083
 GATEWAY_DOWNSTREAM_CONNECT_TIMEOUT_MS=2000
-GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS=8000
+GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS=30000
 ```
 
-No Compose, essas URLs apontam para os nomes dos servicos na rede Docker. Em dev mode, os defaults usam as portas locais do README raiz.
+No Compose, essas URLs apontam para os nomes dos servicos na rede Docker. Em dev mode, os defaults usam as portas locais do README raiz. O timeout de leitura fica em 30s para cobrir fluxos de cadastro que chamam `auth-service`, `user-service` e Keycloak em sequencia.
 
 ## Swagger UI
 

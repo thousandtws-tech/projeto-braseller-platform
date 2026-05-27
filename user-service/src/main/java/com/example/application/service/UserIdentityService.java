@@ -2,10 +2,10 @@ package com.example.application.service;
 
 import com.example.application.command.GrantAccountantAccessCommand;
 import com.example.application.command.RegisterTenantCommand;
+import com.example.application.command.SyncExternalProfileCommand;
 import com.example.application.command.VerifyPasswordCommand;
 import com.example.application.exception.ConflictException;
 import com.example.application.exception.ForbiddenException;
-import com.example.application.exception.TenantMismatchException;
 import com.example.application.exception.ValidationException;
 import com.example.application.port.out.InternalServiceAuthorizer;
 import com.example.application.port.out.PasswordHasher;
@@ -71,10 +71,7 @@ public class UserIdentityService {
         }
     }
 
-    public List<UserView> listTenantMembers(String tenantId, String tenantHeader) {
-        if (tenantHeader != null && !tenantHeader.equals(tenantId)) {
-            throw new TenantMismatchException();
-        }
+    public List<UserView> listTenantMembers(String tenantId) {
         return userIdentityRepository.listTenantUsers(tenantId);
     }
 
@@ -91,12 +88,40 @@ public class UserIdentityService {
                 .map(this::toVerification);
     }
 
+    public Optional<UserView> syncExternalProfile(String internalToken, SyncExternalProfileCommand command) {
+        if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
+            throw new ForbiddenException("invalid_internal_token");
+        }
+        if (isBlank(command.email()) || isBlank(command.provider()) || isBlank(command.providerSubject())) {
+            throw new ValidationException("email, provider and providerSubject are required");
+        }
+
+        return userIdentityRepository.syncExternalProfile(
+                command.email().trim(),
+                command.provider().trim().toUpperCase(),
+                command.providerSubject().trim(),
+                blankToNull(command.fullName()),
+                blankToNull(command.preferredUsername()),
+                blankToNull(command.firstName()),
+                blankToNull(command.lastName()),
+                blankToNull(command.pictureUrl()),
+                command.emailVerified()
+        );
+    }
+
     private IdentityVerification toVerification(StoredUserCredentials credentials) {
         return new IdentityVerification(
                 credentials.userId(),
                 credentials.tenantId(),
                 credentials.email(),
                 credentials.fullName(),
+                credentials.preferredUsername(),
+                credentials.firstName(),
+                credentials.lastName(),
+                credentials.pictureUrl(),
+                credentials.emailVerified(),
+                credentials.provider(),
+                credentials.providerSubject(),
                 credentials.roles()
         );
     }

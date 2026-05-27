@@ -1,0 +1,8 @@
+package com.example.domain.model;
+
+public enum NotificationType {
+    MONTHLY_CLOSING_SUMMARY,
+    ML_PAYMENT_RELEASE_SOON,
+    NEW_SALE,
+    WEEKLY_ACCOUNTANT_REPORT
+}

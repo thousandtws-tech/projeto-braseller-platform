@@ -44,7 +44,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                 connection.commit();
                 return new RegisteredTenant(
                         new TenantView(tenantId, legalName, tradeName, "ACTIVE"),
-                        new UserView(userId, tenantId, email, adminName, "ACTIVE", List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()))
+                        new UserView(userId, tenantId, email, adminName, email, null, null, null, true,
+                                "PASSWORD", null, "ACTIVE", List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()))
                 );
             } catch (SQLException exception) {
                 connection.rollback();
@@ -109,7 +110,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     public List<UserView> listTenantUsers(String tenantId) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT id, tenant_id, email, full_name, status
+                     SELECT id, tenant_id, email, full_name, preferred_username, first_name, last_name, picture_url,
+                            email_verified, provider, provider_subject, status
                      FROM user_accounts
                      WHERE tenant_id = ?
                      ORDER BY created_at ASC
@@ -119,14 +121,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     String userId = resultSet.getString("id");
-                    users.add(new UserView(
-                            userId,
-                            resultSet.getString("tenant_id"),
-                            resultSet.getString("email"),
-                            resultSet.getString("full_name"),
-                            resultSet.getString("status"),
-                            listRoles(connection, tenantId, userId)
-                    ));
+                    users.add(toUserView(connection, resultSet, tenantId, userId));
                 }
             }
             return users;
@@ -139,7 +134,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     public Optional<StoredUserCredentials> findActiveCredentialsByEmail(String email) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT id, tenant_id, email, full_name, password_hash, status
+                     SELECT id, tenant_id, email, full_name, preferred_username, first_name, last_name, picture_url,
+                            email_verified, provider, provider_subject, password_hash, status
                      FROM user_accounts
                      WHERE email_normalized = ?
                      """)) {
@@ -155,12 +151,69 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                         tenantId,
                         resultSet.getString("email"),
                         resultSet.getString("full_name"),
+                        resultSet.getString("preferred_username"),
+                        resultSet.getString("first_name"),
+                        resultSet.getString("last_name"),
+                        resultSet.getString("picture_url"),
+                        resultSet.getBoolean("email_verified"),
+                        resultSet.getString("provider"),
+                        resultSet.getString("provider_subject"),
                         resultSet.getString("password_hash"),
                         listRoles(connection, tenantId, userId)
                 ));
             }
         } catch (SQLException exception) {
             throw new RepositoryException("Could not verify identity", exception);
+        }
+    }
+
+    @Override
+    public Optional<UserView> syncExternalProfile(
+            String email,
+            String provider,
+            String providerSubject,
+            String fullName,
+            String preferredUsername,
+            String firstName,
+            String lastName,
+            String pictureUrl,
+            boolean emailVerified
+    ) {
+        String normalizedEmail = normalizeEmail(email);
+        try (Connection connection = dataSource.getConnection()) {
+            int updated;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE user_accounts
+                    SET full_name = COALESCE(NULLIF(?, ''), full_name),
+                        provider = ?,
+                        provider_subject = ?,
+                        preferred_username = COALESCE(NULLIF(?, ''), preferred_username),
+                        first_name = COALESCE(NULLIF(?, ''), first_name),
+                        last_name = COALESCE(NULLIF(?, ''), last_name),
+                        picture_url = COALESCE(NULLIF(?, ''), picture_url),
+                        email_verified = ?,
+                        updated_at = ?
+                    WHERE email_normalized = ?
+                      AND status = 'ACTIVE'
+                    """)) {
+                statement.setString(1, trimToEmpty(fullName));
+                statement.setString(2, provider);
+                statement.setString(3, providerSubject);
+                statement.setString(4, trimToEmpty(preferredUsername));
+                statement.setString(5, trimToEmpty(firstName));
+                statement.setString(6, trimToEmpty(lastName));
+                statement.setString(7, trimToEmpty(pictureUrl));
+                statement.setBoolean(8, emailVerified);
+                statement.setTimestamp(9, Timestamp.from(Instant.now()));
+                statement.setString(10, normalizedEmail);
+                updated = statement.executeUpdate();
+            }
+            if (updated == 0) {
+                return Optional.empty();
+            }
+            return findActiveUserByEmail(connection, normalizedEmail);
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not synchronize external profile", exception);
         }
     }
 
@@ -191,8 +244,9 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     ) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO user_accounts
-                (id, tenant_id, email, email_normalized, full_name, password_hash, provider, provider_subject, status, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, tenant_id, email, email_normalized, full_name, password_hash, provider, provider_subject,
+                 preferred_username, email_verified, status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, userId);
             statement.setString(2, tenantId);
@@ -202,8 +256,10 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             statement.setString(6, passwordHash);
             statement.setString(7, provider);
             statement.setString(8, providerSubject);
-            statement.setString(9, status);
-            statement.setTimestamp(10, Timestamp.from(Instant.now()));
+            statement.setString(9, email);
+            statement.setBoolean(10, true);
+            statement.setString(11, status);
+            statement.setTimestamp(12, Timestamp.from(Instant.now()));
             statement.executeUpdate();
         }
     }
@@ -259,6 +315,48 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             }
             return roles;
         }
+    }
+
+    private Optional<UserView> findActiveUserByEmail(Connection connection, String normalizedEmail) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT id, tenant_id, email, full_name, preferred_username, first_name, last_name, picture_url,
+                       email_verified, provider, provider_subject, status
+                FROM user_accounts
+                WHERE email_normalized = ?
+                  AND status = 'ACTIVE'
+                """)) {
+            statement.setString(1, normalizedEmail);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                String tenantId = resultSet.getString("tenant_id");
+                String userId = resultSet.getString("id");
+                return Optional.of(toUserView(connection, resultSet, tenantId, userId));
+            }
+        }
+    }
+
+    private UserView toUserView(Connection connection, ResultSet resultSet, String tenantId, String userId) throws SQLException {
+        return new UserView(
+                userId,
+                tenantId,
+                resultSet.getString("email"),
+                resultSet.getString("full_name"),
+                resultSet.getString("preferred_username"),
+                resultSet.getString("first_name"),
+                resultSet.getString("last_name"),
+                resultSet.getString("picture_url"),
+                resultSet.getBoolean("email_verified"),
+                resultSet.getString("provider"),
+                resultSet.getString("provider_subject"),
+                resultSet.getString("status"),
+                listRoles(connection, tenantId, userId)
+        );
+    }
+
+    private String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String normalizeEmail(String email) {

@@ -8,7 +8,7 @@ import com.example.application.exception.FeatureNotConfiguredException;
 import com.example.application.exception.IdentityGatewayException;
 import com.example.application.exception.ValidationException;
 import com.example.application.service.AuthenticationService;
-import com.example.application.service.GoogleOAuthService;
+import com.example.application.service.KeycloakOAuthService;
 import com.example.domain.model.AuthTokenSet;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -29,13 +29,13 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Path("/auth")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "Auth", description = "Cadastro, login, refresh token, logout e OAuth.")
+@Tag(name = "Auth", description = "Cadastro, login, refresh token, logout e OAuth via Keycloak.")
 public class AuthResource {
     @Inject
     AuthenticationService authenticationService;
 
     @Inject
-    GoogleOAuthService googleOAuthService;
+    KeycloakOAuthService keycloakOAuthService;
 
     @GET
     @Produces(MediaType.TEXT_PLAIN)
@@ -47,7 +47,7 @@ public class AuthResource {
 
     @POST
     @Path("/register")
-    @Operation(summary = "Cadastrar vendedor", description = "Cria tenant e usuario admin/vendedor no user-service e emite tokens JWT.")
+    @Operation(summary = "Cadastrar vendedor", description = "Cria tenant/usuario no user-service, cria o usuario no Keycloak e emite JWT da plataforma com refresh token Keycloak.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RegisterRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Cadastro realizado e tokens emitidos.",
@@ -69,6 +69,10 @@ public class AuthResource {
             ))).build();
         } catch (ValidationException exception) {
             return badRequest(exception.getMessage());
+        } catch (FeatureNotConfiguredException exception) {
+            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
+        } catch (AuthenticationException exception) {
+            return Response.status(Response.Status.BAD_GATEWAY).entity(new RestError(exception.getMessage())).build();
         } catch (IdentityGatewayException exception) {
             return identityGatewayFailure(exception);
         }
@@ -76,7 +80,7 @@ public class AuthResource {
 
     @POST
     @Path("/login")
-    @Operation(summary = "Login com e-mail e senha", description = "Valida credenciais no user-service e emite access token + refresh token.")
+    @Operation(summary = "Login", description = "Autentica e-mail/senha no Keycloak e emite access token da plataforma + refresh token Keycloak.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = LoginRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Login realizado.",
@@ -93,6 +97,8 @@ public class AuthResource {
             return Response.ok(authenticationService.login(new LoginCommand(request.email(), request.password()))).build();
         } catch (ValidationException exception) {
             return badRequest(exception.getMessage());
+        } catch (FeatureNotConfiguredException exception) {
+            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
         } catch (AuthenticationException exception) {
             return Response.status(Response.Status.UNAUTHORIZED).entity(new RestError(exception.getMessage())).build();
         } catch (IdentityGatewayException exception) {
@@ -102,7 +108,7 @@ public class AuthResource {
 
     @POST
     @Path("/refresh")
-    @Operation(summary = "Renovar access token", description = "Emite novo access token usando um refresh token valido e nao revogado.")
+    @Operation(summary = "Renovar access token", description = "Renova a sessao no Keycloak e emite novo access token da plataforma.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RefreshRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Token renovado.",
@@ -117,6 +123,8 @@ public class AuthResource {
             return Response.ok(authenticationService.refresh(new RefreshTokenCommand(request.refreshToken()))).build();
         } catch (ValidationException exception) {
             return badRequest(exception.getMessage());
+        } catch (FeatureNotConfiguredException exception) {
+            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
         } catch (AuthenticationException exception) {
             return Response.status(Response.Status.UNAUTHORIZED).entity(new RestError(exception.getMessage())).build();
         }
@@ -124,7 +132,7 @@ public class AuthResource {
 
     @POST
     @Path("/logout")
-    @Operation(summary = "Logout", description = "Revoga o refresh token informado.")
+    @Operation(summary = "Logout", description = "Revoga a sessao/refresh token no Keycloak.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RefreshRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Resultado da revogacao.",
@@ -137,23 +145,53 @@ public class AuthResource {
             return Response.ok(new LogoutResponse(authenticationService.logout(new RefreshTokenCommand(request.refreshToken())))).build();
         } catch (ValidationException exception) {
             return badRequest(exception.getMessage());
+        } catch (FeatureNotConfiguredException exception) {
+            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
+        } catch (AuthenticationException exception) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity(new RestError(exception.getMessage())).build();
         }
     }
 
     @GET
     @Path("/oauth/google/authorize-url")
-    @Operation(summary = "Gerar URL OAuth Google", description = "Retorna a URL de autorizacao Google quando GOOGLE_CLIENT_ID estiver configurado.")
+    @Operation(summary = "Gerar URL OAuth Google", description = "Retorna a URL de autorizacao do Keycloak com kc_idp_hint=google.")
     @APIResponses({
             @APIResponse(responseCode = "200", description = "URL de autorizacao gerada.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = GoogleAuthorizeUrlResponse.class))),
-            @APIResponse(responseCode = "501", description = "OAuth Google nao configurado.",
+            @APIResponse(responseCode = "501", description = "OAuth Keycloak/Google nao configurado.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
     })
     public Response googleAuthorizeUrl() {
         try {
-            return Response.ok(new GoogleAuthorizeUrlResponse(googleOAuthService.authorizationUrl())).build();
+            return Response.ok(new GoogleAuthorizeUrlResponse(keycloakOAuthService.googleAuthorizationUrl())).build();
         } catch (FeatureNotConfiguredException exception) {
             return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
+        }
+    }
+
+    @POST
+    @Path("/oauth/google/callback")
+    @Operation(summary = "Login/cadastro OAuth Google", description = "Troca no Keycloak o code recebido pelo broker Google. Se o e-mail ja existir, faz login; se nao existir, cria tenant/usuario usando tenantName.")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = GoogleCallbackRequest.class)))
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Login ou cadastro Google realizado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = AuthTokenSet.class))),
+            @APIResponse(responseCode = "401", description = "Code ou identidade Google invalida.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "501", description = "OAuth Keycloak/Google nao configurado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
+    })
+    public Response googleCallback(GoogleCallbackRequest request) {
+        try {
+            return Response.ok(keycloakOAuthService.googleCallback(request.code(), request.tenantName())).build();
+        } catch (FeatureNotConfiguredException exception) {
+            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        } catch (AuthenticationException exception) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity(new RestError(exception.getMessage())).build();
+        } catch (IdentityGatewayException exception) {
+            return identityGatewayFailure(exception);
         }
     }
 
@@ -178,11 +216,11 @@ public class AuthResource {
     public record RegisterRequest(String tenantName, String fullName, String email, String password) {
     }
 
-    @Schema(name = "AuthLoginRequest", description = "Credenciais de e-mail e senha.")
+    @Schema(name = "AuthLoginRequest", description = "Credenciais de e-mail/senha autenticadas no Keycloak.")
     public record LoginRequest(String email, String password) {
     }
 
-    @Schema(name = "AuthRefreshRequest", description = "Refresh token emitido pelo auth-service.")
+    @Schema(name = "AuthRefreshRequest", description = "Refresh token emitido pelo Keycloak e retornado pelo auth-service.")
     public record RefreshRequest(String refreshToken) {
     }
 
@@ -193,4 +231,9 @@ public class AuthResource {
     @Schema(name = "GoogleAuthorizeUrlResponse", description = "URL para iniciar OAuth Google.")
     public record GoogleAuthorizeUrlResponse(String authorizeUrl) {
     }
+
+    @Schema(name = "GoogleCallbackRequest", description = "Code retornado pelo broker Google do Keycloak. tenantName e obrigatorio apenas para primeiro cadastro.")
+    public record GoogleCallbackRequest(String code, String tenantName) {
+    }
+
 }

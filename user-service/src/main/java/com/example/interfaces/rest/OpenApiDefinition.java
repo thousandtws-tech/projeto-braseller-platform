@@ -8,6 +8,7 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeIn;
 import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.eclipse.microprofile.openapi.annotations.security.SecuritySchemes;
 
 @OpenAPIDefinition(
         info = @Info(
@@ -21,13 +22,22 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
                 @Tag(name = "Users", description = "Tenants, usuarios, papeis e acesso secundario do contador.")
         }
 )
-@SecurityScheme(
-        securitySchemeName = "internalToken",
-        type = SecuritySchemeType.APIKEY,
-        in = SecuritySchemeIn.HEADER,
-        apiKeyName = "X-Internal-Token",
-        description = "Token interno usado em chamadas service-to-service."
-)
+@SecuritySchemes({
+        @SecurityScheme(
+                securitySchemeName = "bearerAuth",
+                type = SecuritySchemeType.HTTP,
+                scheme = "bearer",
+                bearerFormat = "JWT",
+                description = "JWT emitido pelo auth-service."
+        ),
+        @SecurityScheme(
+                securitySchemeName = "internalToken",
+                type = SecuritySchemeType.APIKEY,
+                in = SecuritySchemeIn.HEADER,
+                apiKeyName = "X-Internal-Token",
+                description = "Token interno usado em chamadas service-to-service."
+        )
+})
 final class OpenApiDefinition {
     private OpenApiDefinition() {
     }

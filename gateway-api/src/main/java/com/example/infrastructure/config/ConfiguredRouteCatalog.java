@@ -27,7 +27,7 @@ public class ConfiguredRouteCatalog implements RouteCatalog {
                 new DownstreamRoute("users", "user-service", URI.create(userServiceUrl), "/users", List.of("internal")),
                 new DownstreamRoute("core", "core-service", URI.create(coreServiceUrl), "/core"),
                 new DownstreamRoute("billing", "billing-service", URI.create(billingServiceUrl), "/billing"),
-                new DownstreamRoute("notifications", "notification-service", URI.create(notificationServiceUrl), "/notifications")
+                new DownstreamRoute("notifications", "notification-service", URI.create(notificationServiceUrl), "/notifications", List.of("events"))
         );
     }
 

@@ -2,7 +2,7 @@ name: brasaller
 
 x-service-env: &service-env
   QUARKUS_PROFILE: prod
-  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4200,https://app.apidog.com}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4200,http://localhost:8080,https://app.apidog.com,https://aistudio.google.com}
   LOG_JSON: ${LOG_JSON:-true}
   HTTP_ACCESS_LOG_ENABLED: ${HTTP_ACCESS_LOG_ENABLED:-true}
   JAVA_MAX_MEM_RATIO: ${JAVA_MAX_MEM_RATIO:-75}
@@ -15,8 +15,12 @@ x-service-env: &service-env
   AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-brasaller-platform}
   AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-only-change-me-please-32-bytes-minimum}
   AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
-  AUTH_REFRESH_TOKEN_TTL_SECONDS: ${AUTH_REFRESH_TOKEN_TTL_SECONDS:-604800}
   INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-dev-internal-token-change-me}
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9093}
+  BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE: ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE:-brasaller.notifications.new-sale.v1}
+  BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ: ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ:-brasaller.notifications.new-sale.dlq.v1}
+  BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_SUMMARY: ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_SUMMARY:-brasaller.analytics.tenant-new-sale-summary.v1}
+  KAFKA_STREAMS_APPLICATION_ID: ${KAFKA_STREAMS_APPLICATION_ID:-notification-service-new-sale-streams}
 
 x-service-healthcheck: &service-healthcheck
   test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/q/health/ready >/dev/null || exit 1"]
@@ -123,6 +127,74 @@ services:
     volumes:
       - auth-service-postgres-data:/var/lib/postgresql/data
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.1
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 0.75
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HTTP_ENABLED: "true"
+      KEYCLOAK_GOOGLE_CLIENT_ID: ${KEYCLOAK_GOOGLE_CLIENT_ID:-not-configured}
+      KEYCLOAK_GOOGLE_CLIENT_SECRET: ${KEYCLOAK_GOOGLE_CLIENT_SECRET:-not-configured}
+      KEYCLOAK_GOOGLE_PROMPT: ${KEYCLOAK_GOOGLE_PROMPT:-}
+      KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-}
+    ports:
+      - "${KEYCLOAK_PORT:-8086}:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak:/opt/keycloak/data/import:ro
+    networks:
+      - brasaller-net
+
+  kafka:
+    image: apache/kafka:4.2.0
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 0.75
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://localhost:9091,HOST://0.0.0.0:9092,DOCKER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:${KAFKA_PORT:-9092},DOCKER://kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,HOST:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9091
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - brasaller-net
+
+  kafka-init:
+    image: apache/kafka:4.2.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE:-brasaller.notifications.new-sale.v1} --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ:-brasaller.notifications.new-sale.dlq.v1} --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_SUMMARY:-brasaller.analytics.tenant-new-sale-summary.v1} --partitions 3 --replication-factor 1 --config cleanup.policy=compact
+    networks:
+      - brasaller-net
+
   gateway-api:
     <<: *service-defaults
     image: brasaller/gateway-api:local
@@ -173,6 +245,8 @@ services:
     depends_on:
       core-service-postgres:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     ports:
       - "${CORE_SERVICE_PORT:-8081}:8080"
 
@@ -208,9 +282,22 @@ services:
       DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-notification_service}
       DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_service_password}
       DB_JDBC_URL: jdbc:postgresql://notification-service-postgres:5432/${NOTIFICATION_DB_NAME:-notification_service}
+      NOTIFICATION_MAIL_FROM: ${NOTIFICATION_MAIL_FROM:-no-reply@braseller.local}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_MOCK: ${SMTP_MOCK:-true}
+      NOTIFICATION_MONTHLY_CLOSING_CRON: ${NOTIFICATION_MONTHLY_CLOSING_CRON:-0 0 8 1 * ?}
+      NOTIFICATION_ML_PAYMENT_RELEASE_CRON: ${NOTIFICATION_ML_PAYMENT_RELEASE_CRON:-0 0/30 * * * ?}
+      NOTIFICATION_WEEKLY_ACCOUNTANT_REPORT_CRON: ${NOTIFICATION_WEEKLY_ACCOUNTANT_REPORT_CRON:-0 0 8 ? * MON}
+      KAFKA_STREAMS_APPLICATION_SERVER: ${KAFKA_STREAMS_APPLICATION_SERVER:-notification-service:8080}
+      KAFKA_STREAMS_STATE_DIR: ${KAFKA_STREAMS_STATE_DIR:-/deployments/kafka-streams}
     depends_on:
       notification-service-postgres:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-8083}:8080"
 
@@ -247,13 +334,23 @@ services:
       DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth_service_password}
       DB_JDBC_URL: jdbc:postgresql://auth-service-postgres:5432/${AUTH_DB_NAME:-auth_service}
       USER_SERVICE_URL: http://user-service:8080
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-not-configured}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8085/auth/oauth/google/callback}
+      KEYCLOAK_BASE_URL: ${KEYCLOAK_INTERNAL_BASE_URL:-http://keycloak:8080}
+      KEYCLOAK_PUBLIC_BASE_URL: ${KEYCLOAK_PUBLIC_BASE_URL:-http://localhost:8086}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-brasaller}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-service}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-not-configured}
+      KEYCLOAK_REDIRECT_URI: ${KEYCLOAK_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      KEYCLOAK_SCOPE: ${KEYCLOAK_SCOPE:-openid email profile}
+      KEYCLOAK_REQUIRE_EMAIL_VERIFIED: ${KEYCLOAK_REQUIRE_EMAIL_VERIFIED:-false}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
     depends_on:
       auth-service-postgres:
         condition: service_healthy
       user-service:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     ports:
       - "${AUTH_SERVICE_PORT:-8085}:8080"
 
@@ -326,4 +423,5 @@ volumes:
   notification-service-postgres-data:
   user-service-postgres-data:
   auth-service-postgres-data:
+  keycloak-data:
   grafana-data:

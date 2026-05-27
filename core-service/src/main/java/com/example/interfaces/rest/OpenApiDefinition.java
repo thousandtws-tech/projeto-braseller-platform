@@ -17,7 +17,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
                 license = @License(name = "Proprietary")
         ),
         tags = {
-                @Tag(name = "Core", description = "Contexto tenant-aware compartilhado entre modulos.")
+                @Tag(name = "Core", description = "Contexto tenant-aware compartilhado entre modulos."),
+                @Tag(name = "Connectors", description = "Contrato padronizado entre Core e conectores de marketplaces.")
         }
 )
 @SecurityScheme(

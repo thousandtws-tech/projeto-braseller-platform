@@ -24,7 +24,21 @@ Os microservices do modulo Core/Auth/User seguem uma separacao em camadas para m
 - `auth-service`: orquestra autenticacao, emite JWT e gerencia refresh tokens/sessoes.
 - `core-service`: resolve contexto tenant-aware a partir do JWT.
 
+Servicos com dados tenant-aware devem resolver o tenant a partir do Bearer JWT emitido pelo `auth-service`. `tenantId` recebido por query, body ou header pode ser usado no maximo como parametro de rota a ser comparado contra o claim `tenant_id`, nunca como fonte de autorizacao. `CONTADOR` e leitura; escritas exigem `ADMIN` ou `VENDEDOR` conforme o caso de uso.
+
 Para novos microservices, replique a mesma organizacao antes de adicionar regra de negocio.
+
+## Camada de conectores no Core
+
+A camada de conectores fica no `core-service` como contrato e orquestracao, nao como implementacao de marketplace. A regra e: Core conhece a porta `MarketplaceConnector`, mas nao conhece SDK, DTO, endpoint, autenticacao ou codigo especifico de Mercado Livre, Shopee, Amazon etc.
+
+- `domain.model.connector`: modelos padronizados, como pedido, item, pagamento, taxa, nota fiscal, status e token.
+- `application.port.out.MarketplaceConnector`: contrato que todo adapter de marketplace deve implementar.
+- `application.service.ConnectorService`: resolve conector por nome e chama o contrato.
+- `infrastructure.connector`: adapters concretos registrados via CDI.
+- `interfaces.rest.ConnectorResource`: API REST para os modulos consumirem o contrato padrao.
+
+Para adicionar um marketplace, crie um novo adapter em `infrastructure.connector` implementando `MarketplaceConnector`. Nao altere os casos de uso do Core para acomodar campos especificos de plataforma; normalize no adapter.
 
 ## Gateway API
 

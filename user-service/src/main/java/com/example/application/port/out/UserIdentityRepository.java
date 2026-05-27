@@ -17,4 +17,8 @@ public interface UserIdentityRepository {
     List<UserView> listTenantUsers(String tenantId);
 
     Optional<StoredUserCredentials> findActiveCredentialsByEmail(String email);
+
+    Optional<UserView> syncExternalProfile(String email, String provider, String providerSubject, String fullName,
+                                           String preferredUsername, String firstName, String lastName,
+                                           String pictureUrl, boolean emailVerified);
 }

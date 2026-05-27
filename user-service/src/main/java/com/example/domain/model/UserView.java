@@ -5,5 +5,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import java.util.List;
 
 @Schema(name = "UserView", description = "Representacao publica de usuario e seus papeis no tenant.")
-public record UserView(String id, String tenantId, String email, String fullName, String status, List<String> roles) {
+public record UserView(String id, String tenantId, String email, String fullName, String preferredUsername,
+                       String firstName, String lastName, String pictureUrl, boolean emailVerified, String provider,
+                       String providerSubject, String status, List<String> roles) {
 }

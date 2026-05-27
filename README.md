@@ -15,23 +15,98 @@ Baseline DevOps para os microservices Quarkus do projeto Brasaller.
 
 ## Modulo Core: Auth + User + Multi-tenant
 
-Este modulo foi montado como a base reutilizavel da Fase 1. O `user-service` e a fonte de tenants, usuarios, papeis e acesso do contador. O `auth-service` delega cadastro/login ao `user-service`, sincroniza uma identidade minima no proprio banco e emite JWT/refresh tokens. O `core-service` valida o contexto tenant-aware que os demais modulos devem consumir.
+Este modulo foi montado como a base reutilizavel da Fase 1. O `user-service` e a fonte de tenants, usuarios, papeis e acesso do contador. O `auth-service` usa o Keycloak para credenciais, sessoes, refresh, logout e OAuth, sincroniza o perfil no `user-service` e emite o JWT interno da plataforma com contexto multi-tenant. O `core-service` valida esse contexto tenant-aware que os demais modulos devem consumir.
 
 Contratos principais:
 
-- `POST /auth/register`: cria tenant + usuario admin/vendedor pelo `user-service` e retorna JWT.
-- `POST /auth/login`: valida e-mail/senha no `user-service` e retorna JWT.
-- `POST /auth/refresh` e `POST /auth/logout`: gerenciam sessoes no banco do `auth-service`.
-- `GET /auth/oauth/google/authorize-url`: prepara o fluxo OAuth Google quando `GOOGLE_CLIENT_ID` estiver configurado.
+- `POST /auth/register`: cria tenant + usuario admin/vendedor no `user-service`, cria o usuario no Keycloak e retorna JWT da plataforma.
+- `POST /auth/login`: autentica e-mail/senha no Keycloak e retorna JWT da plataforma.
+- `POST /auth/refresh` e `POST /auth/logout`: renovam/revogam sessao no Keycloak.
+- `GET /auth/oauth/google/authorize-url`: prepara o fluxo Google pelo broker do Keycloak (`kc_idp_hint=google`).
+- `POST /auth/oauth/google/callback`: finaliza login/cadastro Google pelo broker do Keycloak.
 - `POST /users/tenants/register`: cria tenant isolado e usuario admin inicial.
-- `POST /users/tenants/{tenantId}/accountants`: cria acesso secundario de contador como `CONTADOR`, somente leitura.
-- `GET /users/tenants/{tenantId}/members`: lista membros do tenant.
+- `POST /users/tenants/{tenantId}/accountants`: cria acesso secundario de contador como `CONTADOR`, somente leitura; exige JWT do mesmo tenant com papel `ADMIN`.
+- `GET /users/tenants/{tenantId}/members`: lista membros do tenant resolvido pelo JWT.
 - `POST /users/internal/identity/verify-password`: contrato interno protegido por `X-Internal-Token`.
+- `POST /users/internal/identity/sync-profile`: contrato interno para persistir perfil do Keycloak, incluindo login via broker Google, no `user-service`.
 - `GET /core/context`: valida Bearer JWT e retorna `tenantId`, `userId`, `email`, `roles` e `readOnly`.
 
 Claims padrao do JWT: `tenant_id`, `user_id`, `email`, `roles` e `groups`. Os papeis suportados sao `ADMIN`, `VENDEDOR` e `CONTADOR`; `CONTADOR` e tratado como leitura quando nao houver papel `ADMIN`.
 
+Endpoints tenant-aware de `user-service`, `core-service` e `notification-service` derivam o tenant do JWT. O cliente nao escolhe tenant por query/body/header. Acoes de escrita exigem `ADMIN` ou `VENDEDOR`; `CONTADOR` pode apenas consultar dados do proprio tenant. Eventos internos de notificacao usam `X-Internal-Token` e nao sao expostos pelo gateway publico.
+
 Em ambientes fora de desenvolvimento, troque obrigatoriamente `AUTH_JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, senhas dos bancos e credenciais do Grafana.
+
+## Core: Camada de Conectores
+
+O `core-service` define a interface padronizada entre o Core e os conectores de marketplace. O Core nunca importa codigo de Mercado Livre, Shopee, Amazon ou qualquer marketplace especifico; ele resolve um conector pelo nome e recebe sempre os mesmos modelos.
+
+Contrato obrigatorio de todo conector:
+
+- `authenticate()`: token de acesso do usuario.
+- `refreshToken()`: token renovado automaticamente.
+- `getOrders(filtros)`: lista padronizada de pedidos.
+- `getOrderDetail(id)`: detalhes completos de um pedido.
+- `getPayments(orderId)`: dados de pagamento e liberacao.
+- `getFees(orderId)`: taxas e comissoes.
+- `syncAll(desde)`: sincronizacao completa desde uma data.
+- `getStatus()`: status da conexao.
+
+Contrato opcional:
+
+- `getInvoices(filtros)`: notas fiscais quando a plataforma disponibilizar.
+
+Endpoints do Core:
+
+- `GET /core/connectors`: lista conectores registrados.
+- `POST /core/connectors/{connectorName}/authenticate`.
+- `POST /core/connectors/{connectorName}/refresh-token`.
+- `GET /core/connectors/{connectorName}/orders`.
+- `GET /core/connectors/{connectorName}/orders/{orderId}`.
+- `GET /core/connectors/{connectorName}/orders/{orderId}/payments`.
+- `GET /core/connectors/{connectorName}/orders/{orderId}/fees`.
+- `GET /core/connectors/{connectorName}/invoices`.
+- `POST /core/connectors/{connectorName}/sync-all`.
+- `GET /core/connectors/{connectorName}/status`.
+
+O conector `sandbox` foi incluido para validar o contrato sem depender de marketplace real. Novos marketplaces entram como adapters que implementam a porta `MarketplaceConnector`.
+
+## Modulo Notification
+
+O `notification-service` centraliza comunicacao com o usuario, alertas operacionais e e-mails automaticos.
+
+Funcionalidades iniciais:
+
+- E-mail automatico de fechamento mensal com resumo.
+- Alerta quando pagamento do Mercado Livre esta proximo de liberar.
+- Notificacao de nova venda opcional, ativavel pelo usuario.
+- Relatorio semanal automatico enviado ao contador.
+- Preferencias por tenant para canais e tipos de notificacao.
+
+Contratos principais:
+
+- `GET /notifications/tenants/{tenantId}/preferences`: consulta preferencias.
+- `PUT /notifications/tenants/{tenantId}/preferences`: atualiza preferencias.
+- `GET /notifications/tenants/{tenantId}`: lista notificacoes nao arquivadas.
+- `PATCH /notifications/tenants/{tenantId}/{notificationId}/read`: marca notificacao como lida.
+- `POST /notifications/events/new-sale`: cria notificacao de nova venda quando habilitada.
+- `POST /notifications/events/ml-payment-release`: cria alerta de pagamento ML proximo de liberar.
+- `POST /notifications/events/monthly-closing`: envia fechamento mensal.
+- `POST /notifications/events/weekly-accountant-report`: envia relatorio semanal ao contador.
+
+Consultas em `/notifications/tenants/{tenantId}/...` exigem Bearer JWT do mesmo tenant. Atualizacoes exigem papel de escrita. Endpoints `/notifications/events/**` sao service-to-service, protegidos por `X-Internal-Token`, e bloqueados em `/api/notifications/events/**` pelo gateway.
+
+## Mensageria Kafka
+
+O ambiente Docker sobe um broker Kafka local em `localhost:9092` e cria os topicos versionados usados pelos microservices.
+
+- `core-service` publica eventos de nova venda em `brasaller.notifications.new-sale.v1` ao executar `POST /core/connectors/{connectorName}/sync-all`.
+- `notification-service` consome o topico com o grupo `notification-service` e cria a notificacao conforme as preferencias do tenant.
+- `notification-service` tambem executa Kafka Streams sobre o mesmo topico, mantendo a KTable `tenant-new-sale-summary-store` com resumo de vendas por tenant.
+- A KTable publica atualizacoes no topico compactado `brasaller.analytics.tenant-new-sale-summary.v1` e pode ser consultada em `GET /notifications/tenants/{tenantId}/new-sale-summary`.
+- Falhas de processamento sao enviadas para `brasaller.notifications.new-sale.dlq.v1`.
+
+Variaveis principais: `KAFKA_BOOTSTRAP_SERVERS`, `BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE`, `BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ`, `BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_SUMMARY`, `KAFKA_NOTIFICATION_GROUP_ID`, `KAFKA_STREAMS_APPLICATION_ID` e `KAFKA_STREAMS_APPLICATION_SERVER`. No Compose, os servicos usam `kafka:9093` pela rede interna Docker.
 
 ## Gateway API
 
@@ -41,7 +116,7 @@ O `gateway-api` publica a fachada HTTP em `/api` e encaminha chamadas para os mi
 - `/api/users/**` -> `user-service` em `/users/**`, com `/users/internal/**` bloqueado no gateway.
 - `/api/core/**` -> `core-service` em `/core/**`.
 - `/api/billing/**` -> `billing-service` em `/billing/**`.
-- `/api/notifications/**` -> `notification-service` em `/notifications/**`.
+- `/api/notifications/**` -> `notification-service` em `/notifications/**`, com `/notifications/events/**` bloqueado no gateway.
 
 Headers propagados: `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept` e `Content-Type`. As URLs downstream usam `AUTH_SERVICE_URL`, `USER_SERVICE_URL`, `CORE_SERVICE_URL`, `BILLING_SERVICE_URL` e `NOTIFICATION_SERVICE_URL`; no Compose elas ja apontam para a rede interna Docker.
 
@@ -57,6 +132,7 @@ powershell -ExecutionPolicy Bypass -File scripts/verify-services.ps1
 docker compose --env-file .env.example up --build
 ```
 
+Keycloak fica em `http://localhost:8086` com usuario `admin` e senha `admin` por padrao, configuraveis no `.env.example`.
 Prometheus fica em `http://localhost:9090`.
 Grafana fica em `http://localhost:3001` com usuario `admin` e senha `admin` por padrao, configuraveis no `.env.example`.
 
