@@ -68,4 +68,15 @@ class ExampleResourceTest {
                 .statusCode(403)
                 .body("message", containsString("gateway_route_forbidden"));
     }
+
+    @Test
+    void blocksInternalNotificationEventEndpoints() {
+        given()
+                .contentType("application/json")
+                .body("{\"tenantId\":\"tenant-a\"}")
+                .when().post("/api/notifications/events/new-sale")
+                .then()
+                .statusCode(403)
+                .body("message", containsString("gateway_route_forbidden"));
+    }
 }

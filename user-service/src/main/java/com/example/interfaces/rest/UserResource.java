@@ -2,14 +2,17 @@ package com.example.interfaces.rest;
 
 import com.example.application.command.GrantAccountantAccessCommand;
 import com.example.application.command.RegisterTenantCommand;
+import com.example.application.command.SyncExternalProfileCommand;
 import com.example.application.command.VerifyPasswordCommand;
 import com.example.application.exception.ConflictException;
 import com.example.application.exception.ForbiddenException;
 import com.example.application.exception.ValidationException;
+import com.example.application.service.TenantAuthorizationService;
 import com.example.application.service.UserIdentityService;
 import com.example.domain.model.AccountantAccessView;
 import com.example.domain.model.IdentityVerification;
 import com.example.domain.model.RegisteredTenant;
+import com.example.domain.model.TenantContext;
 import com.example.domain.model.UserView;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -40,6 +43,9 @@ import java.util.List;
 public class UserResource {
     @Inject
     UserIdentityService userIdentityService;
+
+    @Inject
+    TenantAuthorizationService tenantAuthorizationService;
 
     @GET
     @Produces(MediaType.TEXT_PLAIN)
@@ -82,25 +88,33 @@ public class UserResource {
     @POST
     @Path("/tenants/{tenantId}/accountants")
     @Operation(summary = "Conceder acesso ao contador", description = "Cria acesso secundario do contador com papel CONTADOR e perfil somente leitura.")
+    @SecurityRequirement(name = "bearerAuth")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = GrantAccountantAccessRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "201", description = "Acesso do contador criado.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = AccountantAccessView.class))),
             @APIResponse(responseCode = "400", description = "Payload invalido ou tenant/usuario inexistente.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "401", description = "Token ausente, invalido ou expirado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "403", description = "Papel ADMIN exigido para conceder acesso.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
     })
     public Response grantAccountantAccess(
+            @Parameter(description = "Bearer JWT emitido pelo auth-service.", required = true)
+            @HeaderParam("Authorization") String authorizationHeader,
             @Parameter(description = "Tenant que concedera o acesso.", required = true)
             @PathParam("tenantId") String tenantId,
             GrantAccountantAccessRequest request) {
         try {
+            TenantContext context = tenantAuthorizationService.requireAdmin(authorizationHeader, tenantId);
             return Response.status(Response.Status.CREATED)
                     .entity(userIdentityService.grantAccountantAccess(new GrantAccountantAccessCommand(
                             tenantId,
                             request.email(),
                             request.fullName(),
                             request.temporaryPassword(),
-                            request.grantedByUserId()
+                            context.userId()
                     )))
                     .build();
         } catch (ValidationException exception) {
@@ -110,19 +124,23 @@ public class UserResource {
 
     @GET
     @Path("/tenants/{tenantId}/members")
-    @Operation(summary = "Listar membros do tenant", description = "Retorna usuarios e papeis de um tenant. O header X-Tenant-Id, quando enviado, deve bater com o path.")
+    @Operation(summary = "Listar membros do tenant", description = "Retorna usuarios e papeis do tenant resolvido pelo JWT.")
+    @SecurityRequirement(name = "bearerAuth")
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Membros retornados.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = UserView.class))),
-            @APIResponse(responseCode = "403", description = "Header X-Tenant-Id divergente.",
+            @APIResponse(responseCode = "401", description = "Token ausente, invalido ou expirado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "403", description = "JWT de outro tenant ou papel insuficiente.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
     })
     public List<UserView> listTenantMembers(
+            @Parameter(description = "Bearer JWT emitido pelo auth-service.", required = true)
+            @HeaderParam("Authorization") String authorizationHeader,
             @Parameter(description = "Tenant consultado.", required = true)
-            @PathParam("tenantId") String tenantId,
-            @Parameter(description = "Tenant esperado pelo chamador. Usado para evitar vazamento cross-tenant.")
-            @HeaderParam("X-Tenant-Id") String tenantHeader) {
-        return userIdentityService.listTenantMembers(tenantId, tenantHeader);
+            @PathParam("tenantId") String tenantId) {
+        tenantAuthorizationService.requireTenant(authorizationHeader, tenantId);
+        return userIdentityService.listTenantMembers(tenantId);
     }
 
     @POST
@@ -158,8 +176,55 @@ public class UserResource {
         }
     }
 
+    @POST
+    @Path("/internal/identity/sync-profile")
+    @Operation(summary = "Sincronizar perfil externo", description = "Endpoint interno usado pelo auth-service para persistir dados de perfil vindos de Keycloak/Google.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = SyncExternalProfileRequest.class)))
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Perfil sincronizado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = UserView.class))),
+            @APIResponse(responseCode = "400", description = "Payload invalido.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "403", description = "Token interno invalido.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "404", description = "Usuario ativo nao encontrado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
+    })
+    public Response syncExternalProfile(@HeaderParam("X-Internal-Token") String providedInternalToken,
+                                        SyncExternalProfileRequest request) {
+        try {
+            return userIdentityService.syncExternalProfile(
+                            providedInternalToken,
+                            new SyncExternalProfileCommand(
+                                    request.email(),
+                                    request.provider(),
+                                    request.providerSubject(),
+                                    request.fullName(),
+                                    request.preferredUsername(),
+                                    request.firstName(),
+                                    request.lastName(),
+                                    request.pictureUrl(),
+                                    request.emailVerified()
+                            )
+                    )
+                    .map(this::ok)
+                    .orElseGet(() -> Response.status(Response.Status.NOT_FOUND)
+                            .entity(new RestError("user_not_found"))
+                            .build());
+        } catch (ForbiddenException exception) {
+            return Response.status(Response.Status.FORBIDDEN).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
     private Response ok(IdentityVerification verification) {
         return Response.ok(verification).build();
+    }
+
+    private Response ok(UserView user) {
+        return Response.ok(user).build();
     }
 
     private Response badRequest(String message) {
@@ -171,10 +236,16 @@ public class UserResource {
     }
 
     @Schema(name = "GrantAccountantAccessRequest", description = "Dados para conceder acesso secundario ao contador.")
-    public record GrantAccountantAccessRequest(String email, String fullName, String temporaryPassword, String grantedByUserId) {
+    public record GrantAccountantAccessRequest(String email, String fullName, String temporaryPassword) {
     }
 
     @Schema(name = "VerifyPasswordRequest", description = "Credenciais validadas internamente pelo auth-service.")
     public record VerifyPasswordRequest(String email, String password) {
+    }
+
+    @Schema(name = "SyncExternalProfileRequest", description = "Dados de perfil externo sincronizados pelo auth-service.")
+    public record SyncExternalProfileRequest(String email, String provider, String providerSubject, String fullName,
+                                             String preferredUsername, String firstName, String lastName,
+                                             String pictureUrl, boolean emailVerified) {
     }
 }

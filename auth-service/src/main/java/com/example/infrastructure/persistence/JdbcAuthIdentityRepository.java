@@ -2,7 +2,6 @@ package com.example.infrastructure.persistence;
 
 import com.example.application.port.out.AuthIdentityRepository;
 import com.example.domain.model.AuthIdentity;
-import com.example.domain.model.AuthSession;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -37,7 +36,9 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
                 }
                 connection.commit();
                 return new AuthIdentity(identityId, identity.tenantId(), identity.userId(), identity.email(),
-                        identity.fullName(), identity.roles(), identity.status());
+                        identity.fullName(), identity.roles(), identity.status(), identity.provider(),
+                        identity.providerSubject(), identity.preferredUsername(), identity.firstName(),
+                        identity.lastName(), identity.pictureUrl(), identity.emailVerified());
             } catch (SQLException exception) {
                 connection.rollback();
                 throw exception;
@@ -50,39 +51,15 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
     }
 
     @Override
-    public void createSession(AuthSession session) {
+    public Optional<AuthIdentity> findIdentityByEmail(String email) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     INSERT INTO auth_sessions
-                     (id, tenant_id, user_id, token_id, refresh_token_hash, expires_at)
-                     VALUES (?, ?, ?, ?, ?, ?)
+                     SELECT id, tenant_id, user_id, email, full_name, roles, status
+                     FROM auth_identities
+                     WHERE email_normalized = ?
+                       AND status = 'ACTIVE'
                      """)) {
-            statement.setString(1, session.id());
-            statement.setString(2, session.tenantId());
-            statement.setString(3, session.userId());
-            statement.setString(4, session.tokenId());
-            statement.setString(5, session.refreshTokenHash());
-            statement.setTimestamp(6, Timestamp.from(session.expiresAt()));
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new RepositoryException("Could not create auth session", exception);
-        }
-    }
-
-    @Override
-    public Optional<AuthIdentity> findIdentityByRefreshTokenHash(String refreshTokenHash) {
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT i.id, i.tenant_id, i.user_id, i.email, i.full_name, i.roles, i.status
-                     FROM auth_sessions s
-                     JOIN auth_identities i ON i.user_id = s.user_id AND i.tenant_id = s.tenant_id
-                     WHERE s.refresh_token_hash = ?
-                       AND s.revoked_at IS NULL
-                       AND s.expires_at > ?
-                       AND i.status = 'ACTIVE'
-                     """)) {
-            statement.setString(1, refreshTokenHash);
-            statement.setTimestamp(2, Timestamp.from(Instant.now()));
+            statement.setString(1, normalizeEmail(email));
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     return Optional.empty();
@@ -98,23 +75,27 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
                 ));
             }
         } catch (SQLException exception) {
-            throw new RepositoryException("Could not refresh auth session", exception);
+            throw new RepositoryException("Could not find auth identity by email", exception);
         }
     }
 
     @Override
-    public boolean revokeRefreshToken(String refreshTokenHash) {
+    public void linkProviderSubject(String email, String provider, String subject) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     UPDATE auth_sessions
-                     SET revoked_at = ?
-                     WHERE refresh_token_hash = ? AND revoked_at IS NULL
+                     UPDATE auth_identities
+                     SET provider = ?,
+                         provider_subject = ?,
+                         updated_at = ?
+                     WHERE email_normalized = ?
                      """)) {
-            statement.setTimestamp(1, Timestamp.from(Instant.now()));
-            statement.setString(2, refreshTokenHash);
-            return statement.executeUpdate() > 0;
+            statement.setString(1, provider);
+            statement.setString(2, subject);
+            statement.setTimestamp(3, Timestamp.from(Instant.now()));
+            statement.setString(4, normalizeEmail(email));
+            statement.executeUpdate();
         } catch (SQLException exception) {
-            throw new RepositoryException("Could not revoke auth session", exception);
+            throw new RepositoryException("Could not link external identity", exception);
         }
     }
 
