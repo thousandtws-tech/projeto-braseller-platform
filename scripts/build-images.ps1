@@ -5,6 +5,7 @@ param(
         "core-service",
         "billing-service",
         "notification-service",
+        "reporting-service",
         "user-service",
         "auth-service"
     )

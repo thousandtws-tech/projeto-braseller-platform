@@ -41,7 +41,7 @@ public class RestClientDownstreamServiceClient implements DownstreamServiceClien
         try (Response response = send(request, targetUri)) {
             return new GatewayResponse(
                     response.getStatus(),
-                    response.hasEntity() ? response.readEntity(String.class) : "",
+                    response.hasEntity() ? response.readEntity(byte[].class) : new byte[0],
                     copyResponseHeaders(response.getStringHeaders())
             );
         } catch (ProcessingException exception) {

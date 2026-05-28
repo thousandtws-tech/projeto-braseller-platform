@@ -33,7 +33,9 @@ public interface MarketplaceConnector {
 
     List<FeeInfo> getFees(String tenantId, String orderId);
 
-    List<InvoiceInfo> getInvoices(String tenantId, InvoiceFilters filters);
+    default List<InvoiceInfo> getInvoices(String tenantId, InvoiceFilters filters) {
+        return List.of();
+    }
 
     SyncResult syncAll(String tenantId, Instant since);
 

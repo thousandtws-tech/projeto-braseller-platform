@@ -1,0 +1,333 @@
+package com.example;
+
+import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.Test;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import static org.hamcrest.CoreMatchers.containsString;
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@QuarkusTest
+class ExampleResourceTest {
+    @Test
+    void statusEndpointReturnsServiceName() {
+        given()
+                .when().get("/reports")
+                .then()
+                .statusCode(200)
+                .body(is("Reporting Service is running"));
+    }
+
+    @Test
+    void reportEndpointsRequireBearerToken() {
+        given()
+                .when().get("/reports/tenants/tenant-reporting/summary")
+                .then()
+                .statusCode(401)
+                .body("message", is("missing_bearer_token"));
+    }
+
+    @Test
+    void internalIngestRequiresInternalToken() {
+        given()
+                .contentType("application/json")
+                .body(entryPayload("tenant-reporting-internal", "SANDBOX-INT", "sandbox", "RECEIVED", "PIX"))
+                .when().post("/reports/internal/entries")
+                .then()
+                .statusCode(403)
+                .body("message", is("invalid_internal_token"));
+    }
+
+    @Test
+    void dashboardAggregatesEntriesAcrossMarketplaces() {
+        String tenantId = "tenant-reporting-dashboard";
+        ingest(tenantId, "SANDBOX-1001", "sandbox", "RECEIVED", "PIX", "199.90", "173.50", "26.40", "0.00");
+        ingest(tenantId, "ML-2001", "mercado-livre", "PAID", "CREDIT_CARD", "300.00", "0.00", "45.00", "255.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN", "VENDEDOR"))
+                .when().get("/reports/tenants/{tenantId}/dashboard?sort=grossValue&direction=DESC&size=10", tenantId)
+                .then()
+                .statusCode(200)
+                .body("summary.gross_value", is(499.90F))
+                .body("summary.received_value", is(173.50F))
+                .body("summary.fee_value", is(71.40F))
+                .body("summary.receivable_value", is(255.00F))
+                .body("summary.entry_count", is(2))
+                .body("entries.items[0].order_id", is("ML-2001"))
+                .body("filters.platforms", hasItems("sandbox", "mercado-livre"))
+                .body("platform_comparison.platform", hasItems("sandbox", "mercado-livre"));
+    }
+
+    @Test
+    void monthlyExportReturnsCsvWithConsolidatedEntries() {
+        String tenantId = "tenant-reporting-export-csv";
+        ingest(tenantId, "CSV-1001", "sandbox", "RECEIVED", "PIX", "150.00", "140.00", "10.00", "0.00");
+        ingest(tenantId, "CSV-2001", "mercado-livre", "PAID", "CREDIT_CARD", "280.00", "0.00", "42.00", "238.00");
+
+        String csv = given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().get("/reports/tenants/{tenantId}/exports/monthly?month=2026-05&format=csv", tenantId)
+                .then()
+                .statusCode(200)
+                .header("Content-Type", containsString("text/csv"))
+                .header("Content-Disposition", containsString(".csv"))
+                .extract().asString();
+
+        assertTrue(csv.contains("tenant_id,period,platform,order_id"));
+        assertTrue(csv.contains("CSV-1001"));
+        assertTrue(csv.contains("CSV-2001"));
+    }
+
+    @Test
+    void monthlyExportReturnsXlsxWithMarketplaceSheets() throws IOException {
+        String tenantId = "tenant-reporting-export-xlsx";
+        ingest(tenantId, "XLSX-1001", "sandbox", "RECEIVED", "PIX", "180.00", "170.00", "10.00", "0.00");
+        ingest(tenantId, "XLSX-2001", "amazon", "PAID", "BOLETO", "320.00", "0.00", "50.00", "270.00");
+
+        byte[] xlsx = given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().get("/reports/tenants/{tenantId}/exports/monthly?month=2026-05&format=xlsx", tenantId)
+                .then()
+                .statusCode(200)
+                .header("Content-Type", containsString("spreadsheetml.sheet"))
+                .header("Content-Disposition", containsString(".xlsx"))
+                .extract().asByteArray();
+
+        assertTrue(xlsx.length > 4);
+        assertTrue(xlsx[0] == 'P' && xlsx[1] == 'K');
+        String workbookXml = zipText(xlsx, "xl/workbook.xml");
+        assertTrue(workbookXml.contains("Resumo"));
+        assertTrue(workbookXml.contains("sandbox"));
+        assertTrue(workbookXml.contains("amazon"));
+    }
+
+    @Test
+    void platformExportReturnsPdfForSingleMarketplace() {
+        String tenantId = "tenant-reporting-export-pdf";
+        ingest(tenantId, "PDF-1001", "shopee", "RECEIVED", "PIX", "210.00", "200.00", "10.00", "0.00");
+        ingest(tenantId, "PDF-2001", "amazon", "PAID", "BOLETO", "410.00", "0.00", "55.00", "355.00");
+
+        byte[] pdf = given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/exports/platforms/shopee?from=2026-05-01&to=2026-05-31&format=pdf", tenantId)
+                .then()
+                .statusCode(200)
+                .header("Content-Type", containsString("application/pdf"))
+                .header("Content-Disposition", containsString(".pdf"))
+                .extract().asByteArray();
+
+        assertTrue(new String(pdf, 0, 4, StandardCharsets.US_ASCII).equals("%PDF"));
+        assertTrue(new String(pdf, StandardCharsets.ISO_8859_1).contains("PDF-1001"));
+    }
+
+    @Test
+    void internalAutomationEndpointsReturnSummaryAndPaymentReleases() {
+        String tenantId = "tenant-reporting-automation";
+        ingest(tenantId, "ML-AUTO-1001", "mercado-livre", "PAID", "PIX", "220.00", "0.00", "20.00", "200.00");
+        ingest(tenantId, "SHOP-AUTO-1002", "shopee", "RECEIVED", "PIX", "180.00", "170.00", "10.00", "0.00");
+
+        given()
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .when().get("/reports/internal/tenants/{tenantId}/summary?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_value", is(400.00F))
+                .body("entry_count", is(2));
+
+        given()
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .when().get("/reports/internal/tenants/{tenantId}/payment-releases?platform=mercado-livre&from=2026-06-01&to=2026-06-10", tenantId)
+                .then()
+                .statusCode(200)
+                .body("[0].payment_id", is("ML-AUTO-1001"))
+                .body("[0].amount", is(200.00F))
+                .body("[0].release_date", is("2026-06-04"));
+    }
+
+    @Test
+    void entriesSupportFiltersSearchAndOrdering() {
+        String tenantId = "tenant-reporting-search";
+        ingest(tenantId, "SHOP-1001", "shopee", "RECEIVED", "PIX", "100.00", "90.00", "10.00", "0.00");
+        ingest(tenantId, "AMZ-1002", "amazon", "PENDING_RELEASE", "BOLETO", "250.00", "0.00", "35.00", "215.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().get("/reports/tenants/{tenantId}/entries?platform=amazon&search=amz&sort=saleDate&direction=ASC", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total", is(1))
+                .body("items[0].platform", is("amazon"))
+                .body("items[0].order_id", is("AMZ-1002"))
+                .body("items[0].receivable_value", is(215.00F));
+    }
+
+    @Test
+    void manualImportAndPublicIntegrationCreateTenantEntries() {
+        String tenantId = "tenant-reporting-manual";
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN", "VENDEDOR"))
+                .contentType("application/json")
+                .body(publicEntryPayload("magalu", "MAG-1001", "RECEIVED", "PIX", "310.00", "290.00", "20.00", "0.00"))
+                .when().post("/reports/tenants/{tenantId}/manual-import/entries", tenantId)
+                .then()
+                .statusCode(201)
+                .body("tenant_id", is(tenantId))
+                .body("platform", is("magalu"))
+                .body("order_id", is("MAG-1001"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body(publicEntryPayload("custom-system", "ERP-2001", "PAID", "BANK_TRANSFER", "500.00", "0.00", "55.00", "445.00"))
+                .when().post("/reports/tenants/{tenantId}/integrations/entries", tenantId)
+                .then()
+                .statusCode(201)
+                .body("tenant_id", is(tenantId))
+                .body("platform", is("custom-system"))
+                .body("order_id", is("ERP-2001"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/entries?size=10", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total", is(2))
+                .body("items.order_id", hasItems("MAG-1001", "ERP-2001"));
+    }
+
+    @Test
+    void accountantCanReadButCannotIngest() {
+        String tenantId = "tenant-reporting-accountant";
+        ingest(tenantId, "ACC-1001", "sandbox", "RECEIVED", "PIX", "120.00", "110.00", "10.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/summary", tenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_value", is(120.00F));
+    }
+
+    private void ingest(String tenantId, String orderId, String platform, String status, String paymentMethod,
+                        String grossValue, String receivedValue, String feeValue, String receivableValue) {
+        given()
+                .contentType("application/json")
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .body(entryPayload(tenantId, orderId, platform, status, paymentMethod, grossValue, receivedValue, feeValue, receivableValue))
+                .when().post("/reports/internal/entries")
+                .then()
+                .statusCode(201);
+    }
+
+    private String entryPayload(String tenantId, String orderId, String platform, String status, String paymentMethod) {
+        return entryPayload(tenantId, orderId, platform, status, paymentMethod, "199.90", "173.50", "26.40", "0.00");
+    }
+
+    private String entryPayload(String tenantId, String orderId, String platform, String status, String paymentMethod,
+                                String grossValue, String receivedValue, String feeValue, String receivableValue) {
+        return """
+                {
+                  "tenant_id": "%s",
+                  "platform": "%s",
+                  "order_id": "%s",
+                  "sale_date": "2026-05-21",
+                  "gross_value": %s,
+                  "received_value": %s,
+                  "fee_value": %s,
+                  "receivable_value": %s,
+                  "payment_method": "%s",
+                  "status": "%s",
+                  "release_date": "2026-06-04",
+                  "buyer_name": "Comprador Teste",
+                  "invoice_number": "NF-%s"
+                }
+                """.formatted(tenantId, platform, orderId, grossValue, receivedValue, feeValue, receivableValue,
+                paymentMethod, status, orderId);
+    }
+
+    private String publicEntryPayload(String platform, String orderId, String status, String paymentMethod,
+                                      String grossValue, String receivedValue, String feeValue, String receivableValue) {
+        return """
+                {
+                  "platform": "%s",
+                  "order_id": "%s",
+                  "sale_date": "2026-05-21",
+                  "gross_value": %s,
+                  "received_value": %s,
+                  "fee_value": %s,
+                  "receivable_value": %s,
+                  "payment_method": "%s",
+                  "status": "%s",
+                  "release_date": "2026-06-04",
+                  "buyer_name": "Comprador Integrado",
+                  "invoice_number": "NF-%s"
+                }
+                """.formatted(platform, orderId, grossValue, receivedValue, feeValue, receivableValue,
+                paymentMethod, status, orderId);
+    }
+
+    private String token(String tenantId, String... roles) {
+        String header = encode("""
+                {"alg":"HS256","typ":"JWT"}
+                """);
+        long expiration = Instant.now().plusSeconds(300).getEpochSecond();
+        String groups = Arrays.stream(roles)
+                .map(role -> "\"" + role + "\"")
+                .collect(Collectors.joining(", "));
+        String payload = encode("""
+                {
+                  "iss": "brasaller-auth",
+                  "aud": "brasaller-platform",
+                  "exp": %d,
+                  "tenant_id": "%s",
+                  "user_id": "user-123",
+                  "email": "seller@brasaller.test",
+                  "groups": [%s]
+                }
+                """.formatted(expiration, tenantId, groups));
+        String signature = sign(header + "." + payload);
+        return header + "." + payload + "." + signature;
+    }
+
+    private String sign(String value) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec("dev-only-change-me-please-32-bytes-minimum".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private String encode(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String zipText(byte[] xlsx, String path) throws IOException {
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(xlsx), StandardCharsets.UTF_8)) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (path.equals(entry.getName())) {
+                    return new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+        }
+        throw new AssertionError("Missing zip entry: " + path);
+    }
+}

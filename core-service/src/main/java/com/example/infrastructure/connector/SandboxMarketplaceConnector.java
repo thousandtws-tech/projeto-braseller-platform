@@ -66,7 +66,11 @@ public class SandboxMarketplaceConnector implements MarketplaceConnector {
 
     @Override
     public List<StandardOrder> getOrders(String tenantId, OrderFilters filters) {
-        return List.of(order("SANDBOX-1001"), order("SANDBOX-1002"));
+        OrderFilters appliedFilters = filters == null ? new OrderFilters(null, null, null, 50) : filters;
+        return allOrders().stream()
+                .filter(order -> matches(order, appliedFilters))
+                .limit(appliedFilters.limit())
+                .toList();
     }
 
     @Override
@@ -111,7 +115,10 @@ public class SandboxMarketplaceConnector implements MarketplaceConnector {
     @Override
     public SyncResult syncAll(String tenantId, Instant since) {
         Instant startedAt = Instant.now();
-        return new SyncResult(NAME, 2, 2, 2, startedAt, Instant.now());
+        int orderCount = (int) allOrders().stream()
+                .filter(order -> since == null || !order.date().atStartOfDay().toInstant(java.time.ZoneOffset.UTC).isBefore(since))
+                .count();
+        return new SyncResult(NAME, orderCount, orderCount, orderCount, startedAt, Instant.now());
     }
 
     @Override
@@ -121,6 +128,20 @@ public class SandboxMarketplaceConnector implements MarketplaceConnector {
 
     private ConnectorToken token(String accessToken, String refreshToken) {
         return new ConnectorToken(NAME, accessToken, refreshToken, Instant.now().plusSeconds(3600));
+    }
+
+    private List<StandardOrder> allOrders() {
+        return List.of(order("SANDBOX-1001"), order("SANDBOX-1002"));
+    }
+
+    private boolean matches(StandardOrder order, OrderFilters filters) {
+        if (filters.status() != null && order.status() != filters.status()) {
+            return false;
+        }
+        if (filters.from() != null && order.date().isBefore(filters.from())) {
+            return false;
+        }
+        return filters.to() == null || !order.date().isAfter(filters.to());
     }
 
     private StandardOrder order(String orderId) {

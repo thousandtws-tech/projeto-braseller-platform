@@ -16,6 +16,7 @@ x-service-env: &service-env
   AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-only-change-me-please-32-bytes-minimum}
   AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
   INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-dev-internal-token-change-me}
+  BILLING_WEBHOOK_TOKEN: ${BILLING_WEBHOOK_TOKEN:-dev-billing-webhook-token-change-me}
   KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9093}
   BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE: ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE:-brasaller.notifications.new-sale.v1}
   BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ: ${BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ:-brasaller.notifications.new-sale.dlq.v1}
@@ -102,6 +103,18 @@ services:
       - "${NOTIFICATION_DB_PORT:-5435}:5432"
     volumes:
       - notification-service-postgres-data:/var/lib/postgresql/data
+
+  reporting-service-postgres:
+    <<: *postgres-defaults
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${REPORTING_DB_NAME:-reporting_service}
+      POSTGRES_USER: ${REPORTING_DB_USERNAME:-reporting_service}
+      POSTGRES_PASSWORD: ${REPORTING_DB_PASSWORD:-reporting_service_password}
+    ports:
+      - "${REPORTING_DB_PORT:-5438}:5432"
+    volumes:
+      - reporting-service-postgres-data:/var/lib/postgresql/data
 
   user-service-postgres:
     <<: *postgres-defaults
@@ -211,6 +224,7 @@ services:
       CORE_SERVICE_URL: http://core-service:8080
       BILLING_SERVICE_URL: http://billing-service:8080
       NOTIFICATION_SERVICE_URL: http://notification-service:8080
+      REPORTING_SERVICE_URL: http://reporting-service:8080
       USER_SERVICE_URL: http://user-service:8080
       AUTH_SERVICE_URL: http://auth-service:8080
     depends_on:
@@ -221,6 +235,8 @@ services:
       billing-service:
         condition: service_healthy
       notification-service:
+        condition: service_healthy
+      reporting-service:
         condition: service_healthy
       user-service:
         condition: service_healthy
@@ -290,16 +306,41 @@ services:
       SMTP_MOCK: ${SMTP_MOCK:-true}
       NOTIFICATION_MONTHLY_CLOSING_CRON: ${NOTIFICATION_MONTHLY_CLOSING_CRON:-0 0 8 1 * ?}
       NOTIFICATION_ML_PAYMENT_RELEASE_CRON: ${NOTIFICATION_ML_PAYMENT_RELEASE_CRON:-0 0/30 * * * ?}
+      NOTIFICATION_ML_PAYMENT_RELEASE_LOOKAHEAD_DAYS: ${NOTIFICATION_ML_PAYMENT_RELEASE_LOOKAHEAD_DAYS:-2}
       NOTIFICATION_WEEKLY_ACCOUNTANT_REPORT_CRON: ${NOTIFICATION_WEEKLY_ACCOUNTANT_REPORT_CRON:-0 0 8 ? * MON}
+      REPORTING_SERVICE_URL: http://reporting-service:8080
+      REPORTING_SERVICE_CONNECT_TIMEOUT_MS: ${REPORTING_SERVICE_CONNECT_TIMEOUT_MS:-2000}
+      REPORTING_SERVICE_READ_TIMEOUT_MS: ${REPORTING_SERVICE_READ_TIMEOUT_MS:-10000}
       KAFKA_STREAMS_APPLICATION_SERVER: ${KAFKA_STREAMS_APPLICATION_SERVER:-notification-service:8080}
       KAFKA_STREAMS_STATE_DIR: ${KAFKA_STREAMS_STATE_DIR:-/deployments/kafka-streams}
     depends_on:
       notification-service-postgres:
         condition: service_healthy
+      reporting-service:
+        condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-8083}:8080"
+
+  reporting-service:
+    <<: *service-defaults
+    image: brasaller/reporting-service:local
+    build:
+      context: ./reporting-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+      args:
+        SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-true}
+    environment:
+      <<: *service-env
+      DB_USERNAME: ${REPORTING_DB_USERNAME:-reporting_service}
+      DB_PASSWORD: ${REPORTING_DB_PASSWORD:-reporting_service_password}
+      DB_JDBC_URL: jdbc:postgresql://reporting-service-postgres:5432/${REPORTING_DB_NAME:-reporting_service}
+    depends_on:
+      reporting-service-postgres:
+        condition: service_healthy
+    ports:
+      - "${REPORTING_SERVICE_PORT:-8087}:8080"
 
   user-service:
     <<: *service-defaults
@@ -373,6 +414,8 @@ services:
         condition: service_healthy
       notification-service:
         condition: service_healthy
+      reporting-service:
+        condition: service_healthy
       user-service:
         condition: service_healthy
       auth-service:
@@ -421,6 +464,7 @@ volumes:
   core-service-postgres-data:
   billing-service-postgres-data:
   notification-service-postgres-data:
+  reporting-service-postgres-data:
   user-service-postgres-data:
   auth-service-postgres-data:
   keycloak-data:

@@ -25,6 +25,7 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
                     "gateway.services.core.url", baseUrl,
                     "gateway.services.billing.url", baseUrl,
                     "gateway.services.notification.url", baseUrl,
+                    "gateway.services.reporting.url", baseUrl,
                     "quarkus.rest-client.gateway-downstream.url", baseUrl,
                     "quarkus.flyway.migrate-at-start", "false"
             );
@@ -41,6 +42,17 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
     }
 
     private void handle(HttpExchange exchange) throws IOException {
+        if (exchange.getRequestURI().getPath().contains("/exports/")) {
+            byte[] payload = "%PDF-1.4\nmock export\n%%EOF".getBytes(StandardCharsets.US_ASCII);
+            exchange.getResponseHeaders().set("Content-Type", "application/pdf");
+            exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"relatorio.pdf\"");
+            exchange.getResponseHeaders().set("X-Report-Filename", "relatorio.pdf");
+            exchange.sendResponseHeaders(200, payload.length);
+            exchange.getResponseBody().write(payload);
+            exchange.close();
+            return;
+        }
+
         String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         String response = """
                 {
@@ -48,6 +60,7 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
                   "path": %s,
                   "query": %s,
                   "authorization": %s,
+                  "billing_webhook_token": %s,
                   "body": %s
                 }
                 """.formatted(
@@ -55,6 +68,7 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
                 json(exchange.getRequestURI().getPath()),
                 json(exchange.getRequestURI().getRawQuery() == null ? "" : exchange.getRequestURI().getRawQuery()),
                 json(exchange.getRequestHeaders().getFirst("Authorization")),
+                json(exchange.getRequestHeaders().getFirst("X-Billing-Webhook-Token")),
                 json(requestBody)
         );
 

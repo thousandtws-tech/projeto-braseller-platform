@@ -9,6 +9,7 @@ public record NotificationPreference(
         boolean monthlyClosingEnabled,
         boolean mlPaymentReleaseEnabled,
         boolean weeklyAccountantReportEnabled,
+        String recipientEmail,
         String accountantEmail,
         Instant updatedAt) {
 
@@ -20,6 +21,7 @@ public record NotificationPreference(
                 true,
                 true,
                 true,
+                null,
                 null,
                 Instant.now()
         );

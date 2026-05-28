@@ -1,6 +1,8 @@
 package com.example.infrastructure.streaming;
 
+import com.example.application.port.out.NewSaleSummaryQuery;
 import com.example.domain.model.TenantNewSaleSummary;
+import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.kafka.streams.KafkaStreams;
@@ -13,12 +15,14 @@ import java.time.Duration;
 import java.util.Optional;
 
 @ApplicationScoped
-public class NewSaleSummaryInteractiveQueries {
+@UnlessBuildProfile("test")
+public class NewSaleSummaryInteractiveQueries implements NewSaleSummaryQuery {
     private static final Duration STORE_WAIT_TIMEOUT = Duration.ofSeconds(2);
 
     @Inject
     KafkaStreams streams;
 
+    @Override
     public Optional<TenantNewSaleSummary> getTenantSummary(String tenantId) {
         return Optional.ofNullable(getSummaryStore().get(tenantId));
     }

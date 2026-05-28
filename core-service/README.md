@@ -37,7 +37,7 @@ Endpoints:
 | `GET` | `/core/connectors` | Lista conectores registrados |
 | `POST` | `/core/connectors/{connectorName}/authenticate` | `authenticate()` |
 | `POST` | `/core/connectors/{connectorName}/refresh-token` | `refreshToken()` |
-| `GET` | `/core/connectors/{connectorName}/orders` | `getOrders(filtros)` |
+| `GET` | `/core/connectors/{connectorName}/orders` | `getOrders(filtros)` com `from`, `to`, `status=paid|pending|cancelled` e `limit` |
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}` | `getOrderDetail(id)` |
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}/payments` | `getPayments(orderId)` |
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}/fees` | `getFees(orderId)` |
@@ -60,14 +60,14 @@ Formato padronizado de pedido:
   "payment_method": "PIX",
   "payment_date": "2026-05-21",
   "release_date": "2026-06-04",
-  "status": "PAID",
+  "status": "paid",
   "buyer_name": "Comprador Sandbox",
   "items": [],
   "invoice_number": "NF-SANDBOX-1001"
 }
 ```
 
-Para adicionar um novo marketplace, crie um adapter em `infrastructure.connector` implementando `MarketplaceConnector`. A camada `application` continua falando apenas com essa porta.
+Para adicionar um novo marketplace, crie um adapter em `infrastructure.connector` implementando `MarketplaceConnector`. A camada `application` continua falando apenas com essa porta. `getInvoices()` e opcional no contrato: conectores sem NF podem usar o default vazio e declarar `supports_invoices=false` no descriptor.
 
 ## Desenvolvimento
 

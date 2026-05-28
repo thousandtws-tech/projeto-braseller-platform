@@ -3,6 +3,9 @@ package com.example;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
+import com.example.application.port.out.MarketplaceConnector;
+import com.example.domain.model.connector.InvoiceFilters;
+
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -72,7 +75,9 @@ class ExampleResourceTest {
                 .body("[0].platform_fee", is(26.40F))
                 .body("[0].net_value", is(173.50F))
                 .body("[0].payment_method", is("PIX"))
-                .body("[0].status", is("PAID"))
+                .body("[0].payment_date", containsString("-"))
+                .body("[0].release_date", containsString("-"))
+                .body("[0].status", is("paid"))
                 .body("[0].buyer_name", is("Comprador Sandbox"))
                 .body("[0].items[0].sku", is("SKU-001"))
                 .body("[0].invoice_number", is("NF-SANDBOX-1001"));
@@ -101,7 +106,43 @@ class ExampleResourceTest {
                 .when().get("/core/connectors/sandbox/status")
                 .then()
                 .statusCode(200)
-                .body("status", is("ACTIVE"));
+                .body("status", is("active"));
+    }
+
+    @Test
+    void acceptsLowercaseOrderStatusFilter() {
+        given()
+                .header("Authorization", "Bearer " + token())
+                .when().get("/core/connectors/sandbox/orders?status=paid")
+                .then()
+                .statusCode(200)
+                .body("[0].status", is("paid"));
+    }
+
+    @Test
+    void appliesOrderFiltersAndRejectsInvalidStatus() {
+        given()
+                .header("Authorization", "Bearer " + token())
+                .when().get("/core/connectors/sandbox/orders?status=cancelled")
+                .then()
+                .statusCode(200)
+                .body("size()", is(0));
+
+        given()
+                .header("Authorization", "Bearer " + token())
+                .when().get("/core/connectors/sandbox/orders?status=unknown")
+                .then()
+                .statusCode(400)
+                .body("message", is("invalid_order_status: unknown"));
+    }
+
+    @Test
+    void invoicesAreOptionalInConnectorContract() throws Exception {
+        boolean defaultMethod = MarketplaceConnector.class
+                .getMethod("getInvoices", String.class, InvoiceFilters.class)
+                .isDefault();
+
+        org.hamcrest.MatcherAssert.assertThat(defaultMethod, is(true));
     }
 
     @Test

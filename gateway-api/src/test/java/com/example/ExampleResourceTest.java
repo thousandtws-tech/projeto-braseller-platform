@@ -5,10 +5,13 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
 @QuarkusTestResource(value = GatewayDownstreamMockResource.class, restrictToAnnotatedClass = true)
@@ -25,7 +28,8 @@ class ExampleResourceTest {
                         "/api/users",
                         "/api/core",
                         "/api/billing",
-                        "/api/notifications"
+                        "/api/notifications",
+                        "/api/reports"
                 ));
     }
 
@@ -75,6 +79,56 @@ class ExampleResourceTest {
                 .contentType("application/json")
                 .body("{\"tenantId\":\"tenant-a\"}")
                 .when().post("/api/notifications/events/new-sale")
+                .then()
+                .statusCode(403)
+                .body("message", containsString("gateway_route_forbidden"));
+    }
+
+    @Test
+    void forwardsReportRequestsToReportingService() {
+        given()
+                .header("Authorization", "Bearer test-token")
+                .when().get("/api/reports/tenants/tenant-a/summary")
+                .then()
+                .statusCode(200)
+                .body("method", is("GET"))
+                .body("path", is("/reports/tenants/tenant-a/summary"));
+    }
+
+    @Test
+    void forwardsBillingWebhookTokenToBillingService() {
+        given()
+                .contentType("application/json")
+                .header("X-Billing-Webhook-Token", "test-webhook-token")
+                .body("{\"provider_event_id\":\"evt-1\"}")
+                .when().post("/api/billing/webhooks")
+                .then()
+                .statusCode(200)
+                .body("method", is("POST"))
+                .body("path", is("/billing/webhooks"))
+                .body("billing_webhook_token", is("test-webhook-token"));
+    }
+
+    @Test
+    void forwardsBinaryReportExportsWithoutChangingBody() {
+        byte[] body = given()
+                .header("Authorization", "Bearer test-token")
+                .when().get("/api/reports/tenants/tenant-a/exports/monthly?month=2026-05&format=pdf")
+                .then()
+                .statusCode(200)
+                .header("Content-Type", containsString("application/pdf"))
+                .header("Content-Disposition", containsString("relatorio.pdf"))
+                .extract().asByteArray();
+
+        assertTrue(new String(body, 0, 4, StandardCharsets.US_ASCII).equals("%PDF"));
+    }
+
+    @Test
+    void blocksInternalReportingEndpoints() {
+        given()
+                .contentType("application/json")
+                .body("{\"tenant_id\":\"tenant-a\"}")
+                .when().post("/api/reports/internal/entries")
                 .then()
                 .statusCode(403)
                 .body("message", containsString("gateway_route_forbidden"));

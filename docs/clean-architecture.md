@@ -26,6 +26,17 @@ Os microservices do modulo Core/Auth/User seguem uma separacao em camadas para m
 
 Servicos com dados tenant-aware devem resolver o tenant a partir do Bearer JWT emitido pelo `auth-service`. `tenantId` recebido por query, body ou header pode ser usado no maximo como parametro de rota a ser comparado contra o claim `tenant_id`, nunca como fonte de autorizacao. `CONTADOR` e leitura; escritas exigem `ADMIN` ou `VENDEDOR` conforme o caso de uso.
 
+## Reporting Service
+
+O `reporting-service` segue o mesmo desenho em camadas para manter o painel financeiro separado do Core. O Core continua como contrato de conectores e normalizacao operacional; o Reporting materializa um read model de consulta para dashboard, tabela de lancamentos e graficos.
+
+- `interfaces.rest`: endpoints `/reports/tenants/{tenantId}/...` e `/reports/internal/**`.
+- `application`: autorizacao tenant-aware, validacao e orquestracao de relatorios.
+- `domain`: modelos de lancamento, filtros, cards, comparativos e dashboard.
+- `infrastructure`: validacao JWT, token interno e repository JDBC.
+
+Endpoints publicos do Reporting devem ser apenas de leitura. Ingestao de lancamentos fica em `/reports/internal/**`, protegida por `X-Internal-Token` e bloqueada no gateway.
+
 Para novos microservices, replique a mesma organizacao antes de adicionar regra de negocio.
 
 ## Camada de conectores no Core

@@ -5,13 +5,14 @@ import com.example.application.command.MlPaymentReleaseNotificationCommand;
 import com.example.application.command.NewSaleNotificationCommand;
 import com.example.application.command.UpdateNotificationPreferenceCommand;
 import com.example.application.command.WeeklyAccountantReportCommand;
+import com.example.application.port.out.NewSaleSummaryQuery;
 import com.example.application.service.NotificationService;
 import com.example.application.service.TenantAuthorizationService;
 import com.example.domain.model.NotificationMessage;
 import com.example.domain.model.NotificationPreference;
+import com.example.domain.model.TenantContext;
 import com.example.domain.model.TenantNewSaleSummary;
 import com.example.infrastructure.security.ConfiguredInternalServiceAuthorizer;
-import com.example.infrastructure.streaming.NewSaleSummaryInteractiveQueries;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -54,7 +55,7 @@ public class NotificationResource {
     ConfiguredInternalServiceAuthorizer internalServiceAuthorizer;
 
     @Inject
-    NewSaleSummaryInteractiveQueries newSaleSummaryInteractiveQueries;
+    NewSaleSummaryQuery newSaleSummaryQuery;
 
     @GET
     @Produces(MediaType.TEXT_PLAIN)
@@ -84,7 +85,7 @@ public class NotificationResource {
             @HeaderParam("Authorization") String authorizationHeader,
             @PathParam("tenantId") String tenantId,
             PreferenceRequest request) {
-        tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        TenantContext context = tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
         return notificationService.updatePreference(new UpdateNotificationPreferenceCommand(
                 tenantId,
                 request.emailEnabled(),
@@ -92,6 +93,7 @@ public class NotificationResource {
                 request.monthlyClosingEnabled(),
                 request.mlPaymentReleaseEnabled(),
                 request.weeklyAccountantReportEnabled(),
+                firstNonBlank(request.recipientEmail(), context.email()),
                 request.accountantEmail()
         ));
     }
@@ -117,7 +119,7 @@ public class NotificationResource {
             @PathParam("tenantId") String tenantId) {
         tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
         try {
-            TenantNewSaleSummary summary = newSaleSummaryInteractiveQueries.getTenantSummary(tenantId)
+            TenantNewSaleSummary summary = newSaleSummaryQuery.getTenantSummary(tenantId)
                     .orElseGet(() -> TenantNewSaleSummary.empty(tenantId));
             return Response.ok(summary).build();
         } catch (IllegalStateException exception) {
@@ -230,6 +232,7 @@ public class NotificationResource {
             Boolean monthlyClosingEnabled,
             Boolean mlPaymentReleaseEnabled,
             Boolean weeklyAccountantReportEnabled,
+            String recipientEmail,
             String accountantEmail) {
     }
 
@@ -259,5 +262,12 @@ public class NotificationResource {
     }
 
     public record ClearReadResponse(int archivedCount) {
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first.trim();
+        }
+        return second == null || second.isBlank() ? null : second.trim();
     }
 }

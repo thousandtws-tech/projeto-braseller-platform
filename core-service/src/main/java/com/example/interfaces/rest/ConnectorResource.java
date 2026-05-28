@@ -1,5 +1,6 @@
 package com.example.interfaces.rest;
 
+import com.example.application.exception.ConnectorValidationException;
 import com.example.application.service.ConnectorService;
 import com.example.application.service.TenantAuthorizationService;
 import com.example.domain.model.TenantContext;
@@ -88,10 +89,10 @@ public class ConnectorResource {
             @PathParam("connectorName") String connectorName,
             @QueryParam("from") LocalDate from,
             @QueryParam("to") LocalDate to,
-            @QueryParam("status") OrderStatus status,
+            @QueryParam("status") String status,
             @QueryParam("limit") Integer limit) {
         TenantContext context = tenantAuthorizationService.requireReadable(authorizationHeader);
-        return connectorService.getOrders(connectorName, context.tenantId(), from, to, status, limit);
+        return connectorService.getOrders(connectorName, context.tenantId(), from, to, parseStatus(status), limit);
     }
 
     @GET
@@ -175,5 +176,13 @@ public class ConnectorResource {
     }
 
     public record SyncAllRequest(Instant since) {
+    }
+
+    private OrderStatus parseStatus(String status) {
+        try {
+            return OrderStatus.fromValue(status);
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectorValidationException(exception.getMessage());
+        }
     }
 }

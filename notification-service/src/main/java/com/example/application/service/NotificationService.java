@@ -55,7 +55,8 @@ public class NotificationService {
                 valueOrDefault(command.monthlyClosingEnabled(), current.monthlyClosingEnabled()),
                 valueOrDefault(command.mlPaymentReleaseEnabled(), current.mlPaymentReleaseEnabled()),
                 valueOrDefault(command.weeklyAccountantReportEnabled(), current.weeklyAccountantReportEnabled()),
-                blankToNull(command.accountantEmail()),
+                firstNonBlank(command.recipientEmail(), current.recipientEmail()),
+                firstNonBlank(command.accountantEmail(), current.accountantEmail()),
                 Instant.now()
         );
         return repository.savePreference(updated);

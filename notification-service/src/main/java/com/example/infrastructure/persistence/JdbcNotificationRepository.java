@@ -45,6 +45,46 @@ public class JdbcNotificationRepository implements NotificationRepository {
     }
 
     @Override
+    public List<NotificationPreference> listMonthlyClosingPreferences() {
+        return listPreferences("""
+                SELECT tenant_id, email_enabled, new_sale_enabled, monthly_closing_enabled,
+                       ml_payment_release_enabled, weekly_accountant_report_enabled,
+                       recipient_email, accountant_email, updated_at
+                FROM notification_preferences
+                WHERE monthly_closing_enabled = TRUE
+                  AND email_enabled = TRUE
+                  AND recipient_email IS NOT NULL
+                ORDER BY tenant_id
+                """);
+    }
+
+    @Override
+    public List<NotificationPreference> listMlPaymentReleasePreferences() {
+        return listPreferences("""
+                SELECT tenant_id, email_enabled, new_sale_enabled, monthly_closing_enabled,
+                       ml_payment_release_enabled, weekly_accountant_report_enabled,
+                       recipient_email, accountant_email, updated_at
+                FROM notification_preferences
+                WHERE ml_payment_release_enabled = TRUE
+                ORDER BY tenant_id
+                """);
+    }
+
+    @Override
+    public List<NotificationPreference> listWeeklyAccountantReportPreferences() {
+        return listPreferences("""
+                SELECT tenant_id, email_enabled, new_sale_enabled, monthly_closing_enabled,
+                       ml_payment_release_enabled, weekly_accountant_report_enabled,
+                       recipient_email, accountant_email, updated_at
+                FROM notification_preferences
+                WHERE weekly_accountant_report_enabled = TRUE
+                  AND email_enabled = TRUE
+                  AND accountant_email IS NOT NULL
+                ORDER BY tenant_id
+                """);
+    }
+
+    @Override
     public NotificationMessage save(NotificationMessage notification) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -163,6 +203,7 @@ public class JdbcNotificationRepository implements NotificationRepository {
                     monthly_closing_enabled = ?,
                     ml_payment_release_enabled = ?,
                     weekly_accountant_report_enabled = ?,
+                    recipient_email = ?,
                     accountant_email = ?,
                     updated_at = ?
                 WHERE tenant_id = ?
@@ -172,9 +213,10 @@ public class JdbcNotificationRepository implements NotificationRepository {
             statement.setBoolean(3, preference.monthlyClosingEnabled());
             statement.setBoolean(4, preference.mlPaymentReleaseEnabled());
             statement.setBoolean(5, preference.weeklyAccountantReportEnabled());
-            statement.setString(6, preference.accountantEmail());
-            statement.setTimestamp(7, Timestamp.from(preference.updatedAt()));
-            statement.setString(8, preference.tenantId());
+            statement.setString(6, preference.recipientEmail());
+            statement.setString(7, preference.accountantEmail());
+            statement.setTimestamp(8, Timestamp.from(preference.updatedAt()));
+            statement.setString(9, preference.tenantId());
             return statement.executeUpdate();
         }
     }
@@ -183,8 +225,8 @@ public class JdbcNotificationRepository implements NotificationRepository {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO notification_preferences
                 (tenant_id, email_enabled, new_sale_enabled, monthly_closing_enabled,
-                 ml_payment_release_enabled, weekly_accountant_report_enabled, accountant_email, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ml_payment_release_enabled, weekly_accountant_report_enabled, recipient_email, accountant_email, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, preference.tenantId());
             statement.setBoolean(2, preference.emailEnabled());
@@ -192,8 +234,9 @@ public class JdbcNotificationRepository implements NotificationRepository {
             statement.setBoolean(4, preference.monthlyClosingEnabled());
             statement.setBoolean(5, preference.mlPaymentReleaseEnabled());
             statement.setBoolean(6, preference.weeklyAccountantReportEnabled());
-            statement.setString(7, preference.accountantEmail());
-            statement.setTimestamp(8, Timestamp.from(preference.updatedAt()));
+            statement.setString(7, preference.recipientEmail());
+            statement.setString(8, preference.accountantEmail());
+            statement.setTimestamp(9, Timestamp.from(preference.updatedAt()));
             statement.executeUpdate();
         }
     }
@@ -202,7 +245,7 @@ public class JdbcNotificationRepository implements NotificationRepository {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT tenant_id, email_enabled, new_sale_enabled, monthly_closing_enabled,
-                            ml_payment_release_enabled, weekly_accountant_report_enabled, accountant_email, updated_at
+                            ml_payment_release_enabled, weekly_accountant_report_enabled, recipient_email, accountant_email, updated_at
                      FROM notification_preferences
                      WHERE tenant_id = ?
                      """)) {
@@ -211,18 +254,38 @@ public class JdbcNotificationRepository implements NotificationRepository {
                 if (!resultSet.next()) {
                     return Optional.empty();
                 }
-                return Optional.of(new NotificationPreference(
-                        resultSet.getString("tenant_id"),
-                        resultSet.getBoolean("email_enabled"),
-                        resultSet.getBoolean("new_sale_enabled"),
-                        resultSet.getBoolean("monthly_closing_enabled"),
-                        resultSet.getBoolean("ml_payment_release_enabled"),
-                        resultSet.getBoolean("weekly_accountant_report_enabled"),
-                        resultSet.getString("accountant_email"),
-                        resultSet.getTimestamp("updated_at").toInstant()
-                ));
+                return Optional.of(readPreference(resultSet));
             }
         }
+    }
+
+    private List<NotificationPreference> listPreferences(String sql) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            List<NotificationPreference> preferences = new ArrayList<>();
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    preferences.add(readPreference(resultSet));
+                }
+            }
+            return preferences;
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not list notification preferences", exception);
+        }
+    }
+
+    private NotificationPreference readPreference(ResultSet resultSet) throws SQLException {
+        return new NotificationPreference(
+                resultSet.getString("tenant_id"),
+                resultSet.getBoolean("email_enabled"),
+                resultSet.getBoolean("new_sale_enabled"),
+                resultSet.getBoolean("monthly_closing_enabled"),
+                resultSet.getBoolean("ml_payment_release_enabled"),
+                resultSet.getBoolean("weekly_accountant_report_enabled"),
+                resultSet.getString("recipient_email"),
+                resultSet.getString("accountant_email"),
+                resultSet.getTimestamp("updated_at").toInstant()
+        );
     }
 
     private Optional<NotificationMessage> findNotification(Connection connection, String tenantId, String notificationId) throws SQLException {

@@ -10,6 +10,7 @@ Configurado em `prometheus.yml` para raspar `/q/metrics` dos servicos pela rede 
 - `core-service:8080`
 - `billing-service:8080`
 - `notification-service:8080`
+- `reporting-service:8080`
 - `user-service:8080`
 - `auth-service:8080`
 

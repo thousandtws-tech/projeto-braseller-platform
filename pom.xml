@@ -13,6 +13,7 @@
         <module>core-service</module>
         <module>billing-service</module>
         <module>notification-service</module>
+        <module>reporting-service</module>
         <module>user-service</module>
         <module>auth-service</module>
     </modules>

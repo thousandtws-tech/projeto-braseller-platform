@@ -27,6 +27,12 @@ scrape_configs:
       - targets:
           - notification-service:8080
 
+  - job_name: reporting-service
+    metrics_path: /q/metrics
+    static_configs:
+      - targets:
+          - reporting-service:8080
+
   - job_name: user-service
     metrics_path: /q/metrics
     static_configs:
