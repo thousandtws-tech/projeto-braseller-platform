@@ -15,6 +15,7 @@ Padrao aplicado:
 - Comunicacao assincrona por Kafka para eventos de nova venda entre `core-service` e `notification-service`.
 - Jobs do `notification-service` consultam o `reporting-service` por endpoints internos para montar fechamento mensal, alerta de liberacao ML e relatorio semanal ao contador.
 - Observabilidade via `/q/health`, `/q/metrics`, Prometheus e Grafana.
+- Evolucao funcional em duas versoes: MVP com integracao de marketplaces + complementos manuais, e versao completa com fiscal, estoque, custos, conciliacao bancaria e logistica integrados por APIs/adapters.
 
 ## Diagrama UML de Componentes
 
@@ -58,6 +59,9 @@ flowchart LR
 
     subgraph External["Integracoes externas"]
         Marketplaces["Marketplaces<br/>Mercado Livre/Shopee/Amazon/etc.<br/>via adapters"]
+        FiscalProviders["APIs fiscais futuras<br/>NF-e/XML/impostos"]
+        BankProviders["APIs bancarias futuras<br/>extrato, tarifas e conciliacao"]
+        LogisticsProviders["APIs logisticas futuras<br/>frete e rastreio"]
         PaymentProviders["Stripe/Pagar.me<br/>integracao futura<br/>webhooks de cobranca"]
         SMTP["SMTP/Mailer"]
     end
@@ -91,6 +95,9 @@ flowchart LR
     GW --> GatewayDB
 
     Core -->|"MarketplaceConnector"| Marketplaces
+    Core -. "FiscalProvider adapter futuro" .-> FiscalProviders
+    Core -. "BankProvider adapter futuro" .-> BankProviders
+    Core -. "LogisticsProvider adapter futuro" .-> LogisticsProviders
     Core -->|"lancamentos normalizados<br/>POST /reports/internal/entries"| Reporting
     Core -->|"publica NewSaleEvent"| Kafka
     Kafka -->|"consome grupo notification-service"| Notification
@@ -183,7 +190,7 @@ flowchart TB
 | `gateway-api` | Borda publica HTTP | Resolve o segmento `/api/{service}`, valida metodo, bloqueia paths internos e encaminha para downstream via REST Client. | REST para `auth`, `users`, `core`, `billing`, `notifications` e `reports`; propaga headers `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept`, `Content-Type` e `X-Billing-Webhook-Token`. | `gateway_api`, atualmente metadados/migrations base. |
 | `auth-service` | Autenticacao e JWT da plataforma | Registra, autentica, renova e encerra sessoes. Usa Keycloak para credenciais/sessoes/OAuth e emite JWT interno com `tenant_id`, `user_id`, `roles/groups`. Sincroniza perfil com `user-service`. | Keycloak, `user-service` por `X-Internal-Token`, `TokenIssuer`, `AuthIdentityRepository`. | `auth_identities`, `auth_sessions`. |
 | `user-service` | Fonte de tenants, usuarios, papeis e contador | Cria tenant e admin inicial, concede acesso `CONTADOR` read-only, lista membros, verifica senha e sincroniza perfil externo para uso interno do auth. | Valida JWT HS256 nos endpoints tenant-aware; aceita `X-Internal-Token` nos endpoints `/users/internal/**`. | `tenants`, `user_accounts`, `user_roles`, `accountant_access`. |
-| `core-service` | Contexto tenant-aware e contratos de marketplace | Valida contexto JWT, aplica leitura/escrita por papel, resolve conector por nome, normaliza pedidos/pagamentos/taxas/notas e publica eventos de nova venda apos `sync-all`. | Kafka topic `brasaller.notifications.new-sale.v1`; adapters `MarketplaceConnector`; hoje existe `sandbox`. | `tenant_context_audit` e metadados base. |
+| `core-service` | Contexto tenant-aware e contratos de marketplace | Valida contexto JWT, aplica leitura/escrita por papel, resolve conector por nome, normaliza pedidos/pagamentos/taxas/notas e publica eventos de nova venda apos `sync-all`. | Kafka topic `brasaller.notifications.new-sale.v1`; adapters `MarketplaceConnector`; hoje existem `sandbox` e `mercado-livre`. | `tenant_context_audit`, `marketplace_connector_tokens` e metadados base. |
 | `notification-service` | Notificacoes, alertas, e-mail e analytics de venda | Gerencia preferencias por tenant, cria notificacoes in-app, envia e-mail quando habilitado, consome `NewSaleEvent`, mantem resumo por tenant via Kafka Streams/KTable e executa jobs automaticos de fechamento mensal, liberacao ML e relatorio semanal. | Kafka input, DLQ, Kafka Streams, SMTP/Mailer, `reporting-service` por REST interno, JWT HS256, `X-Internal-Token` para eventos internos. | `notification_preferences`, `notifications`, `notification_deliveries`, state store Kafka Streams. |
 | `billing-service` | Planos, trial, assinaturas e cobranca recorrente | Lista planos `BASIC`, `PRO` e `AGENCY`, cria trial gratuito de 14 dias, consulta assinatura do tenant, permite upgrade/downgrade e aplica webhooks de ativacao/suspensao/cancelamento. | JWT HS256 nos endpoints tenant-aware; `X-Billing-Webhook-Token` em `/billing/webhooks`; `BillingProviderGateway` local hoje e adapter futuro para Stripe/Pagar.me. | `billing_plans`, `billing_subscriptions`, `billing_webhook_events`. |
 | `reporting-service` | Painel financeiro, relatorios e exportacoes | Materializa lancamentos por tenant, soma faturado/recebido/taxas/a receber, oferece filtros, busca, ordenacao, tabela, graficos, exportacao PDF/XLSX/CSV e consultas internas para automacoes. | JWT HS256 para leitura; `X-Internal-Token` em `/reports/internal/**` para ingestao e consultas service-to-service; renderizadores `ReportExportRenderer`. | `report_entries`. |
@@ -569,6 +576,97 @@ sequenceDiagram
     Store-->>Store: atualiza saleCount, grossRevenue, ultimo pedido/evento
 ```
 
+## Fluxo UML - Operacao Comercial em Duas Versoes
+
+### Versao 1 - MVP
+
+Objetivo: entregar valor rapido com pedidos, pagamentos, taxas, custos manuais e relatorios. O sistema importa automaticamente o que o marketplace disponibiliza e complementa internamente o que nao vem da plataforma.
+
+```mermaid
+flowchart LR
+    Seller["Vendedor/Admin"]
+    Accountant["Contador"]
+    Gateway["gateway-api<br/>/api"]
+    Core["core-service<br/>MarketplaceConnector"]
+    ML["Mercado Livre API<br/>orders, payments, users"]
+    OtherMkt["Shopee/Amazon/etc.<br/>adapters futuros"]
+    Manual["Cadastros manuais<br/>empresa, SKU, custo unitario,<br/>despesas, anexos"]
+    Reporting["reporting-service<br/>dashboard e exportacao"]
+    Notification["notification-service<br/>alertas"]
+    Reports["Relatorios<br/>margem, taxas, a receber,<br/>exportacao contador"]
+
+    Seller -->|"OAuth + sync-all"| Gateway
+    Gateway --> Core
+    Core -->|"GET /orders/search<br/>GET /orders/{id}<br/>GET /payments/{id}<br/>GET /users/{id}"| ML
+    Core -. "adapters futuros" .-> OtherMkt
+    Seller -->|"complementa dados internos"| Manual
+    Core -->|"pedido, pagamento, frete, taxas marketplace"| Reporting
+    Manual -->|"custo, despesa, SKU, empresa, anexos"| Reporting
+    Reporting --> Reports
+    Notification --> Reports
+    Accountant -->|"acesso read-only"| Reports
+```
+
+Escopo funcional do MVP:
+
+- Cadastro de empresa com regime tributario informado manualmente: Simples, Lucro Presumido ou Lucro Real.
+- Cadastro simples de produto/SKU e custo unitario para calculo de margem.
+- Importacao automatica de pedidos, itens, pagamentos, taxas, frete e status quando a API do marketplace disponibilizar.
+- Lancamento manual de custos operacionais, taxas bancarias, insumos, embalagem, mao de obra e outras despesas.
+- Status do pedido puxado do marketplace e status interno simples para etapas operacionais.
+- Cancelamento, devolucao, avaria e perda registrados como status/movimentacao manual quando a API nao informar.
+- Anexos opcionais para documentos de apoio; validacao fiscal fica com o contador.
+
+### Versao 2 - Completa / Evolutiva
+
+Objetivo: evoluir o MVP para uma operacao mais parecida com ERP/financeiro, com integracoes fiscais, estoque, conciliacao bancaria e logistica.
+
+```mermaid
+flowchart LR
+    Seller["Vendedor/Admin"]
+    Gateway["gateway-api<br/>/api"]
+    Core["core-service<br/>orquestracao e adapters"]
+    Marketplaces["Marketplaces<br/>ML/Shopee/Amazon"]
+    FiscalAPI["API fiscal<br/>NF-e, XML, impostos"]
+    BankAPI["Banco/Open Finance<br/>extratos, tarifas, recebimentos"]
+    LogisticsAPI["Transportadoras/Correios<br/>frete e rastreio"]
+    ProductInventory["Modulo produtos/estoque<br/>SKU, NF entrada, custo medio,<br/>perda, avaria, devolucao"]
+    Finance["Modulo financeiro<br/>conciliacao, taxas, despesas,<br/>margem real"]
+    Reporting["reporting-service<br/>read model consolidado"]
+    Notification["notification-service<br/>alertas operacionais"]
+    Accountant["Contador"]
+
+    Seller --> Gateway
+    Gateway --> Core
+    Core -->|"pedidos, pagamentos, taxas, status"| Marketplaces
+    Core -->|"NF emitida, NF entrada, XML, impostos"| FiscalAPI
+    Core -->|"recebimentos, tarifas bancarias"| BankAPI
+    Core -->|"frete externo, rastreio"| LogisticsAPI
+
+    Marketplaces --> ProductInventory
+    FiscalAPI --> ProductInventory
+    FiscalAPI --> Finance
+    BankAPI --> Finance
+    LogisticsAPI --> Finance
+    ProductInventory --> Reporting
+    Finance --> Reporting
+    Reporting --> Accountant
+    Reporting --> Seller
+    Notification --> Seller
+```
+
+Escopo funcional evolutivo:
+
+- Importacao de XML/NF de entrada para alimentar estoque, custo de aquisicao e documentos fiscais.
+- Consulta/ingestao de NF emitida para capturar impostos reais da venda quando o provedor fiscal disponibilizar.
+- Controle de estoque por SKU com entrada, saida por venda, devolucao, perda, avaria e ajuste.
+- Conciliacao bancaria por API ou importacao de extrato para tarifas bancarias, recebimentos e divergencias.
+- Regras fiscais parametrizadas por regime tributario e apoio ao contador nos relatorios.
+- Frete, seguro, descontos, outras despesas da NF e custos extras como componentes do pedido/lancamento financeiro.
+- Workflow operacional completo: pago, separacao, NF emitida, expedicao, enviado, recebido, cancelado, devolvido, avariado ou perdido.
+
+Decisao de arquitetura: APIs externas entram sempre como adapters nas camadas de infraestrutura. A camada de aplicacao continua falando por portas internas, evitando acoplamento direto com Mercado Livre, provedor fiscal, banco ou transportadora.
+
 ## Fluxo UML - Consulta de Notificacoes e Resumo de Vendas
 
 ```mermaid
@@ -787,6 +885,7 @@ erDiagram
     BILLING_SUBSCRIPTIONS ||--o{ BILLING_WEBHOOK_EVENTS : atualiza
     TENANTS ||--o{ REPORT_ENTRIES : materializa
     TENANTS ||--o{ BILLING_SUBSCRIPTIONS : assina
+    TENANTS ||--o{ MARKETPLACE_CONNECTOR_TOKENS : autentica
 
     TENANTS {
         string id PK
@@ -894,6 +993,15 @@ erDiagram
         string status
         date release_date
     }
+    MARKETPLACE_CONNECTOR_TOKENS {
+        string tenant_id PK
+        string connector_name PK
+        string seller_id
+        string access_token
+        string refresh_token
+        timestamp expires_at
+        timestamp updated_at
+    }
 ```
 
 ## Observacoes de Estado Atual
@@ -901,6 +1009,7 @@ erDiagram
 - `auth-service`, `user-service`, `core-service`, `billing-service`, `notification-service`, `reporting-service` e `gateway-api` possuem logica de negocio implementada em Clean Architecture.
 - `billing-service` possui dominio inicial de planos, trial, assinatura e webhooks. A integracao real com Stripe/Pagar.me ainda deve substituir o adapter `LocalBillingProviderGateway`.
 - `reporting-service` possui read model financeiro, endpoints de dashboard/graficos/tabela e motor unico de exportacao PDF/XLSX/CSV.
-- O conector de marketplace implementado e `sandbox`; novos marketplaces devem entrar como adapters em `core-service/src/main/java/com/example/infrastructure/connector` implementando `MarketplaceConnector`.
+- Os conectores de marketplace implementados sao `sandbox` e `mercado-livre`; novos marketplaces devem entrar como adapters em `core-service/src/main/java/com/example/infrastructure/connector` implementando `MarketplaceConnector`.
+- O conector `mercado-livre` usa OAuth 2.0, persiste tokens por tenant em `marketplace_connector_tokens`, renova token automaticamente antes do vencimento e normaliza pedidos, pagamentos, taxas, frete e datas para o contrato padrao do Core.
 - Eventos internos de notificacao existem por REST (`/notifications/events/**`), o caminho preferido para nova venda ja e Kafka a partir do `core-service`, e os alertas recorrentes consultam `reporting-service` por contrato interno.
 - Kafka hoje nao e usado diretamente por `billing-service` nem `reporting-service`.

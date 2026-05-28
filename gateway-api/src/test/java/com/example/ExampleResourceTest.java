@@ -85,10 +85,32 @@ class ExampleResourceTest {
     }
 
     @Test
+    void forwardsNotificationAliasRequestsToNotificationService() {
+        given()
+                .header("Authorization", "Bearer test-token")
+                .when().get("/api/notification/preferences")
+                .then()
+                .statusCode(200)
+                .body("method", is("GET"))
+                .body("path", is("/notifications/preferences"));
+    }
+
+    @Test
     void forwardsReportRequestsToReportingService() {
         given()
                 .header("Authorization", "Bearer test-token")
                 .when().get("/api/reports/tenants/tenant-a/summary")
+                .then()
+                .statusCode(200)
+                .body("method", is("GET"))
+                .body("path", is("/reports/tenants/tenant-a/summary"));
+    }
+
+    @Test
+    void forwardsReportingAliasRequestsToReportingService() {
+        given()
+                .header("Authorization", "Bearer test-token")
+                .when().get("/api/reporting/tenants/tenant-a/summary")
                 .then()
                 .statusCode(200)
                 .body("method", is("GET"))

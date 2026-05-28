@@ -29,6 +29,7 @@ O Core define o contrato padronizado para conectores de marketplace. Ele nao imp
 Conector de validacao disponivel:
 
 - `sandbox`: implementacao local para exercitar o contrato completo sem depender de marketplace real.
+- `mercado-livre`: adapter MVP para MELI API com OAuth 2.0, pedidos, pagamentos, taxas e refresh automatico de token.
 
 Endpoints:
 
@@ -68,6 +69,27 @@ Formato padronizado de pedido:
 ```
 
 Para adicionar um novo marketplace, crie um adapter em `infrastructure.connector` implementando `MarketplaceConnector`. A camada `application` continua falando apenas com essa porta. `getInvoices()` e opcional no contrato: conectores sem NF podem usar o default vazio e declarar `supports_invoices=false` no descriptor.
+
+## Conector Mercado Livre
+
+Variaveis necessarias para habilitar o OAuth:
+
+```shell
+MERCADOLIVRE_CLIENT_ID=
+MERCADOLIVRE_CLIENT_SECRET=
+MERCADOLIVRE_REDIRECT_URI=
+MERCADOLIVRE_REFRESH_SKEW_SECONDS=300
+```
+
+Fluxo de uso:
+
+1. Cadastre o app em `developers.mercadolivre.com.br` com a mesma `redirect_uri`.
+2. Apos receber o `code` OAuth, chame `POST /core/connectors/mercado-livre/authenticate`.
+3. O Core salva `access_token`, `refresh_token`, `seller_id` e vencimento por tenant.
+4. Chamadas de leitura usam `/orders/search`, `/orders/{id}`, `/payments/{id}` e `/users/{id}` via `https://api.mercadolibre.com`.
+5. Antes de expirar, o conector troca o refresh token automaticamente e persiste o novo par de tokens.
+
+Datas retornadas em UTC pela MELI API sao normalizadas para `America/Sao_Paulo` no formato padrao do Core. Taxas normalizadas somam `sale_fee` e `shipping_cost`.
 
 ## Desenvolvimento
 

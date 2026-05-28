@@ -59,6 +59,7 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(200)
                 .body("name", hasItem("sandbox"))
+                .body("name", hasItem("mercado-livre"))
                 .body("required_methods.flatten()", hasItem("getOrders"));
     }
 
@@ -107,6 +108,18 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(200)
                 .body("status", is("active"));
+    }
+
+    @Test
+    void mercadoLivreConnectorReportsDisconnectedWhenOAuthIsNotConfigured() {
+        given()
+                .header("Authorization", "Bearer " + token())
+                .when().get("/core/connectors/mercado-livre/status")
+                .then()
+                .statusCode(200)
+                .body("platform", is("mercado-livre"))
+                .body("status", is("disconnected"))
+                .body("message", is("mercado_livre_oauth_not_configured"));
     }
 
     @Test

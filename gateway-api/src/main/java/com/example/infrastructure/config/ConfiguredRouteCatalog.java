@@ -36,9 +36,20 @@ public class ConfiguredRouteCatalog implements RouteCatalog {
     @Override
     public Optional<DownstreamRoute> findByPublicSegment(String publicSegment) {
         String normalizedSegment = publicSegment == null ? "" : publicSegment.trim().toLowerCase(Locale.ROOT);
+        String resolvedSegment = resolveAlias(normalizedSegment);
         return routes.stream()
-                .filter(route -> route.publicSegment().equals(normalizedSegment))
+                .filter(route -> route.publicSegment().equals(resolvedSegment))
                 .findFirst();
+    }
+
+    private String resolveAlias(String publicSegment) {
+        if ("notification".equals(publicSegment)) {
+            return "notifications";
+        }
+        if ("reporting".equals(publicSegment)) {
+            return "reports";
+        }
+        return publicSegment;
     }
 
     @Override

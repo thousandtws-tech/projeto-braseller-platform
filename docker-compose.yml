@@ -258,6 +258,10 @@ services:
       DB_USERNAME: ${CORE_DB_USERNAME:-core_service}
       DB_PASSWORD: ${CORE_DB_PASSWORD:-core_service_password}
       DB_JDBC_URL: jdbc:postgresql://core-service-postgres:5432/${CORE_DB_NAME:-core_service}
+      MERCADOLIVRE_CLIENT_ID: ${MERCADOLIVRE_CLIENT_ID:-}
+      MERCADOLIVRE_CLIENT_SECRET: ${MERCADOLIVRE_CLIENT_SECRET:-}
+      MERCADOLIVRE_REDIRECT_URI: ${MERCADOLIVRE_REDIRECT_URI:-}
+      MERCADOLIVRE_REFRESH_SKEW_SECONDS: ${MERCADOLIVRE_REFRESH_SKEW_SECONDS:-300}
     depends_on:
       core-service-postgres:
         condition: service_healthy
