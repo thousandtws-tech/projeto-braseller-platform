@@ -125,7 +125,7 @@ public class GatewayResource {
     private Response toRestResponse(GatewayResponse response) {
         Response.ResponseBuilder builder = Response.status(response.status());
         response.headers().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
-        if (response.body().isBlank()) {
+        if (!response.hasBody()) {
             return builder.build();
         }
         return builder.entity(response.body()).build();

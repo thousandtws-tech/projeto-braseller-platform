@@ -7,5 +7,6 @@ public record UpdateNotificationPreferenceCommand(
         Boolean monthlyClosingEnabled,
         Boolean mlPaymentReleaseEnabled,
         Boolean weeklyAccountantReportEnabled,
+        String recipientEmail,
         String accountantEmail) {
 }

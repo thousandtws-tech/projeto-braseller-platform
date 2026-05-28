@@ -2,6 +2,7 @@ package com.example.infrastructure.streaming;
 
 import com.example.domain.model.TenantNewSaleSummary;
 import com.example.infrastructure.messaging.NewSaleEvent;
+import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.kafka.client.serialization.ObjectMapperSerde;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -19,6 +20,7 @@ import org.apache.kafka.streams.state.Stores;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
+@UnlessBuildProfile("test")
 public class NewSaleStreamsTopology {
     public static final String TENANT_NEW_SALE_SUMMARY_STORE = "tenant-new-sale-summary-store";
 

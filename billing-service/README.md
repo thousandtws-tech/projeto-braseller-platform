@@ -1,62 +1,62 @@
 # billing-service
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Microservice Quarkus responsavel por planos, trials, assinaturas e eventos de cobranca do BraSeller.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+A integracao real com Stripe ou Pagar.me ainda nao foi implementada. O servico ja deixa essa fronteira isolada na porta `BillingProviderGateway` e usa um adapter `LOCAL` para validar o fluxo enquanto o provedor definitivo nao entra.
 
-## Running the application in dev mode
+## Endpoints locais
 
-You can run your application in dev mode that enables live coding using:
+- API: `http://localhost:8082/billing`
+- Health: `http://localhost:8082/q/health`
+- Metrics: `http://localhost:8082/q/metrics`
+- OpenAPI: `http://localhost:8082/q/openapi`
+- Swagger UI: `http://localhost:8082/q/swagger-ui`
 
-```shell script
+## Contratos
+
+- `GET /billing`: status do servico.
+- `GET /billing/plans`: lista planos `BASIC`, `PRO` e `AGENCY`.
+- `GET /billing/tenants/{tenantId}/subscription`: consulta assinatura atual do tenant.
+- `POST /billing/tenants/{tenantId}/trial`: inicia trial gratuito de 14 dias.
+- `PUT /billing/tenants/{tenantId}/subscription/plan`: upgrade ou downgrade pelo usuario.
+- `POST /billing/webhooks`: aplica eventos de cobranca do provedor.
+
+## Planos
+
+- `BASIC`: plano inicial para um marketplace.
+- `PRO`: plano multi-marketplace para operacao recorrente.
+- `AGENCY`: plano para agencias e contadores com maior limite operacional.
+
+Todos os planos iniciam com `trial_days = 14`.
+
+## Webhooks
+
+Enquanto Stripe/Pagar.me nao entram, os webhooks aceitam eventos normalizados:
+
+- `SUBSCRIPTION_ACTIVATED`
+- `PAYMENT_SUCCEEDED`
+- `PAYMENT_FAILED`
+- `SUBSCRIPTION_SUSPENDED`
+- `SUBSCRIPTION_CANCELLED`
+
+O endpoint exige `X-Billing-Webhook-Token`, configurado por `BILLING_WEBHOOK_TOKEN`.
+
+## Controle de acesso
+
+Consultas de assinatura exigem Bearer JWT do mesmo tenant.
+
+- `ADMIN`, `VENDEDOR` e `CONTADOR`: podem consultar.
+- `ADMIN` e `VENDEDOR`: podem iniciar trial e alterar plano.
+- `CONTADOR`: somente leitura.
+
+## Desenvolvimento
+
+```shell
 ./mvnw quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+## Build
 
-## Packaging and running the application
-
-The application can be packaged using:
-
-```shell script
-./mvnw package
+```shell
+./mvnw verify
 ```
-
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
-
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/billing-service-1.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Provided Code
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)

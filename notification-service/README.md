@@ -26,7 +26,7 @@ Microservice Quarkus para notificacoes, alertas e comunicacao com usuarios.
 | --- | --- | --- |
 | `GET` | `/notifications` | Status do servico |
 | `GET` | `/notifications/tenants/{tenantId}/preferences` | Consultar preferencias |
-| `PUT` | `/notifications/tenants/{tenantId}/preferences` | Atualizar preferencias |
+| `PUT` | `/notifications/tenants/{tenantId}/preferences` | Atualizar preferencias, e-mail do usuario e e-mail do contador |
 | `GET` | `/notifications/tenants/{tenantId}` | Listar notificacoes |
 | `GET` | `/notifications/tenants/{tenantId}/new-sale-summary` | Resumo materializado via Kafka Streams/KTable |
 | `PATCH` | `/notifications/tenants/{tenantId}/{notificationId}/read` | Marcar como lida |
@@ -78,7 +78,13 @@ NOTIFICATION_ML_PAYMENT_RELEASE_CRON=0 0/30 * * * ?
 NOTIFICATION_WEEKLY_ACCOUNTANT_REPORT_CRON=0 0 8 ? * MON
 ```
 
-Os jobs estao preparados como pontos de orquestracao. Enquanto os contratos de vendas, Mercado Livre e contabilidade nao existem no repo, os disparos reais entram pelos endpoints de eventos.
+Os jobs executam a orquestracao real:
+
+- Fechamento mensal: lista tenants com `monthlyClosingEnabled`, busca o resumo no `reporting-service` e envia e-mail ao `recipientEmail`.
+- Pagamento ML proximo de liberar: busca no `reporting-service` pagamentos `mercado-livre` com `release_date` dentro da janela configurada e cria alerta.
+- Relatorio semanal ao contador: lista tenants com `weeklyAccountantReportEnabled`, busca resumo semanal no `reporting-service` e envia ao `accountantEmail`.
+
+O `reporting-service` e chamado por endpoints internos protegidos por `X-Internal-Token`.
 
 ## Desenvolvimento
 

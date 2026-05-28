@@ -13,6 +13,12 @@ public interface NotificationRepository {
 
     NotificationPreference savePreference(NotificationPreference preference);
 
+    List<NotificationPreference> listMonthlyClosingPreferences();
+
+    List<NotificationPreference> listMlPaymentReleasePreferences();
+
+    List<NotificationPreference> listWeeklyAccountantReportPreferences();
+
     NotificationMessage save(NotificationMessage notification);
 
     void recordDelivery(String notificationId, NotificationChannel channel, DeliveryStatus status, String errorMessage);

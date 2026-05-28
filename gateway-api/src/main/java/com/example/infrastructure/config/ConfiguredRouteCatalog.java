@@ -21,13 +21,15 @@ public class ConfiguredRouteCatalog implements RouteCatalog {
             @ConfigProperty(name = "gateway.services.user.url") String userServiceUrl,
             @ConfigProperty(name = "gateway.services.core.url") String coreServiceUrl,
             @ConfigProperty(name = "gateway.services.billing.url") String billingServiceUrl,
-            @ConfigProperty(name = "gateway.services.notification.url") String notificationServiceUrl) {
+            @ConfigProperty(name = "gateway.services.notification.url") String notificationServiceUrl,
+            @ConfigProperty(name = "gateway.services.reporting.url") String reportingServiceUrl) {
         this.routes = List.of(
                 new DownstreamRoute("auth", "auth-service", URI.create(authServiceUrl), "/auth"),
                 new DownstreamRoute("users", "user-service", URI.create(userServiceUrl), "/users", List.of("internal")),
                 new DownstreamRoute("core", "core-service", URI.create(coreServiceUrl), "/core"),
                 new DownstreamRoute("billing", "billing-service", URI.create(billingServiceUrl), "/billing"),
-                new DownstreamRoute("notifications", "notification-service", URI.create(notificationServiceUrl), "/notifications", List.of("events"))
+                new DownstreamRoute("notifications", "notification-service", URI.create(notificationServiceUrl), "/notifications", List.of("events")),
+                new DownstreamRoute("reports", "reporting-service", URI.create(reportingServiceUrl), "/reports", List.of("internal"))
         );
     }
 
