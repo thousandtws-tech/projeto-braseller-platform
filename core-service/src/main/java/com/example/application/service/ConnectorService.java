@@ -53,11 +53,10 @@ public class ConnectorService {
         ));
     }
 
-    public ConnectorToken refreshToken(String connectorName, String tenantId, String refreshToken) {
+    public ConnectorToken refreshToken(String connectorName, String tenantId) {
         return connector(connectorName).refreshToken(new ConnectorRefreshTokenCommand(
                 connectorName,
-                requireText(tenantId, "tenantId"),
-                requireText(refreshToken, "refreshToken")
+                requireText(tenantId, "tenantId")
         ));
     }
 

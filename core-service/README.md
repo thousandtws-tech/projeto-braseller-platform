@@ -37,7 +37,7 @@ Endpoints:
 | --- | --- | --- |
 | `GET` | `/core/connectors` | Lista conectores registrados |
 | `POST` | `/core/connectors/{connectorName}/authenticate` | `authenticate()` |
-| `POST` | `/core/connectors/{connectorName}/refresh-token` | `refreshToken()` |
+| `POST` | `/core/connectors/{connectorName}/refresh-token` | `refreshToken()` usando o refresh token criptografado no Core |
 | `GET` | `/core/connectors/{connectorName}/orders` | `getOrders(filtros)` com `from`, `to`, `status=paid|pending|cancelled` e `limit` |
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}` | `getOrderDetail(id)` |
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}/payments` | `getPayments(orderId)` |
@@ -46,7 +46,7 @@ Endpoints:
 | `POST` | `/core/connectors/{connectorName}/sync-all` | `syncAll(desde)` |
 | `GET` | `/core/connectors/{connectorName}/status` | `getStatus()` |
 
-Todos os endpoints de conector, exceto a listagem de conectores registrados, exigem Bearer JWT. Consultas aceitam `ADMIN`, `VENDEDOR` ou `CONTADOR`; autenticacao, refresh e sincronizacao exigem `ADMIN` ou `VENDEDOR`.
+Todos os endpoints de conector, exceto a listagem de conectores registrados, exigem Bearer JWT. Consultas aceitam `ADMIN`, `VENDEDOR` ou `CONTADOR`; autenticacao, refresh e sincronizacao exigem `ADMIN` ou `VENDEDOR`. Respostas HTTP nunca expõem `access_token` ou `refresh_token` de marketplace.
 
 Formato padronizado de pedido:
 
@@ -79,15 +79,18 @@ MERCADOLIVRE_CLIENT_ID=
 MERCADOLIVRE_CLIENT_SECRET=
 MERCADOLIVRE_REDIRECT_URI=
 MERCADOLIVRE_REFRESH_SKEW_SECONDS=300
+CONNECTOR_TOKEN_ENCRYPTION_KEY=
 ```
 
 Fluxo de uso:
 
 1. Cadastre o app em `developers.mercadolivre.com.br` com a mesma `redirect_uri`.
 2. Apos receber o `code` OAuth, chame `POST /core/connectors/mercado-livre/authenticate`.
-3. O Core salva `access_token`, `refresh_token`, `seller_id` e vencimento por tenant.
+3. O Core salva `access_token`, `refresh_token`, `seller_id` e vencimento por tenant; os tokens ficam criptografados com AES-256 no banco.
 4. Chamadas de leitura usam `/orders/search`, `/orders/{id}`, `/payments/{id}` e `/users/{id}` via `https://api.mercadolibre.com`.
-5. Antes de expirar, o conector troca o refresh token automaticamente e persiste o novo par de tokens.
+5. Antes de expirar, o conector troca o refresh token automaticamente e persiste o novo par de tokens criptografado.
+
+O frontend envia apenas o `code` OAuth e nunca trafega tokens da plataforma diretamente. `POST /refresh-token` nao recebe token no body; ele usa o segredo persistido no Core.
 
 Datas retornadas em UTC pela MELI API sao normalizadas para `America/Sao_Paulo` no formato padrao do Core. Taxas normalizadas somam `sale_fee` e `shipping_cost`.
 

@@ -2,7 +2,7 @@ CREATE TABLE billing_plans (
     code VARCHAR(40) PRIMARY KEY,
     name VARCHAR(80) NOT NULL,
     description VARCHAR(240) NOT NULL,
-    monthly_price NUMERIC(19, 2) NOT NULL,
+    monthly_price DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(3) NOT NULL,
     trial_days INTEGER NOT NULL,
     marketplace_limit INTEGER NOT NULL,

@@ -1,13 +1,27 @@
 package com.example.interfaces.rest;
 
+import com.example.application.command.CreateExpenseCommand;
+import com.example.application.command.UpdateExpenseCommand;
 import com.example.application.command.UpsertReportEntryCommand;
+import com.example.application.command.UpsertFiscalProfileCommand;
 import com.example.application.exception.ValidationException;
+import com.example.application.service.CloudinaryUploadSignatureService;
+import com.example.application.service.FiscalAccountingService;
 import com.example.application.service.ReportExportService;
 import com.example.application.service.ReportingService;
 import com.example.application.service.TenantAuthorizationService;
+import com.example.domain.model.AccountingPeriodClosing;
 import com.example.domain.model.AvailableFilters;
+import com.example.domain.model.CloudinaryUploadSignature;
 import com.example.domain.model.DashboardView;
+import com.example.domain.model.DreStatement;
+import com.example.domain.model.ExpenseAttachment;
+import com.example.domain.model.ExpenseCategory;
+import com.example.domain.model.ExpenseEntry;
+import com.example.domain.model.ExpenseFilter;
+import com.example.domain.model.ExpensePage;
 import com.example.domain.model.FinancialSummary;
+import com.example.domain.model.FiscalProfile;
 import com.example.domain.model.MonthlyEvolutionPoint;
 import com.example.domain.model.PaymentMethod;
 import com.example.domain.model.PaymentReleaseAlert;
@@ -18,16 +32,20 @@ import com.example.domain.model.ReportEntryStatus;
 import com.example.domain.model.ReportExportFile;
 import com.example.domain.model.ReportExportFormat;
 import com.example.domain.model.ReportFilter;
+import com.example.domain.model.TaxRegime;
+import com.example.domain.model.TenantContext;
 import com.example.infrastructure.security.ConfiguredInternalServiceAuthorizer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -52,6 +70,12 @@ import java.util.Locale;
 public class ReportingResource {
     @Inject
     ReportingService reportingService;
+
+    @Inject
+    FiscalAccountingService fiscalAccountingService;
+
+    @Inject
+    CloudinaryUploadSignatureService cloudinaryUploadSignatureService;
 
     @Inject
     ReportExportService reportExportService;
@@ -194,6 +218,181 @@ public class ReportingResource {
             @PathParam("tenantId") String tenantId) {
         tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
         return reportingService.filters(tenantId);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/fiscal-profile")
+    @Operation(summary = "Consultar perfil fiscal", description = "Retorna o regime tributario e a aliquota estimada usados na DRE.")
+    @SecurityRequirement(name = "bearerAuth")
+    public FiscalProfile fiscalProfile(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.profile(tenantId);
+    }
+
+    @PUT
+    @Path("/tenants/{tenantId}/fiscal-profile")
+    @Operation(summary = "Salvar perfil fiscal", description = "Cadastra ou atualiza regime tributario e aliquota estimada do tenant.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = FiscalProfileRequest.class)))
+    public FiscalProfile upsertFiscalProfile(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            FiscalProfileRequest request) {
+        tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        if (request == null) {
+            throw new ValidationException("fiscal profile is required");
+        }
+        return fiscalAccountingService.upsertProfile(new UpsertFiscalProfileCommand(
+                tenantId,
+                parseTaxRegime(request.taxRegime()),
+                request.estimatedTaxRate(),
+                request.notes()
+        ));
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/expenses/upload-signature")
+    @Operation(summary = "Assinar upload Cloudinary", description = "Gera parametros assinados para upload direto de comprovantes de despesa no Cloudinary.")
+    @SecurityRequirement(name = "bearerAuth")
+    public CloudinaryUploadSignature expenseUploadSignature(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId) {
+        tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        return cloudinaryUploadSignatureService.expenseUploadSignature(tenantId);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/expenses")
+    @Operation(summary = "Listar despesas", description = "Lista despesas operacionais com metadados de anexos Cloudinary.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ExpensePage expenses(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("from") LocalDate from,
+            @QueryParam("to") LocalDate to,
+            @QueryParam("category") String category,
+            @QueryParam("page") Integer page,
+            @QueryParam("size") Integer size) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.expenses(tenantId, new ExpenseFilter(from, to, parseExpenseCategory(category), page, size));
+    }
+
+    @POST
+    @Path("/tenants/{tenantId}/expenses")
+    @Operation(summary = "Criar despesa", description = "Lanca uma despesa manual com comprovante obrigatorio armazenado no Cloudinary.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ExpenseRequest.class)))
+    public Response createExpense(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            ExpenseRequest request) {
+        tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        if (request == null) {
+            throw new ValidationException("expense is required");
+        }
+        ExpenseEntry expense = fiscalAccountingService.createExpense(new CreateExpenseCommand(
+                tenantId,
+                request.expenseDate(),
+                parseExpenseCategory(request.category()),
+                request.description(),
+                request.amount(),
+                attachment(request.attachment())
+        ));
+        return Response.status(Response.Status.CREATED).entity(expense).build();
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/expenses/{expenseId}")
+    @Operation(summary = "Detalhar despesa", description = "Retorna uma despesa especifica do tenant.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ExpenseEntry expense(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @PathParam("expenseId") String expenseId) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.expense(tenantId, expenseId);
+    }
+
+    @PUT
+    @Path("/tenants/{tenantId}/expenses/{expenseId}")
+    @Operation(summary = "Atualizar despesa", description = "Atualiza uma despesa manual e seu anexo Cloudinary.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ExpenseRequest.class)))
+    public ExpenseEntry updateExpense(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @PathParam("expenseId") String expenseId,
+            ExpenseRequest request) {
+        tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        if (request == null) {
+            throw new ValidationException("expense is required");
+        }
+        return fiscalAccountingService.updateExpense(new UpdateExpenseCommand(
+                tenantId,
+                expenseId,
+                request.expenseDate(),
+                parseExpenseCategory(request.category()),
+                request.description(),
+                request.amount(),
+                attachment(request.attachment())
+        ));
+    }
+
+    @DELETE
+    @Path("/tenants/{tenantId}/expenses/{expenseId}")
+    @Operation(summary = "Remover despesa", description = "Remove uma despesa manual do tenant.")
+    @SecurityRequirement(name = "bearerAuth")
+    public Response deleteExpense(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @PathParam("expenseId") String expenseId) {
+        tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        fiscalAccountingService.deleteExpense(tenantId, expenseId);
+        return Response.noContent().build();
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/dre")
+    @Operation(summary = "Gerar DRE", description = "Gera uma DRE simplificada a partir de vendas, taxas, regime tributario e despesas.")
+    @SecurityRequirement(name = "bearerAuth")
+    public DreStatement dre(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("from") LocalDate from,
+            @QueryParam("to") LocalDate to) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.dre(tenantId, from, to);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/closings/{month}")
+    @Operation(summary = "Consultar fechamento contabil", description = "Retorna a assinatura digital que travou o periodo contabil.")
+    @SecurityRequirement(name = "bearerAuth")
+    public AccountingPeriodClosing accountingClosing(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @PathParam("month") String month) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.closing(tenantId, parseMonth(month));
+    }
+
+    @POST
+    @Path("/tenants/{tenantId}/closings/{month}/sign")
+    @Operation(summary = "Assinar fechamento contabil", description = "Assinatura do contador que torna imutaveis pedidos, taxas e despesas do mes.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = AccountingPeriodSignatureRequest.class)))
+    public AccountingPeriodClosing signAccountingClosing(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @PathParam("month") String month,
+            AccountingPeriodSignatureRequest request) {
+        TenantContext signer = tenantAuthorizationService.requireClosingSigner(authorizationHeader, tenantId);
+        if (request == null) {
+            throw new ValidationException("closing signature is required");
+        }
+        return fiscalAccountingService.signClosing(tenantId, parseMonth(month), signer, request.signatureHash());
     }
 
     @GET
@@ -378,6 +577,44 @@ public class ReportingResource {
         }
     }
 
+    private TaxRegime parseTaxRegime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().replace('-', '_').toUpperCase(Locale.ROOT);
+        try {
+            return TaxRegime.valueOf(normalized);
+        } catch (IllegalArgumentException exception) {
+            throw new ValidationException("invalid_tax_regime");
+        }
+    }
+
+    private ExpenseCategory parseExpenseCategory(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().replace('-', '_').toUpperCase(Locale.ROOT);
+        try {
+            return ExpenseCategory.valueOf(normalized);
+        } catch (IllegalArgumentException exception) {
+            throw new ValidationException("invalid_expense_category");
+        }
+    }
+
+    private ExpenseAttachment attachment(CloudinaryAttachmentRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new ExpenseAttachment(
+                request.publicId(),
+                request.secureUrl(),
+                request.resourceType(),
+                request.originalFilename(),
+                request.contentType(),
+                request.sizeBytes()
+        );
+    }
+
     private ReportEntryStatus parseStatus(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -405,6 +642,37 @@ public class ReportingResource {
             @JsonProperty("release_date") LocalDate releaseDate,
             @JsonProperty("buyer_name") String buyerName,
             @JsonProperty("invoice_number") String invoiceNumber) {
+    }
+
+    @Schema(name = "FiscalProfileRequest")
+    public record FiscalProfileRequest(
+            @JsonProperty("tax_regime") String taxRegime,
+            @JsonProperty("estimated_tax_rate") BigDecimal estimatedTaxRate,
+            @JsonProperty("notes") String notes) {
+    }
+
+    @Schema(name = "ExpenseRequest")
+    public record ExpenseRequest(
+            @JsonProperty("expense_date") LocalDate expenseDate,
+            @JsonProperty("category") String category,
+            @JsonProperty("description") String description,
+            @JsonProperty("amount") BigDecimal amount,
+            @JsonProperty("attachment") CloudinaryAttachmentRequest attachment) {
+    }
+
+    @Schema(name = "CloudinaryAttachmentRequest")
+    public record CloudinaryAttachmentRequest(
+            @JsonProperty("public_id") String publicId,
+            @JsonProperty("secure_url") String secureUrl,
+            @JsonProperty("resource_type") String resourceType,
+            @JsonProperty("original_filename") String originalFilename,
+            @JsonProperty("content_type") String contentType,
+            @JsonProperty("size_bytes") Long sizeBytes) {
+    }
+
+    @Schema(name = "AccountingPeriodSignatureRequest")
+    public record AccountingPeriodSignatureRequest(
+            @JsonProperty("signature_hash") String signatureHash) {
     }
 
     @Schema(name = "PublicReportEntryImportRequest")

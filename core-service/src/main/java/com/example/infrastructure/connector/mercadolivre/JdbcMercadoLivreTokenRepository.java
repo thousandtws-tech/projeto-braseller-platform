@@ -1,6 +1,7 @@
 package com.example.infrastructure.connector.mercadolivre;
 
 import com.example.application.exception.ConnectorValidationException;
+import com.example.infrastructure.security.Aes256TokenCipher;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -20,6 +21,9 @@ public class JdbcMercadoLivreTokenRepository {
     @Inject
     AgroalDataSource dataSource;
 
+    @Inject
+    Aes256TokenCipher tokenCipher;
+
     public Optional<MercadoLivreConnectorToken> find(String tenantId) {
         String sql = """
                 SELECT tenant_id, seller_id, access_token, refresh_token, expires_at
@@ -37,8 +41,8 @@ public class JdbcMercadoLivreTokenRepository {
                 return Optional.of(new MercadoLivreConnectorToken(
                         resultSet.getString("tenant_id"),
                         resultSet.getString("seller_id"),
-                        resultSet.getString("access_token"),
-                        resultSet.getString("refresh_token"),
+                        tokenCipher.decrypt(resultSet.getString("access_token")),
+                        tokenCipher.decrypt(resultSet.getString("refresh_token")),
                         resultSet.getTimestamp("expires_at").toInstant()
                 ));
             }
@@ -63,8 +67,8 @@ public class JdbcMercadoLivreTokenRepository {
                 """;
         try (PreparedStatement statement = connection.prepareStatement(updateSql)) {
             statement.setString(1, token.sellerId());
-            statement.setString(2, token.accessToken());
-            statement.setString(3, token.refreshToken());
+            statement.setString(2, tokenCipher.encrypt(token.accessToken()));
+            statement.setString(3, tokenCipher.encrypt(token.refreshToken()));
             statement.setTimestamp(4, Timestamp.from(token.expiresAt()));
             statement.setTimestamp(5, Timestamp.from(Instant.now()));
             statement.setString(6, token.tenantId());
@@ -86,8 +90,8 @@ public class JdbcMercadoLivreTokenRepository {
             statement.setString(1, token.tenantId());
             statement.setString(2, CONNECTOR_NAME);
             statement.setString(3, token.sellerId());
-            statement.setString(4, token.accessToken());
-            statement.setString(5, token.refreshToken());
+            statement.setString(4, tokenCipher.encrypt(token.accessToken()));
+            statement.setString(5, tokenCipher.encrypt(token.refreshToken()));
             statement.setTimestamp(6, Timestamp.from(token.expiresAt()));
             statement.setTimestamp(7, Timestamp.from(Instant.now()));
             statement.executeUpdate();

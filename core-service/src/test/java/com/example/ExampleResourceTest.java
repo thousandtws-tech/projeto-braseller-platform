@@ -1,14 +1,22 @@
 package com.example;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.agroal.api.AgroalDataSource;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import com.example.application.port.out.MarketplaceConnector;
 import com.example.domain.model.connector.InvoiceFilters;
+import com.example.infrastructure.connector.mercadolivre.JdbcMercadoLivreTokenRepository;
+import com.example.infrastructure.connector.mercadolivre.MercadoLivreConnectorToken;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
@@ -18,9 +26,18 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
 class ExampleResourceTest {
+    @Inject
+    JdbcMercadoLivreTokenRepository mercadoLivreTokenRepository;
+
+    @Inject
+    AgroalDataSource dataSource;
+
     @Test
     void testHelloEndpoint() {
         given()
@@ -100,7 +117,9 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(200)
                 .body("platform", is("sandbox"))
-                .body("access_token", containsString("sandbox-access-tenant-123"));
+                .body("status", is("active"))
+                .body("access_token", nullValue())
+                .body("refresh_token", nullValue());
 
         given()
                 .header("Authorization", "Bearer " + token())
@@ -108,6 +127,40 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(200)
                 .body("status", is("active"));
+    }
+
+    @Test
+    void marketplaceTokensAreEncryptedAtRest() throws SQLException {
+        String tenantId = "tenant-token-encryption";
+        mercadoLivreTokenRepository.save(new MercadoLivreConnectorToken(
+                tenantId,
+                "seller-123",
+                "ml-access-token-raw",
+                "ml-refresh-token-raw",
+                Instant.now().plusSeconds(3600)
+        ));
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT access_token, refresh_token
+                     FROM marketplace_connector_tokens
+                     WHERE tenant_id = ? AND connector_name = 'mercado-livre'
+                     """)) {
+            statement.setString(1, tenantId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                String storedAccessToken = resultSet.getString("access_token");
+                String storedRefreshToken = resultSet.getString("refresh_token");
+                assertNotEquals("ml-access-token-raw", storedAccessToken);
+                assertNotEquals("ml-refresh-token-raw", storedRefreshToken);
+                assertTrue(storedAccessToken.startsWith("v1:"));
+                assertTrue(storedRefreshToken.startsWith("v1:"));
+            }
+        }
+
+        MercadoLivreConnectorToken decrypted = mercadoLivreTokenRepository.find(tenantId).orElseThrow();
+        org.hamcrest.MatcherAssert.assertThat(decrypted.accessToken(), is("ml-access-token-raw"));
+        org.hamcrest.MatcherAssert.assertThat(decrypted.refreshToken(), is("ml-refresh-token-raw"));
     }
 
     @Test

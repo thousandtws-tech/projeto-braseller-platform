@@ -104,8 +104,10 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
     @Override
     public ConnectorToken refreshToken(ConnectorRefreshTokenCommand command) {
         requireOAuthConfig();
-        String refreshToken = requireText(command.refreshToken(), "mercado_livre_refresh_token_required");
-        MercadoLivreConnectorToken token = refresh(command.tenantId(), null, refreshToken);
+        MercadoLivreConnectorToken current = tokenRepository.find(command.tenantId())
+                .orElseThrow(() -> new ConnectorValidationException("mercado_livre_not_authenticated"));
+        String refreshToken = requireText(current.refreshToken(), "mercado_livre_refresh_token_required");
+        MercadoLivreConnectorToken token = refresh(command.tenantId(), current.sellerId(), refreshToken);
         return toConnectorToken(token);
     }
 
@@ -237,7 +239,7 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
     }
 
     private ConnectorToken toConnectorToken(MercadoLivreConnectorToken token) {
-        return new ConnectorToken(NAME, token.accessToken(), token.refreshToken(), token.expiresAt());
+        return new ConnectorToken(NAME, ConnectorConnectionStatus.ACTIVE, token.expiresAt());
     }
 
     private StandardOrder toStandardOrder(JsonNode order) {

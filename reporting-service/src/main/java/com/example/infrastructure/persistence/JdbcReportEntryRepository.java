@@ -1,6 +1,7 @@
 package com.example.infrastructure.persistence;
 
 import com.example.application.command.UpsertReportEntryCommand;
+import com.example.application.exception.AccountingPeriodClosedException;
 import com.example.application.port.out.ReportEntryRepository;
 import com.example.domain.model.AvailableFilters;
 import com.example.domain.model.FinancialSummary;
@@ -24,6 +25,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +42,7 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
+                ensurePeriodOpen(connection, command.tenantId(), command.saleDate());
                 int updated = updateEntry(connection, command);
                 if (updated == 0) {
                     insertEntry(connection, command);
@@ -495,6 +498,26 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
 
     private Date date(LocalDate value) {
         return value == null ? null : Date.valueOf(value);
+    }
+
+    private void ensurePeriodOpen(Connection connection, String tenantId, LocalDate date) throws SQLException {
+        if (tenantId == null || tenantId.isBlank() || date == null) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*)
+                FROM accounting_period_closings
+                WHERE tenant_id = ? AND period_month = ?
+                """)) {
+            statement.setString(1, tenantId);
+            statement.setDate(2, Date.valueOf(YearMonth.from(date).atDay(1)));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                if (resultSet.getLong(1) > 0) {
+                    throw new AccountingPeriodClosedException("accounting_period_closed");
+                }
+            }
+        }
     }
 
     private List<String> distinctStrings(Connection connection, String columnName, String tenantId) throws SQLException {

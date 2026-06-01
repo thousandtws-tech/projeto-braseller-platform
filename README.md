@@ -36,7 +36,7 @@ Claims padrao do JWT: `tenant_id`, `user_id`, `email`, `roles` e `groups`. Os pa
 
 Endpoints tenant-aware de `user-service`, `core-service`, `notification-service` e `reporting-service` derivam o tenant do JWT. O cliente nao escolhe tenant por query/body/header. Acoes de escrita exigem `ADMIN` ou `VENDEDOR`; `CONTADOR` pode apenas consultar dados do proprio tenant. Eventos internos e ingestao interna usam `X-Internal-Token` e nao sao expostos pelo gateway publico.
 
-Em ambientes fora de desenvolvimento, troque obrigatoriamente `AUTH_JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, senhas dos bancos e credenciais do Grafana.
+Em ambientes fora de desenvolvimento, troque obrigatoriamente `AUTH_JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, `CONNECTOR_TOKEN_ENCRYPTION_KEY`, senhas dos bancos e credenciais do Grafana.
 
 ## Core: Camada de Conectores
 
@@ -44,8 +44,8 @@ O `core-service` define a interface padronizada entre o Core e os conectores de 
 
 Contrato obrigatorio de todo conector:
 
-- `authenticate()`: token de acesso do usuario.
-- `refreshToken()`: token renovado automaticamente.
+- `authenticate()`: autentica o usuario e persiste tokens apenas no Core.
+- `refreshToken()`: token renovado automaticamente a partir do segredo criptografado no banco.
 - `getOrders(filtros)`: lista padronizada de pedidos com `from`, `to`, `status=paid|pending|cancelled` e `limit`.
 - `getOrderDetail(id)`: detalhes completos de um pedido.
 - `getPayments(orderId)`: dados de pagamento e liberacao.
@@ -70,7 +70,7 @@ Endpoints do Core:
 - `POST /core/connectors/{connectorName}/sync-all`.
 - `GET /core/connectors/{connectorName}/status`.
 
-O conector `sandbox` foi incluido para validar o contrato sem depender de marketplace real. Novos marketplaces entram como adapters que implementam a porta `MarketplaceConnector`; `getInvoices()` e default opcional para plataformas sem NF.
+O conector `sandbox` foi incluido para validar o contrato sem depender de marketplace real. Novos marketplaces entram como adapters que implementam a porta `MarketplaceConnector`; `getInvoices()` e default opcional para plataformas sem NF. O frontend nunca recebe nem envia `access_token` ou `refresh_token` de marketplace; os endpoints de autenticacao retornam apenas status/conexao e vencimento.
 
 ## Modulo Billing
 
@@ -144,6 +144,7 @@ Funcionalidades iniciais:
 - Filtros por periodo, plataforma, forma de pagamento e status.
 - Tabela de lancamentos com busca, ordenacao e paginacao.
 - Graficos de evolucao mensal e comparativo entre plataformas.
+- Nucleo fiscal MVP com regime tributario, despesas com anexo Cloudinary e DRE simplificada.
 - Motor unico de exportacao em PDF, Excel `.xlsx` e CSV.
 - Relatorio mensal consolidado com todos os marketplaces.
 - Relatorio por plataforma/modulo, incluindo Excel com abas por marketplace.
@@ -157,11 +158,24 @@ Contratos principais:
 - `GET /reports/tenants/{tenantId}/charts/monthly-evolution`: evolucao mensal.
 - `GET /reports/tenants/{tenantId}/charts/platform-comparison`: comparativo por marketplace.
 - `GET /reports/tenants/{tenantId}/filters`: opcoes de filtro disponiveis.
+- `GET|PUT /reports/tenants/{tenantId}/fiscal-profile`: consulta/cadastro do regime tributario.
+- `GET /reports/tenants/{tenantId}/expenses/upload-signature`: gera assinatura para upload direto de comprovante no Cloudinary.
+- `GET|POST /reports/tenants/{tenantId}/expenses`: lista/lanca despesas com anexo Cloudinary obrigatorio.
+- `GET|PUT|DELETE /reports/tenants/{tenantId}/expenses/{expenseId}`: detalha, atualiza ou remove despesa.
+- `GET /reports/tenants/{tenantId}/dre`: gera DRE simplificada por periodo.
+- `GET /reports/tenants/{tenantId}/closings/{month}`: consulta assinatura do fechamento mensal.
+- `POST /reports/tenants/{tenantId}/closings/{month}/sign`: contador assina e trava o periodo `YYYY-MM`.
 - `GET /reports/tenants/{tenantId}/exports/monthly?month=YYYY-MM&format=pdf|xlsx|csv`: exportacao mensal consolidada.
 - `GET /reports/tenants/{tenantId}/exports/platforms/{platform}?from=YYYY-MM-DD&to=YYYY-MM-DD&format=pdf|xlsx|csv`: exportacao por marketplace/modulo.
 - `POST /reports/internal/entries`: ingestao interna protegida por `X-Internal-Token`.
 
-Consultas em `/reports/tenants/{tenantId}/...` exigem Bearer JWT do mesmo tenant. `ADMIN`, `VENDEDOR` e `CONTADOR` podem consultar. Endpoints `/reports/internal/**` sao service-to-service e ficam bloqueados no gateway publico.
+Consultas em `/reports/tenants/{tenantId}/...` exigem Bearer JWT do mesmo tenant. `ADMIN`, `VENDEDOR` e `CONTADOR` podem consultar. O perfil fiscal e as despesas sao escrita de `ADMIN`/`VENDEDOR`; `CONTADOR` acessa em modo leitura. Endpoints `/reports/internal/**` sao service-to-service e ficam bloqueados no gateway publico.
+
+Decisao de arquitetura da Fase 1: nao foi criado microservice novo para fiscal/contabil. O escopo atual depende diretamente do read model financeiro do `reporting-service` e ainda e manual/simplificado. Um `accounting-service` separado fica reservado para uma etapa com apuracao fiscal propria, NF-e/SPED, conciliacao bancaria ou workflow contabil independente.
+
+Regras criticas aplicadas: despesas sem comprovante nao sao aceitas para DRE; fechamento assinado pelo contador trava lancamentos/despesas daquele mes; valores financeiros usam `DECIMAL(10,2)` no banco; tokens de marketplace sao criptografados com AES-256 no Core.
+
+Pendencias documentadas: estoque/CMV por XML, CNAE/faixas fiscais detalhadas, DRE materializada/versionada, RLS nativo PostgreSQL, assinatura digital real, upload Cloudinary no frontend, Shopee, Amazon, Open Finance/OFX e conciliacao bancaria. A lista completa fica em `docs/technical-architecture-current.md`.
 
 ## Gateway API
 
@@ -188,7 +202,7 @@ powershell -ExecutionPolicy Bypass -File scripts/verify-services.ps1
 docker compose --env-file .env.example up --build
 ```
 
-Keycloak fica em `http://localhost:8086` com usuario `admin` e senha `admin` por padrao, configuraveis no `.env.example`.
+Por padrao, o `auth-service` aponta para o Keycloak configurado em `KEYCLOAK_BASE_URL`/`KEYCLOAK_PUBLIC_BASE_URL`. O Keycloak local em `http://localhost:8086` continua disponivel no Compose para desenvolvimento, mas so deve ser usado quando essas variaveis forem trocadas para a URL local.
 Prometheus fica em `http://localhost:9090`.
 Grafana fica em `http://localhost:3001` com usuario `admin` e senha `admin` por padrao, configuraveis no `.env.example`.
 
@@ -230,6 +244,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build-images.ps1 -Tag local
 - CI em matriz por servico com testes Maven e build de imagem.
 
 Detalhes da arquitetura ficam em `docs/clean-architecture.md`.
+O documento tecnico convertido para a stack atual fica em `docs/technical-architecture-current.md`.
 Diagramas UML e high level architecture ficam em `docs/high-level-microservices-uml.md`.
 
 

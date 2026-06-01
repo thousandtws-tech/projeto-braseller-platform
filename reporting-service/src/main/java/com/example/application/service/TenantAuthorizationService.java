@@ -13,6 +13,7 @@ public class TenantAuthorizationService {
     private static final Set<String> READ_ROLES = Set.of("ADMIN", "VENDEDOR", "CONTADOR");
     private static final Set<String> WRITE_ROLES = Set.of("ADMIN", "VENDEDOR");
     private static final Set<String> INTEGRATION_WRITE_ROLES = Set.of("ADMIN", "VENDEDOR", "CONTADOR");
+    private static final Set<String> CLOSING_SIGNER_ROLES = Set.of("CONTADOR");
 
     @Inject
     AccessTokenVerifier accessTokenVerifier;
@@ -38,6 +39,13 @@ public class TenantAuthorizationService {
         TenantContext context = accessTokenVerifier.verify(authorizationHeader);
         requireSameTenant(context, tenantId);
         requireAnyRole(context, INTEGRATION_WRITE_ROLES, "integration_role_required");
+        return context;
+    }
+
+    public TenantContext requireClosingSigner(String authorizationHeader, String tenantId) {
+        TenantContext context = accessTokenVerifier.verify(authorizationHeader);
+        requireSameTenant(context, tenantId);
+        requireAnyRole(context, CLOSING_SIGNER_ROLES, "accountant_role_required");
         return context;
     }
 

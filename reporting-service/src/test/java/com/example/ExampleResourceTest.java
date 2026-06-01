@@ -19,6 +19,7 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
@@ -212,6 +213,179 @@ class ExampleResourceTest {
     }
 
     @Test
+    void fiscalProfileExpensesAndDreWorkForMvpAccounting() {
+        String tenantId = "tenant-reporting-fiscal";
+        ingest(tenantId, "DRE-1001", "mercado-livre", "RECEIVED", "PIX", "300.00", "255.00", "45.00", "0.00");
+        ingest(tenantId, "DRE-1002", "mercado-livre", "RECEIVED", "CREDIT_CARD", "200.00", "180.00", "20.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(fiscalProfilePayload("LUCRO_PRESUMIDO", "0.1120"))
+                .when().put("/reports/tenants/{tenantId}/fiscal-profile", tenantId)
+                .then()
+                .statusCode(200)
+                .body("tax_regime", is("LUCRO_PRESUMIDO"))
+                .body("estimated_tax_rate", is(0.1120F));
+
+        String expenseId = given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN", "VENDEDOR"))
+                .contentType("application/json")
+                .body(expensePayload("PACKAGING", "Embalagens maio", "42.50", true))
+                .when().post("/reports/tenants/{tenantId}/expenses", tenantId)
+                .then()
+                .statusCode(201)
+                .body("tenant_id", is(tenantId))
+                .body("category", is("PACKAGING"))
+                .body("attachment.public_id", is("brasaller/despesas/embalagem-maio"))
+                .extract().path("id");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(expensePayload("BANK_FEE", "Tarifa bancaria", "17.50", true))
+                .when().post("/reports/tenants/{tenantId}/expenses", tenantId)
+                .then()
+                .statusCode(201);
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(expensePayload("OTHER", "Sem comprovante", "10.00", false))
+                .when().post("/reports/tenants/{tenantId}/expenses", tenantId)
+                .then()
+                .statusCode(400)
+                .body("message", is("expense_attachment_required"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/expenses/{expenseId}", tenantId, expenseId)
+                .then()
+                .statusCode(200)
+                .body("amount", is(42.50F))
+                .body("attachment.secure_url", is("https://res.cloudinary.com/brasaller/image/upload/v1/despesas/embalagem-maio.pdf"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("tax_regime", is("LUCRO_PRESUMIDO"))
+                .body("gross_revenue", is(500.00F))
+                .body("marketplace_fees", is(65.00F))
+                .body("estimated_taxes", is(56.00F))
+                .body("operating_expenses", is(60.00F))
+                .body("net_result", is(319.00F))
+                .body("expense_count", is(2))
+                .body("expenses_by_category.category", hasItems("PACKAGING", "BANK_FEE"));
+    }
+
+    @Test
+    void expenseUploadSignatureUsesCloudinaryConfiguration() {
+        String tenantId = "tenant-reporting-cloudinary";
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().get("/reports/tenants/{tenantId}/expenses/upload-signature", tenantId)
+                .then()
+                .statusCode(200)
+                .body("cloud_name", is("brasaller-test"))
+                .body("api_key", is("test-api-key"))
+                .body("upload_url", is("https://api.cloudinary.com/v1_1/brasaller-test/auto/upload"))
+                .body("resource_type", is("auto"))
+                .body("folder", is("brasaller/despesas/tenant-reporting-cloudinary"))
+                .body("use_filename", is(true))
+                .body("unique_filename", is(true))
+                .body("signature", notNullValue());
+    }
+
+    @Test
+    void accountantSignatureLocksClosedAccountingPeriod() {
+        String tenantId = "tenant-reporting-closing";
+        ingest(tenantId, "CLOSE-1001", "mercado-livre", "RECEIVED", "PIX", "300.00", "255.00", "45.00", "0.00");
+
+        String expenseId = given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(expensePayload("PACKAGING", "Embalagem fechamento", "30.00", true))
+                .when().post("/reports/tenants/{tenantId}/expenses", tenantId)
+                .then()
+                .statusCode(201)
+                .extract().path("id");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "signature_hash": "sha256:assinatura-contador-maio"
+                        }
+                        """)
+                .when().post("/reports/tenants/{tenantId}/closings/2026-05/sign", tenantId)
+                .then()
+                .statusCode(200)
+                .body("tenant_id", is(tenantId))
+                .body("period_month", is("2026-05"))
+                .body("signed_by_email", is("seller@brasaller.test"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(publicEntryPayload("mercado-livre", "CLOSE-1002", "CANCELLED", "PIX", "300.00", "0.00", "45.00", "0.00"))
+                .when().post("/reports/tenants/{tenantId}/manual-import/entries", tenantId)
+                .then()
+                .statusCode(409)
+                .body("message", is("accounting_period_closed"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(expensePayload("PACKAGING", "Edicao bloqueada", "35.00", true))
+                .when().put("/reports/tenants/{tenantId}/expenses/{expenseId}", tenantId, expenseId)
+                .then()
+                .statusCode(409)
+                .body("message", is("accounting_period_closed"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().delete("/reports/tenants/{tenantId}/expenses/{expenseId}", tenantId, expenseId)
+                .then()
+                .statusCode(409)
+                .body("message", is("accounting_period_closed"));
+    }
+
+    @Test
+    void accountantCanReadDreButCannotWriteFiscalData() {
+        String tenantId = "tenant-reporting-fiscal-accountant";
+        ingest(tenantId, "DRE-ACC-1001", "sandbox", "RECEIVED", "PIX", "100.00", "90.00", "10.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body(fiscalProfilePayload("SIMPLES_NACIONAL", "0.0600"))
+                .when().put("/reports/tenants/{tenantId}/fiscal-profile", tenantId)
+                .then()
+                .statusCode(403);
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body(expensePayload("OTHER", "Despesa contador", "10.00", false))
+                .when().post("/reports/tenants/{tenantId}/expenses", tenantId)
+                .then()
+                .statusCode(403);
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_revenue", is(100.00F))
+                .body("marketplace_fees", is(10.00F))
+                .body("net_result", is(90.00F));
+    }
+
+    @Test
     void accountantCanReadButCannotIngest() {
         String tenantId = "tenant-reporting-accountant";
         ingest(tenantId, "ACC-1001", "sandbox", "RECEIVED", "PIX", "120.00", "110.00", "10.00", "0.00");
@@ -259,6 +433,42 @@ class ExampleResourceTest {
                 }
                 """.formatted(tenantId, platform, orderId, grossValue, receivedValue, feeValue, receivableValue,
                 paymentMethod, status, orderId);
+    }
+
+    private String fiscalProfilePayload(String taxRegime, String estimatedTaxRate) {
+        return """
+                {
+                  "tax_regime": "%s",
+                  "estimated_tax_rate": %s,
+                  "notes": "Perfil fiscal usado na DRE MVP"
+                }
+                """.formatted(taxRegime, estimatedTaxRate);
+    }
+
+    private String expensePayload(String category, String description, String amount, boolean withAttachment) {
+        String attachment = withAttachment
+                ? """
+                  "attachment": {
+                    "public_id": "brasaller/despesas/embalagem-maio",
+                    "secure_url": "https://res.cloudinary.com/brasaller/image/upload/v1/despesas/embalagem-maio.pdf",
+                    "resource_type": "image",
+                    "original_filename": "embalagem-maio.pdf",
+                    "content_type": "application/pdf",
+                    "size_bytes": 2048
+                  }
+                """
+                : """
+                  "attachment": null
+                """;
+        return """
+                {
+                  "expense_date": "2026-05-23",
+                  "category": "%s",
+                  "description": "%s",
+                  "amount": %s,
+                  %s
+                }
+                """.formatted(category, description, amount, attachment);
     }
 
     private String publicEntryPayload(String platform, String orderId, String status, String paymentMethod,

@@ -69,15 +69,13 @@ public class ConnectorResource {
 
     @POST
     @Path("/{connectorName}/refresh-token")
-    @Operation(summary = "Renovar token", description = "Executa refreshToken() do conector pelo nome.")
+    @Operation(summary = "Renovar token", description = "Renova usando o refresh token criptografado armazenado no Core.")
     @SecurityRequirement(name = "bearerAuth")
-    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RefreshTokenRequest.class)))
     public ConnectorToken refreshToken(
             @HeaderParam("Authorization") String authorizationHeader,
-            @PathParam("connectorName") String connectorName,
-            RefreshTokenRequest request) {
+            @PathParam("connectorName") String connectorName) {
         TenantContext context = tenantAuthorizationService.requireWritable(authorizationHeader);
-        return connectorService.refreshToken(connectorName, context.tenantId(), request.refreshToken());
+        return connectorService.refreshToken(connectorName, context.tenantId());
     }
 
     @GET
@@ -170,9 +168,6 @@ public class ConnectorResource {
     }
 
     public record AuthenticateRequest(Map<String, String> credentials) {
-    }
-
-    public record RefreshTokenRequest(String refreshToken) {
     }
 
     public record SyncAllRequest(Instant since) {

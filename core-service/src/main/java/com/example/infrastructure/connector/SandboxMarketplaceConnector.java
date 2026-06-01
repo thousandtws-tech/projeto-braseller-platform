@@ -61,7 +61,7 @@ public class SandboxMarketplaceConnector implements MarketplaceConnector {
 
     @Override
     public ConnectorToken refreshToken(ConnectorRefreshTokenCommand command) {
-        return token("sandbox-access-refreshed-" + command.tenantId(), command.refreshToken());
+        return token();
     }
 
     @Override
@@ -127,7 +127,11 @@ public class SandboxMarketplaceConnector implements MarketplaceConnector {
     }
 
     private ConnectorToken token(String accessToken, String refreshToken) {
-        return new ConnectorToken(NAME, accessToken, refreshToken, Instant.now().plusSeconds(3600));
+        return token();
+    }
+
+    private ConnectorToken token() {
+        return new ConnectorToken(NAME, ConnectorConnectionStatus.ACTIVE, Instant.now().plusSeconds(3600));
     }
 
     private List<StandardOrder> allOrders() {

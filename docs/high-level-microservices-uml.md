@@ -14,6 +14,7 @@ Padrao aplicado:
 - Comunicacao sincrona por REST onde ha consulta/comando direto.
 - Comunicacao assincrona por Kafka para eventos de nova venda entre `core-service` e `notification-service`.
 - Jobs do `notification-service` consultam o `reporting-service` por endpoints internos para montar fechamento mensal, alerta de liberacao ML e relatorio semanal ao contador.
+- Nucleo fiscal da Fase 1 no `reporting-service`: regime tributario, despesas com comprovante Cloudinary obrigatorio, DRE simplificada e fechamento mensal assinado pelo contador.
 - Observabilidade via `/q/health`, `/q/metrics`, Prometheus e Grafana.
 - Evolucao funcional em duas versoes: MVP com integracao de marketplaces + complementos manuais, e versao completa com fiscal, estoque, custos, conciliacao bancaria e logistica integrados por APIs/adapters.
 
@@ -30,7 +31,7 @@ flowchart LR
     subgraph Identity["Identidade e Acesso"]
         Auth["auth-service<br/>Porta 8085<br/>/auth"]
         User["user-service<br/>Porta 8084<br/>/users"]
-        Keycloak["Keycloak<br/>Porta 8086<br/>OIDC/OAuth/Google broker"]
+        Keycloak["Keycloak<br/>Railway ou local :8086<br/>OIDC/OAuth/Google broker"]
     end
 
     subgraph Business["Dominio BraSeller"]
@@ -63,6 +64,7 @@ flowchart LR
         BankProviders["APIs bancarias futuras<br/>extrato, tarifas e conciliacao"]
         LogisticsProviders["APIs logisticas futuras<br/>frete e rastreio"]
         PaymentProviders["Stripe/Pagar.me<br/>integracao futura<br/>webhooks de cobranca"]
+        Cloudinary["Cloudinary<br/>comprovantes de despesas"]
         SMTP["SMTP/Mailer"]
     end
 
@@ -108,6 +110,7 @@ flowchart LR
     PaymentProviders -. "webhook HTTP<br/>X-Billing-Webhook-Token" .-> Billing
     Billing -. "BillingProviderGateway<br/>adapter futuro" .-> PaymentProviders
     Notification --> SMTP
+    Reporting -->|"assinatura de upload<br/>e metadados public_id/secure_url"| Cloudinary
 
     Prometheus -. scrape /q/metrics .-> GW
     Prometheus -. scrape /q/metrics .-> Auth
@@ -134,7 +137,7 @@ flowchart TB
             Reporting["reporting-service :8087"]
             User["user-service :8084"]
             Auth["auth-service :8085"]
-            Keycloak["keycloak :8086"]
+            Keycloak["keycloak local opcional :8086"]
             Kafka["kafka :9092 host / :9093 interno"]
             Prometheus["prometheus :9090"]
             Grafana["grafana :3001"]
@@ -190,10 +193,10 @@ flowchart TB
 | `gateway-api` | Borda publica HTTP | Resolve o segmento `/api/{service}`, valida metodo, bloqueia paths internos e encaminha para downstream via REST Client. | REST para `auth`, `users`, `core`, `billing`, `notifications` e `reports`; propaga headers `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept`, `Content-Type` e `X-Billing-Webhook-Token`. | `gateway_api`, atualmente metadados/migrations base. |
 | `auth-service` | Autenticacao e JWT da plataforma | Registra, autentica, renova e encerra sessoes. Usa Keycloak para credenciais/sessoes/OAuth e emite JWT interno com `tenant_id`, `user_id`, `roles/groups`. Sincroniza perfil com `user-service`. | Keycloak, `user-service` por `X-Internal-Token`, `TokenIssuer`, `AuthIdentityRepository`. | `auth_identities`, `auth_sessions`. |
 | `user-service` | Fonte de tenants, usuarios, papeis e contador | Cria tenant e admin inicial, concede acesso `CONTADOR` read-only, lista membros, verifica senha e sincroniza perfil externo para uso interno do auth. | Valida JWT HS256 nos endpoints tenant-aware; aceita `X-Internal-Token` nos endpoints `/users/internal/**`. | `tenants`, `user_accounts`, `user_roles`, `accountant_access`. |
-| `core-service` | Contexto tenant-aware e contratos de marketplace | Valida contexto JWT, aplica leitura/escrita por papel, resolve conector por nome, normaliza pedidos/pagamentos/taxas/notas e publica eventos de nova venda apos `sync-all`. | Kafka topic `brasaller.notifications.new-sale.v1`; adapters `MarketplaceConnector`; hoje existem `sandbox` e `mercado-livre`. | `tenant_context_audit`, `marketplace_connector_tokens` e metadados base. |
+| `core-service` | Contexto tenant-aware e contratos de marketplace | Valida contexto JWT, aplica leitura/escrita por papel, resolve conector por nome, normaliza pedidos/pagamentos/taxas/notas e publica eventos de nova venda apos `sync-all`. Tokens de marketplace ficam criptografados e nunca retornam ao frontend. | Kafka topic `brasaller.notifications.new-sale.v1`; adapters `MarketplaceConnector`; hoje existem `sandbox` e `mercado-livre`. | `tenant_context_audit`, `marketplace_connector_tokens` com AES-256 e metadados base. |
 | `notification-service` | Notificacoes, alertas, e-mail e analytics de venda | Gerencia preferencias por tenant, cria notificacoes in-app, envia e-mail quando habilitado, consome `NewSaleEvent`, mantem resumo por tenant via Kafka Streams/KTable e executa jobs automaticos de fechamento mensal, liberacao ML e relatorio semanal. | Kafka input, DLQ, Kafka Streams, SMTP/Mailer, `reporting-service` por REST interno, JWT HS256, `X-Internal-Token` para eventos internos. | `notification_preferences`, `notifications`, `notification_deliveries`, state store Kafka Streams. |
 | `billing-service` | Planos, trial, assinaturas e cobranca recorrente | Lista planos `BASIC`, `PRO` e `AGENCY`, cria trial gratuito de 14 dias, consulta assinatura do tenant, permite upgrade/downgrade e aplica webhooks de ativacao/suspensao/cancelamento. | JWT HS256 nos endpoints tenant-aware; `X-Billing-Webhook-Token` em `/billing/webhooks`; `BillingProviderGateway` local hoje e adapter futuro para Stripe/Pagar.me. | `billing_plans`, `billing_subscriptions`, `billing_webhook_events`. |
-| `reporting-service` | Painel financeiro, relatorios e exportacoes | Materializa lancamentos por tenant, soma faturado/recebido/taxas/a receber, oferece filtros, busca, ordenacao, tabela, graficos, exportacao PDF/XLSX/CSV e consultas internas para automacoes. | JWT HS256 para leitura; `X-Internal-Token` em `/reports/internal/**` para ingestao e consultas service-to-service; renderizadores `ReportExportRenderer`. | `report_entries`. |
+| `reporting-service` | Painel financeiro, relatorios, fiscal MVP e exportacoes | Materializa lancamentos por tenant, soma faturado/recebido/taxas/a receber, oferece filtros, busca, ordenacao, tabela, graficos, exportacao PDF/XLSX/CSV, perfil fiscal, assinatura de upload Cloudinary, despesas com comprovante obrigatorio, DRE simplificada, fechamento mensal assinado e consultas internas para automacoes. | JWT HS256 para leitura; escrita fiscal por `ADMIN`/`VENDEDOR`; `CONTADOR` read-only e assinante do fechamento; `X-Internal-Token` em `/reports/internal/**` para ingestao e consultas service-to-service; renderizadores `ReportExportRenderer`. | `report_entries`, `tenant_fiscal_profiles`, `expense_entries`, `accounting_period_closings`. |
 
 ## Clean Architecture por Servico
 
@@ -615,7 +618,7 @@ Escopo funcional do MVP:
 - Lancamento manual de custos operacionais, taxas bancarias, insumos, embalagem, mao de obra e outras despesas.
 - Status do pedido puxado do marketplace e status interno simples para etapas operacionais.
 - Cancelamento, devolucao, avaria e perda registrados como status/movimentacao manual quando a API nao informar.
-- Anexos opcionais para documentos de apoio; validacao fiscal fica com o contador.
+- Comprovantes obrigatorios em despesas manuais, armazenados no Cloudinary e validados pelo contador.
 
 ### Versao 2 - Completa / Evolutiva
 
@@ -884,6 +887,9 @@ erDiagram
     BILLING_PLANS ||--o{ BILLING_SUBSCRIPTIONS : define
     BILLING_SUBSCRIPTIONS ||--o{ BILLING_WEBHOOK_EVENTS : atualiza
     TENANTS ||--o{ REPORT_ENTRIES : materializa
+    TENANTS ||--|| TENANT_FISCAL_PROFILES : configura
+    TENANTS ||--o{ EXPENSE_ENTRIES : lanca
+    TENANTS ||--o{ ACCOUNTING_PERIOD_CLOSINGS : assina
     TENANTS ||--o{ BILLING_SUBSCRIPTIONS : assina
     TENANTS ||--o{ MARKETPLACE_CONNECTOR_TOKENS : autentica
 
@@ -993,12 +999,36 @@ erDiagram
         string status
         date release_date
     }
+    TENANT_FISCAL_PROFILES {
+        string tenant_id PK
+        string tax_regime
+        decimal estimated_tax_rate
+        string notes
+    }
+    EXPENSE_ENTRIES {
+        string id PK
+        string tenant_id
+        date expense_date
+        string category
+        string description
+        decimal amount
+        string attachment_public_id
+        string attachment_secure_url
+    }
+    ACCOUNTING_PERIOD_CLOSINGS {
+        string tenant_id PK
+        date period_month PK
+        string signed_by_user_id
+        string signed_by_email
+        string signature_hash
+        timestamp signed_at
+    }
     MARKETPLACE_CONNECTOR_TOKENS {
         string tenant_id PK
         string connector_name PK
         string seller_id
-        string access_token
-        string refresh_token
+        string access_token_encrypted
+        string refresh_token_encrypted
         timestamp expires_at
         timestamp updated_at
     }
@@ -1008,8 +1038,10 @@ erDiagram
 
 - `auth-service`, `user-service`, `core-service`, `billing-service`, `notification-service`, `reporting-service` e `gateway-api` possuem logica de negocio implementada em Clean Architecture.
 - `billing-service` possui dominio inicial de planos, trial, assinatura e webhooks. A integracao real com Stripe/Pagar.me ainda deve substituir o adapter `LocalBillingProviderGateway`.
-- `reporting-service` possui read model financeiro, endpoints de dashboard/graficos/tabela e motor unico de exportacao PDF/XLSX/CSV.
+- `reporting-service` possui read model financeiro, endpoints de dashboard/graficos/tabela, nucleo fiscal MVP com regime tributario, despesas com comprovante Cloudinary obrigatorio, DRE simplificada e fechamento contabil assinado, alem de motor unico de exportacao PDF/XLSX/CSV.
+- Nao foi criado microservice novo para fiscal/contabil na Fase 1; o escopo atual depende diretamente do read model do `reporting-service`. Um servico dedicado passa a fazer sentido quando houver apuracao fiscal propria, NF-e/SPED, conciliacao bancaria ou workflow contabil independente.
+- Campos monetarios persistidos usam `DECIMAL(10,2)`; tipos de ponto flutuante sao proibidos para transacoes financeiras.
 - Os conectores de marketplace implementados sao `sandbox` e `mercado-livre`; novos marketplaces devem entrar como adapters em `core-service/src/main/java/com/example/infrastructure/connector` implementando `MarketplaceConnector`.
-- O conector `mercado-livre` usa OAuth 2.0, persiste tokens por tenant em `marketplace_connector_tokens`, renova token automaticamente antes do vencimento e normaliza pedidos, pagamentos, taxas, frete e datas para o contrato padrao do Core.
+- O conector `mercado-livre` usa OAuth 2.0, persiste tokens por tenant em `marketplace_connector_tokens` com AES-256, renova token automaticamente antes do vencimento e normaliza pedidos, pagamentos, taxas, frete e datas para o contrato padrao do Core. O frontend trafega somente o `code` OAuth, nunca tokens da plataforma.
 - Eventos internos de notificacao existem por REST (`/notifications/events/**`), o caminho preferido para nova venda ja e Kafka a partir do `core-service`, e os alertas recorrentes consultam `reporting-service` por contrato interno.
 - Kafka hoje nao e usado diretamente por `billing-service` nem `reporting-service`.

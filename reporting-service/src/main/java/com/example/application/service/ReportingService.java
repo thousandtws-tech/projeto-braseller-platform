@@ -1,7 +1,9 @@
 package com.example.application.service;
 
 import com.example.application.command.UpsertReportEntryCommand;
+import com.example.application.exception.AccountingPeriodClosedException;
 import com.example.application.exception.ValidationException;
+import com.example.application.port.out.FiscalAccountingRepository;
 import com.example.application.port.out.ReportEntryRepository;
 import com.example.domain.model.AvailableFilters;
 import com.example.domain.model.DashboardView;
@@ -23,14 +25,19 @@ import java.util.List;
 @ApplicationScoped
 public class ReportingService {
     private final ReportEntryRepository repository;
+    private final FiscalAccountingRepository fiscalAccountingRepository;
 
     @Inject
-    public ReportingService(ReportEntryRepository repository) {
+    public ReportingService(ReportEntryRepository repository, FiscalAccountingRepository fiscalAccountingRepository) {
         this.repository = repository;
+        this.fiscalAccountingRepository = fiscalAccountingRepository;
     }
 
     public ReportEntry upsert(UpsertReportEntryCommand command) {
         UpsertReportEntryCommand normalized = normalize(command);
+        if (fiscalAccountingRepository.isPeriodClosed(normalized.tenantId(), normalized.saleDate())) {
+            throw new AccountingPeriodClosedException("accounting_period_closed");
+        }
         return repository.upsert(normalized);
     }
 
