@@ -524,7 +524,7 @@ variable "http_access_log_enabled" {
 variable "swagger_ui_enabled" {
   description = "Include/enable Swagger UI in service images."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "graceful_shutdown_timeout" {

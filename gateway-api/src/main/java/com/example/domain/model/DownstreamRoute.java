@@ -32,6 +32,9 @@ public record DownstreamRoute(
         if (normalizedRemainingPath.isBlank()) {
             return downstreamPathPrefix;
         }
+        if ("q/openapi".equals(normalizedRemainingPath.toLowerCase(Locale.ROOT))) {
+            return "/q/openapi";
+        }
         if ("/".equals(downstreamPathPrefix)) {
             return "/" + normalizedRemainingPath;
         }

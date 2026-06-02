@@ -195,12 +195,12 @@ locals {
       NOTIFICATION_SERVICE_URL = local.internal_service_urls["notification-service"]
       REPORTING_SERVICE_URL    = local.internal_service_urls["reporting-service"]
 
-      AUTH_SERVICE_OPENAPI_URL         = "http://auth-service:8080/q/openapi"
-      USER_SERVICE_OPENAPI_URL         = "http://user-service:8080/q/openapi"
-      CORE_SERVICE_OPENAPI_URL         = "http://core-service:8080/q/openapi"
-      BILLING_SERVICE_OPENAPI_URL      = "http://billing-service:8080/q/openapi"
-      NOTIFICATION_SERVICE_OPENAPI_URL = "http://notification-service:8080/q/openapi"
-      REPORTING_SERVICE_OPENAPI_URL    = "http://reporting-service:8080/q/openapi"
+      AUTH_SERVICE_OPENAPI_URL         = "/api/auth/q/openapi"
+      USER_SERVICE_OPENAPI_URL         = "/api/users/q/openapi"
+      CORE_SERVICE_OPENAPI_URL         = "/api/core/q/openapi"
+      BILLING_SERVICE_OPENAPI_URL      = "/api/billing/q/openapi"
+      NOTIFICATION_SERVICE_OPENAPI_URL = "/api/notifications/q/openapi"
+      REPORTING_SERVICE_OPENAPI_URL    = "/api/reports/q/openapi"
 
       SWAGGER_UI_ENABLED = "true"
     }

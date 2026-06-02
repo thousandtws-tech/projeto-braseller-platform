@@ -63,6 +63,16 @@ class ExampleResourceTest {
     }
 
     @Test
+    void forwardsOpenApiRequestsToServiceOperationalEndpoint() {
+        given()
+                .when().get("/api/users/q/openapi")
+                .then()
+                .statusCode(200)
+                .body("method", is("GET"))
+                .body("path", is("/q/openapi"));
+    }
+
+    @Test
     void blocksInternalUserServiceEndpoints() {
         given()
                 .contentType("application/json")

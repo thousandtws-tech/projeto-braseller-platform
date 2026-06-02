@@ -280,7 +280,7 @@ jobs:
             --registry "$ACR_NAME" \
             --image "$SERVICE:$TAG" \
             --image "$SERVICE:${{ needs.detect.outputs.target_environment }}-latest" \
-            --build-arg "SWAGGER_UI_ENABLED=${SWAGGER_UI_ENABLED:-false}" \
+            --build-arg "SWAGGER_UI_ENABLED=${SWAGGER_UI_ENABLED:-true}" \
             --file "$SERVICE/src/main/docker/Dockerfile.jvm" \
             "$SERVICE"
 
