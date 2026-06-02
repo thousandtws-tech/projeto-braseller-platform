@@ -3,6 +3,7 @@ package com.example.infrastructure.connector.mercadolivre;
 import com.example.application.exception.ConnectorValidationException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -21,17 +22,26 @@ import java.util.StringJoiner;
 
 @ApplicationScoped
 public class MercadoLivreApiClient {
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    private HttpClient httpClient;
 
     @Inject
     ObjectMapper objectMapper;
 
     @ConfigProperty(name = "mercadolivre.api.base-url", defaultValue = "https://api.mercadolibre.com")
     String baseUrl;
+
+    @ConfigProperty(name = "mercadolivre.api.connect-timeout-ms", defaultValue = "5000")
+    long connectTimeoutMs;
+
+    @ConfigProperty(name = "mercadolivre.api.request-timeout-ms", defaultValue = "15000")
+    long requestTimeoutMs;
+
+    @PostConstruct
+    void initHttpClient() {
+        httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+    }
 
     public JsonNode exchangeCode(String clientId, String clientSecret, String redirectUri, String code) {
         Map<String, String> form = new LinkedHashMap<>();
@@ -58,7 +68,7 @@ public class MercadoLivreApiClient {
 
     public JsonNode get(String path, String accessToken, Map<String, String> queryParameters) {
         HttpRequest request = HttpRequest.newBuilder(uri(path, queryParameters))
-                .timeout(REQUEST_TIMEOUT)
+                .timeout(requestTimeout())
                 .header("Accept", "application/json")
                 .header("Authorization", "Bearer " + accessToken)
                 .GET()
@@ -68,7 +78,7 @@ public class MercadoLivreApiClient {
 
     private JsonNode postForm(String path, Map<String, String> form) {
         HttpRequest request = HttpRequest.newBuilder(uri(path, Map.of()))
-                .timeout(REQUEST_TIMEOUT)
+                .timeout(requestTimeout())
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(formBody(form)))
@@ -131,6 +141,10 @@ public class MercadoLivreApiClient {
 
     private String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private Duration requestTimeout() {
+        return Duration.ofMillis(requestTimeoutMs);
     }
 
     private String text(JsonNode node, String field) {

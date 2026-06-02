@@ -5,6 +5,9 @@
 
 # Local env
 .env
+.env.prod
+.env.production
+secrets/
 *.log
 
 # Maven

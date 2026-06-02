@@ -76,14 +76,23 @@ public class NotificationService {
     }
 
     public Optional<NotificationMessage> notifyNewSale(NewSaleNotificationCommand command) {
+        if (command == null) {
+            throw new ValidationException("new sale notification is required");
+        }
+        String eventId = firstNonBlank(command.eventId(), UUID.randomUUID().toString());
+        Instant occurredAt = command.occurredAt() == null ? Instant.now() : command.occurredAt();
         String tenantId = requireText(command.tenantId(), "tenantId");
+        String marketplace = defaultText(command.marketplace(), "Marketplace");
+        String orderId = requireText(command.orderId(), "orderId");
+        if (!repository.recordNewSaleEvent(eventId, tenantId, marketplace, orderId, command.amount(), occurredAt)) {
+            return Optional.empty();
+        }
+
         NotificationPreference preference = repository.getPreference(tenantId);
         if (!preference.newSaleEnabled()) {
             return Optional.empty();
         }
 
-        String marketplace = defaultText(command.marketplace(), "Marketplace");
-        String orderId = requireText(command.orderId(), "orderId");
         String title = "Nova venda recebida";
         String message = "Venda " + orderId + " em " + marketplace + " no valor de " + money(command.amount()) + ".";
         return Optional.of(createAndDeliver(tenantId, command.recipientEmail(), NotificationType.NEW_SALE, title, message, preference));

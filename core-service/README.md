@@ -16,9 +16,16 @@ Microservice Quarkus responsavel pelo contexto compartilhado do BraSeller: valid
 
 O contexto espera JWT HS256 com `AUTH_JWT_SECRET`, `AUTH_JWT_ISSUER` e `AUTH_JWT_AUDIENCE` iguais aos do `auth-service`. O papel `CONTADOR` sem `ADMIN` e tratado como somente leitura.
 
-## Eventos Kafka
+## Processamento interno
 
-Ao executar `POST /core/connectors/{connectorName}/sync-all`, o servico publica eventos de nova venda no topico `brasaller.notifications.new-sale.v1` usando `KAFKA_BOOTSTRAP_SERVERS`. O `notification-service` consome esse evento para criar notificacoes sem chamada HTTP service-to-service.
+Ao executar `POST /core/connectors/{connectorName}/sync-all`, o servico cria um job em `connector_sync_jobs`, grava a solicitacao no outbox interno e responde `202 Accepted` com `job_id`. Um scheduler do proprio Core processa o job em background, e o status pode ser consultado em `GET /core/connectors/sync-jobs/{jobId}`.
+
+Depois da sincronizacao, o Core usa chamadas REST internas protegidas por `X-Internal-Token` para:
+
+- Enviar lancamentos normalizados para `POST /reports/internal/entries`.
+- Enviar eventos de nova venda para `POST /notifications/events/new-sale`.
+
+Falhas ficam registradas no outbox interno para retry controlado e no status do job de sincronizacao.
 
 Os endpoints tenant-aware do Core resolvem `tenantId` exclusivamente a partir do Bearer JWT. Nenhum endpoint de conector usa `tenantId` recebido por query string ou body como autoridade de isolamento.
 
@@ -43,7 +50,8 @@ Endpoints:
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}/payments` | `getPayments(orderId)` |
 | `GET` | `/core/connectors/{connectorName}/orders/{orderId}/fees` | `getFees(orderId)` |
 | `GET` | `/core/connectors/{connectorName}/invoices` | `getInvoices(filtros)` opcional |
-| `POST` | `/core/connectors/{connectorName}/sync-all` | `syncAll(desde)` |
+| `POST` | `/core/connectors/{connectorName}/sync-all` | Enfileira `syncAll(desde)` para processamento assincrono |
+| `GET` | `/core/connectors/sync-jobs/{jobId}` | Consulta status/resultado do job de sincronizacao |
 | `GET` | `/core/connectors/{connectorName}/status` | `getStatus()` |
 
 Todos os endpoints de conector, exceto a listagem de conectores registrados, exigem Bearer JWT. Consultas aceitam `ADMIN`, `VENDEDOR` ou `CONTADOR`; autenticacao, refresh e sincronizacao exigem `ADMIN` ou `VENDEDOR`. Respostas HTTP nunca expõem `access_token` ou `refresh_token` de marketplace.

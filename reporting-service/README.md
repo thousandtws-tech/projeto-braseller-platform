@@ -2,7 +2,7 @@
 
 Microservice Quarkus responsavel pelo painel financeiro e relatorios consolidados por tenant.
 
-O servico materializa um read model proprio para consultas rapidas de dashboard, tabela de lancamentos e graficos. A ingestao inicial entra por endpoint interno protegido por `X-Internal-Token`; o caminho natural de evolucao e o `core-service` publicar/encaminhar os pedidos normalizados dos conectores para este read model.
+O servico materializa um read model proprio para consultas rapidas de dashboard, tabela de lancamentos e graficos. A ingestao principal vem do endpoint interno `POST /reports/internal/entries`, protegido por `X-Internal-Token`, chamado pelo `core-service` e por integracoes service-to-service autorizadas.
 
 ## Endpoints locais
 
@@ -30,8 +30,11 @@ O servico materializa um read model proprio para consultas rapidas de dashboard,
 - `PUT /reports/tenants/{tenantId}/expenses/{expenseId}`: atualiza despesa.
 - `DELETE /reports/tenants/{tenantId}/expenses/{expenseId}`: remove despesa.
 - `GET /reports/tenants/{tenantId}/dre`: gera DRE simplificada por periodo.
+- `POST /reports/tenants/{tenantId}/dre/jobs`: cria um job de DRE em banco com status `QUEUED`.
+- `GET /reports/tenants/{tenantId}/dre/jobs/{jobId}`: consulta status e resultado materializado do job.
 - `GET /reports/tenants/{tenantId}/closings/{month}`: consulta fechamento assinado no formato `YYYY-MM`.
 - `POST /reports/tenants/{tenantId}/closings/{month}/sign`: contador assina o fechamento e trava o mes.
+- `POST /reports/webhooks/clicksign`: recebe eventos Clicksign assinados por `Content-Hmac`.
 - `POST /reports/tenants/{tenantId}/manual-import/entries`: importacao manual de lancamento normalizado para plataformas sem API.
 - `POST /reports/tenants/{tenantId}/integrations/entries`: API publica para vendedor/contador integrar sistemas proprios.
 - `GET /reports/tenants/{tenantId}/exports/monthly?month=YYYY-MM&format=pdf|xlsx|csv`: exportacao mensal consolidada com todos os marketplaces.
@@ -59,6 +62,14 @@ Endpoints `/reports/tenants/{tenantId}/...` exigem Bearer JWT emitido pelo `auth
 - `CONTADOR`: pode assinar o fechamento mensal, tornando imutaveis os lancamentos e despesas do periodo.
 - `ADMIN`, `VENDEDOR` e `CONTADOR`: podem enviar lancamentos pelos endpoints de importacao/integracao publica. O tenant continua vindo do JWT/path, nunca do body.
 - `/reports/internal/**`: aceita apenas `X-Internal-Token` e fica bloqueado no gateway publico.
+
+## Processamento interno
+
+- `POST /reports/internal/entries`: materializa lancamentos enviados pelo `core-service` apos a sincronizacao de conectores.
+- `POST /reports/tenants/{tenantId}/dre/jobs`: cria um job em `dre_calculation_jobs` e grava a solicitacao no outbox interno.
+- `ReportingOutboxDispatcher`: scheduler Quarkus que processa jobs de DRE em background com retry controlado.
+
+O resultado da DRE assincrona fica na tabela `dre_calculation_jobs` com status `QUEUED`, `PROCESSING`, `COMPLETED` ou `FAILED`.
 
 ## Cards financeiros
 
@@ -90,11 +101,31 @@ A DRE simplificada calcula:
 - `operating_expenses`: despesas manuais do periodo.
 - `net_result`: `gross_revenue - marketplace_fees - estimated_taxes - operating_expenses`.
 
+Para execucao assincrona, chame `POST /reports/tenants/{tenantId}/dre/jobs` com `from` e `to`; o retorno traz `job_id`. Consulte `GET /reports/tenants/{tenantId}/dre/jobs/{jobId}` ate o status virar `COMPLETED` e o campo `statement` conter a DRE calculada.
+
 ## Fechamento Contabil
 
 O endpoint `POST /reports/tenants/{tenantId}/closings/{month}/sign` registra a assinatura digital do contador para o mes informado. A partir desse registro, `report_entries` e `expense_entries` daquele periodo ficam bloqueados nos repositórios antes de qualquer `INSERT`, `UPDATE`, `UPSERT` ou `DELETE`.
 
 Cancelamentos retroativos nao devem reabrir o mes assinado: devem ser lancados como novo ajuste no mes corrente.
+
+### Evolucao Clicksign
+
+Provedor definido para assinatura digital real: Clicksign. A evolucao esperada e criar um Envelope Clicksign com o PDF do balanco/DRE, cadastrar o contador como signatario, receber o webhook de conclusao, salvar os identificadores/PDF assinado e so entao registrar o fechamento contabil.
+
+URL publica para cadastrar na Clicksign via gateway:
+
+```text
+https://SEU-DOMINIO/api/reports/webhooks/clicksign
+```
+
+Em sandbox/local com tunel:
+
+```text
+https://SEU-NGROK.ngrok-free.app/api/reports/webhooks/clicksign
+```
+
+Depois de cadastrar o webhook, copie o HMAC SHA256 Secret gerado pela Clicksign para `CLICKSIGN_WEBHOOK_SECRET`. O endpoint valida o header `Content-Hmac` quando esse secret estiver configurado.
 
 ## Precisao Financeira
 

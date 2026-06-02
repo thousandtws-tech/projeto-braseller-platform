@@ -7,8 +7,12 @@ import com.example.application.command.UpsertFiscalProfileCommand;
 import com.example.application.exception.AccountingPeriodClosedException;
 import com.example.application.exception.NotFoundException;
 import com.example.application.exception.ValidationException;
+import com.example.application.event.DreCalculationRequestedEvent;
+import com.example.application.port.out.DreCalculationEventPublisher;
+import com.example.application.port.out.DreCalculationJobRepository;
 import com.example.application.port.out.FiscalAccountingRepository;
 import com.example.domain.model.AccountingPeriodClosing;
+import com.example.domain.model.DreCalculationJob;
 import com.example.domain.model.DreStatement;
 import com.example.domain.model.ExpenseAttachment;
 import com.example.domain.model.ExpenseCategory;
@@ -37,11 +41,19 @@ public class FiscalAccountingService {
 
     private final FiscalAccountingRepository fiscalRepository;
     private final ReportingService reportingService;
+    private final DreCalculationJobRepository dreCalculationJobRepository;
+    private final DreCalculationEventPublisher dreCalculationEventPublisher;
 
     @Inject
-    public FiscalAccountingService(FiscalAccountingRepository fiscalRepository, ReportingService reportingService) {
+    public FiscalAccountingService(
+            FiscalAccountingRepository fiscalRepository,
+            ReportingService reportingService,
+            DreCalculationJobRepository dreCalculationJobRepository,
+            DreCalculationEventPublisher dreCalculationEventPublisher) {
         this.fiscalRepository = fiscalRepository;
         this.reportingService = reportingService;
+        this.dreCalculationJobRepository = dreCalculationJobRepository;
+        this.dreCalculationEventPublisher = dreCalculationEventPublisher;
     }
 
     public FiscalProfile upsertProfile(UpsertFiscalProfileCommand command) {
@@ -153,14 +165,10 @@ public class FiscalAccountingService {
 
     public DreStatement dre(String tenantId, LocalDate from, LocalDate to) {
         String resolvedTenantId = requireText(tenantId, "tenantId");
-        LocalDate resolvedTo = to == null ? LocalDate.now() : to;
-        LocalDate resolvedFrom = from == null ? resolvedTo.withDayOfMonth(1) : from;
-        if (resolvedFrom.isAfter(resolvedTo)) {
-            throw new ValidationException("invalid_period");
-        }
+        DrePeriod period = resolvePeriod(from, to);
 
-        ReportFilter reportFilter = new ReportFilter(resolvedFrom, resolvedTo, null, null, null, null, null, null, null, null);
-        ExpenseFilter expenseFilter = new ExpenseFilter(resolvedFrom, resolvedTo, null, null, null);
+        ReportFilter reportFilter = new ReportFilter(period.from(), period.to(), null, null, null, null, null, null, null, null);
+        ExpenseFilter expenseFilter = new ExpenseFilter(period.from(), period.to(), null, null, null);
         FinancialSummary summary = reportingService.summary(resolvedTenantId, reportFilter);
         FiscalProfile profile = fiscalRepository.findProfile(resolvedTenantId).orElse(null);
         BigDecimal estimatedTaxRate = profile == null ? BigDecimal.ZERO : profile.estimatedTaxRate();
@@ -178,8 +186,8 @@ public class FiscalAccountingService {
 
         return new DreStatement(
                 resolvedTenantId,
-                resolvedFrom,
-                resolvedTo,
+                period.from(),
+                period.to(),
                 profile == null ? null : profile.taxRegime(),
                 estimatedTaxRate,
                 grossRevenue,
@@ -191,6 +199,45 @@ public class FiscalAccountingService {
                 expenseCount,
                 expensesByCategory
         );
+    }
+
+    public DreCalculationJob requestDreCalculation(String tenantId, LocalDate from, LocalDate to, TenantContext requester) {
+        if (requester == null) {
+            throw new ValidationException("requester is required");
+        }
+        String resolvedTenantId = requireText(tenantId, "tenantId");
+        DrePeriod period = resolvePeriod(from, to);
+        DreCalculationRequestedEvent event = DreCalculationRequestedEvent.create(
+                resolvedTenantId,
+                period.from(),
+                period.to(),
+                requester.userId(),
+                requester.email()
+        );
+        DreCalculationJob job = dreCalculationJobRepository.createQueued(event);
+        dreCalculationEventPublisher.publish(event);
+        return job;
+    }
+
+    public DreCalculationJob dreCalculationJob(String tenantId, String jobId) {
+        return dreCalculationJobRepository.find(requireText(tenantId, "tenantId"), requireText(jobId, "jobId"))
+                .orElseThrow(() -> new NotFoundException("dre_calculation_job_not_found"));
+    }
+
+    public DreCalculationJob processDreCalculation(DreCalculationRequestedEvent event) {
+        if (event == null) {
+            throw new ValidationException("dre calculation event is required");
+        }
+        if (!dreCalculationJobRepository.tryMarkProcessing(event.jobId())) {
+            return null;
+        }
+        try {
+            DreStatement statement = dre(event.tenantId(), event.from(), event.to());
+            return dreCalculationJobRepository.markCompleted(event.jobId(), statement);
+        } catch (RuntimeException exception) {
+            dreCalculationJobRepository.markFailed(event.jobId(), exception.getMessage());
+            throw exception;
+        }
     }
 
     private CreateExpenseCommand normalize(CreateExpenseCommand command) {
@@ -215,6 +262,15 @@ public class FiscalAccountingService {
             throw new ValidationException("invalid_period");
         }
         return filter;
+    }
+
+    private DrePeriod resolvePeriod(LocalDate from, LocalDate to) {
+        LocalDate resolvedTo = to == null ? LocalDate.now() : to;
+        LocalDate resolvedFrom = from == null ? resolvedTo.withDayOfMonth(1) : from;
+        if (resolvedFrom.isAfter(resolvedTo)) {
+            throw new ValidationException("invalid_period");
+        }
+        return new DrePeriod(resolvedFrom, resolvedTo);
     }
 
     private ExpenseAttachment normalizeAttachment(ExpenseAttachment attachment) {
@@ -297,5 +353,8 @@ public class FiscalAccountingService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private record DrePeriod(LocalDate from, LocalDate to) {
     }
 }

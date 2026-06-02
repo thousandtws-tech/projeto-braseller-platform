@@ -7,6 +7,7 @@ import com.example.application.exception.IdentityGatewayException;
 import com.example.application.port.out.UserIdentityGateway;
 import com.example.domain.model.AuthIdentity;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -22,9 +23,7 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class HttpUserIdentityGateway implements UserIdentityGateway {
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .build();
+    private HttpClient httpClient;
 
     @Inject
     ObjectMapper objectMapper;
@@ -34,6 +33,19 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
 
     @ConfigProperty(name = "auth.user-service.internal-token")
     String internalToken;
+
+    @ConfigProperty(name = "auth.http-client.connect-timeout-ms")
+    long connectTimeoutMs;
+
+    @ConfigProperty(name = "auth.http-client.request-timeout-ms")
+    long requestTimeoutMs;
+
+    @PostConstruct
+    void initHttpClient() {
+        httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+    }
 
     @Override
     public AuthIdentity registerTenant(RegisterCommand command) {
@@ -98,7 +110,7 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
         try {
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl() + path))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(Duration.ofMillis(requestTimeoutMs))
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)));

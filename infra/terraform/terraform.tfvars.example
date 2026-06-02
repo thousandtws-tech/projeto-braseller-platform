@@ -1,0 +1,71 @@
+# Azure
+subscription_id = "00000000-0000-0000-0000-000000000000"
+location        = "brazilsouth"
+project_name    = "brasaller"
+environment     = "prod"
+
+# ACR names are global. Change this before applying.
+acr_name  = "acrbrasallerprod001"
+image_tag = "prod-202606011530"
+
+# Set to false when images are built by CI/CD before terraform apply.
+build_images_with_acr = true
+
+# PostgreSQL/Neon. Create the databases before applying.
+postgres_host     = "ep-xxxxx.us-east-2.aws.neon.tech"
+postgres_username = "neondb_owner"
+postgres_password = "change-me"
+
+# Optional: uncomment when services use different databases or credentials.
+# service_database_credentials = {
+#   "gateway-api" = {
+#     host     = "ep-xxxxx.us-east-2.aws.neon.tech"
+#     database = "gateway_api"
+#     username = "gateway-api"
+#     password = "change-me"
+#     jdbc_url = "jdbc:postgresql://ep-xxxxx.us-east-2.aws.neon.tech/gateway_api?sslmode=require"
+#   }
+# }
+
+cors_origins = [
+  "https://app.seudominio.com.br",
+  "https://api.seudominio.com.br"
+]
+
+# Platform secrets. Use long random values in real environments.
+auth_jwt_secret                = "change-me-auth-jwt-secret-with-at-least-32-chars"
+internal_service_token         = "change-me-internal-service-token-32-chars"
+billing_webhook_token          = "change-me-billing-webhook-token-32-chars"
+connector_token_encryption_key = "change-me-connector-token-key-32-chars"
+
+# Keycloak
+keycloak_base_url             = "https://auth.seudominio.com.br"
+keycloak_public_base_url      = "https://auth.seudominio.com.br"
+keycloak_realm                = "brasaller"
+keycloak_client_id            = "auth-service"
+keycloak_client_secret        = "change-me"
+keycloak_admin_username       = "admin"
+keycloak_admin_password       = "change-me"
+keycloak_redirect_uri         = "https://app.seudominio.com.br/auth/callback"
+keycloak_require_email_verified = true
+
+# Mercado Livre
+mercadolivre_client_id     = ""
+mercadolivre_client_secret = "not-configured"
+mercadolivre_redirect_uri  = "https://api.seudominio.com.br/integrations/mercado-livre/callback"
+
+# Reporting integrations
+cloudinary_cloud_name    = "not-configured"
+cloudinary_api_key       = "not-configured"
+cloudinary_api_secret    = "not-configured"
+clicksign_base_url       = "https://sandbox.clicksign.com/api/v3"
+clicksign_access_token   = "not-configured"
+clicksign_webhook_secret = "not-configured"
+
+# Notification e-mail
+notification_mail_from = "no-reply@seudominio.com.br"
+smtp_host              = "smtp.seudominio.com.br"
+smtp_port              = 587
+smtp_username          = "apikey"
+smtp_password          = "not-configured"
+smtp_mock              = false

@@ -5,6 +5,7 @@ import com.example.application.command.UpdateExpenseCommand;
 import com.example.application.command.UpsertReportEntryCommand;
 import com.example.application.command.UpsertFiscalProfileCommand;
 import com.example.application.exception.ValidationException;
+import com.example.application.service.ClicksignWebhookService;
 import com.example.application.service.CloudinaryUploadSignatureService;
 import com.example.application.service.FiscalAccountingService;
 import com.example.application.service.ReportExportService;
@@ -12,8 +13,10 @@ import com.example.application.service.ReportingService;
 import com.example.application.service.TenantAuthorizationService;
 import com.example.domain.model.AccountingPeriodClosing;
 import com.example.domain.model.AvailableFilters;
+import com.example.domain.model.ClicksignWebhookEvent;
 import com.example.domain.model.CloudinaryUploadSignature;
 import com.example.domain.model.DashboardView;
+import com.example.domain.model.DreCalculationJob;
 import com.example.domain.model.DreStatement;
 import com.example.domain.model.ExpenseAttachment;
 import com.example.domain.model.ExpenseCategory;
@@ -78,6 +81,9 @@ public class ReportingResource {
     CloudinaryUploadSignatureService cloudinaryUploadSignatureService;
 
     @Inject
+    ClicksignWebhookService clicksignWebhookService;
+
+    @Inject
     ReportExportService reportExportService;
 
     @Inject
@@ -91,6 +97,16 @@ public class ReportingResource {
     @Operation(summary = "Status do reporting-service", description = "Verifica se o reporting-service esta respondendo.")
     public String status() {
         return "Reporting Service is running";
+    }
+
+    @POST
+    @Path("/webhooks/clicksign")
+    @Operation(summary = "Webhook Clicksign", description = "Recebe eventos Clicksign assinados via Content-Hmac para auditoria e conciliacao do fechamento contabil.")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON))
+    public ClicksignWebhookEvent clicksignWebhook(
+            @HeaderParam("Content-Hmac") String contentHmac,
+            String payload) {
+        return clicksignWebhookService.receive(payload, contentHmac);
     }
 
     @GET
@@ -364,6 +380,37 @@ public class ReportingResource {
             @QueryParam("to") LocalDate to) {
         tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
         return fiscalAccountingService.dre(tenantId, from, to);
+    }
+
+    @POST
+    @Path("/tenants/{tenantId}/dre/jobs")
+    @Operation(summary = "Enfileirar calculo de DRE", description = "Cria um job em banco para calcular a DRE do periodo em background e materializar o resultado.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = DreCalculationRequest.class)))
+    public Response requestDreCalculation(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            DreCalculationRequest request) {
+        TenantContext requester = tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        DreCalculationJob job = fiscalAccountingService.requestDreCalculation(
+                tenantId,
+                request == null ? null : request.from(),
+                request == null ? null : request.to(),
+                requester
+        );
+        return Response.accepted(job).build();
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/dre/jobs/{jobId}")
+    @Operation(summary = "Consultar job de DRE", description = "Retorna status e resultado materializado do calculo assincrono de DRE.")
+    @SecurityRequirement(name = "bearerAuth")
+    public DreCalculationJob dreCalculationJob(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @PathParam("jobId") String jobId) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.dreCalculationJob(tenantId, jobId);
     }
 
     @GET
@@ -673,6 +720,12 @@ public class ReportingResource {
     @Schema(name = "AccountingPeriodSignatureRequest")
     public record AccountingPeriodSignatureRequest(
             @JsonProperty("signature_hash") String signatureHash) {
+    }
+
+    @Schema(name = "DreCalculationRequest")
+    public record DreCalculationRequest(
+            @JsonProperty("from") LocalDate from,
+            @JsonProperty("to") LocalDate to) {
     }
 
     @Schema(name = "PublicReportEntryImportRequest")

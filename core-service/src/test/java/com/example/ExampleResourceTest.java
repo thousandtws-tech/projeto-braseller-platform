@@ -186,6 +186,35 @@ class ExampleResourceTest {
     }
 
     @Test
+    void syncAllIsQueuedForAsyncProcessing() {
+        String jobId = given()
+                .header("Authorization", "Bearer " + token())
+                .contentType("application/json")
+                .body("""
+                        {
+                          "since": "2026-05-01T00:00:00Z"
+                        }
+                        """)
+                .when().post("/core/connectors/sandbox/sync-all")
+                .then()
+                .statusCode(202)
+                .body("status", is("QUEUED"))
+                .body("connector_name", is("sandbox"))
+                .body("tenant_id", is("tenant-123"))
+                .body("job_id", containsString("-"))
+                .extract().path("job_id");
+
+        given()
+                .header("Authorization", "Bearer " + token())
+                .when().get("/core/connectors/sync-jobs/{jobId}", jobId)
+                .then()
+                .statusCode(200)
+                .body("job_id", is(jobId))
+                .body("status", is("QUEUED"))
+                .body("connector_name", is("sandbox"));
+    }
+
+    @Test
     void appliesOrderFiltersAndRejectsInvalidStatus() {
         given()
                 .header("Authorization", "Bearer " + token())

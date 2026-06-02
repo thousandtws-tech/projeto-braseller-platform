@@ -1,16 +1,19 @@
 package com.example.infrastructure.persistence;
 
 import com.example.application.port.out.NotificationRepository;
+import com.example.application.port.out.NewSaleSummaryQuery;
 import com.example.domain.model.DeliveryStatus;
 import com.example.domain.model.NotificationChannel;
 import com.example.domain.model.NotificationMessage;
 import com.example.domain.model.NotificationPreference;
 import com.example.domain.model.NotificationStatus;
 import com.example.domain.model.NotificationType;
+import com.example.domain.model.TenantNewSaleSummary;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -23,7 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
-public class JdbcNotificationRepository implements NotificationRepository {
+public class JdbcNotificationRepository implements NotificationRepository, NewSaleSummaryQuery {
     @Inject
     DataSource dataSource;
 
@@ -110,6 +113,56 @@ public class JdbcNotificationRepository implements NotificationRepository {
     }
 
     @Override
+    public boolean recordNewSaleEvent(String eventId, String tenantId, String marketplace, String orderId, BigDecimal amount, Instant occurredAt) {
+        try (Connection connection = dataSource.getConnection()) {
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                if (!insertNewSaleEvent(connection, eventId, tenantId, marketplace, orderId, amount, occurredAt)) {
+                    connection.rollback();
+                    return false;
+                }
+                upsertNewSaleSummary(connection, eventId, tenantId, marketplace, orderId, amount, occurredAt);
+                connection.commit();
+                return true;
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(autoCommit);
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not record new sale event", exception);
+        }
+    }
+
+    @Override
+    public Optional<TenantNewSaleSummary> findNewSaleSummary(String tenantId) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT tenant_id, sale_count, gross_revenue, last_marketplace,
+                            last_order_id, last_event_id, last_event_at
+                     FROM notification_new_sale_summaries
+                     WHERE tenant_id = ?
+                     """)) {
+            statement.setString(1, tenantId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(readNewSaleSummary(resultSet));
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not find new sale summary", exception);
+        }
+    }
+
+    @Override
+    public Optional<TenantNewSaleSummary> getTenantSummary(String tenantId) {
+        return findNewSaleSummary(tenantId);
+    }
+
+    @Override
     public void recordDelivery(String notificationId, NotificationChannel channel, DeliveryStatus status, String errorMessage) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -126,6 +179,95 @@ public class JdbcNotificationRepository implements NotificationRepository {
             statement.executeUpdate();
         } catch (SQLException exception) {
             throw new RepositoryException("Could not record notification delivery", exception);
+        }
+    }
+
+    private boolean insertNewSaleEvent(
+            Connection connection,
+            String eventId,
+            String tenantId,
+            String marketplace,
+            String orderId,
+            BigDecimal amount,
+            Instant occurredAt) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO notification_new_sale_events
+                (event_id, tenant_id, marketplace, order_id, amount, occurred_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """)) {
+            statement.setString(1, eventId);
+            statement.setString(2, tenantId);
+            statement.setString(3, marketplace);
+            statement.setString(4, orderId);
+            statement.setBigDecimal(5, money(amount));
+            statement.setTimestamp(6, Timestamp.from(occurredAt));
+            statement.executeUpdate();
+            return true;
+        } catch (SQLException exception) {
+            if (isDuplicate(exception)) {
+                return false;
+            }
+            throw exception;
+        }
+    }
+
+    private void upsertNewSaleSummary(
+            Connection connection,
+            String eventId,
+            String tenantId,
+            String marketplace,
+            String orderId,
+            BigDecimal amount,
+            Instant occurredAt) throws SQLException {
+        try (PreparedStatement update = connection.prepareStatement("""
+                UPDATE notification_new_sale_summaries
+                SET sale_count = sale_count + 1,
+                    gross_revenue = gross_revenue + ?,
+                    last_marketplace = ?,
+                    last_order_id = ?,
+                    last_event_id = ?,
+                    last_event_at = ?,
+                    updated_at = ?
+                WHERE tenant_id = ?
+                """)) {
+            Timestamp now = Timestamp.from(Instant.now());
+            update.setBigDecimal(1, money(amount));
+            update.setString(2, marketplace);
+            update.setString(3, orderId);
+            update.setString(4, eventId);
+            update.setTimestamp(5, Timestamp.from(occurredAt));
+            update.setTimestamp(6, now);
+            update.setString(7, tenantId);
+            if (update.executeUpdate() > 0) {
+                return;
+            }
+            insertNewSaleSummary(connection, eventId, tenantId, marketplace, orderId, amount, occurredAt, now);
+        }
+    }
+
+    private void insertNewSaleSummary(
+            Connection connection,
+            String eventId,
+            String tenantId,
+            String marketplace,
+            String orderId,
+            BigDecimal amount,
+            Instant occurredAt,
+            Timestamp updatedAt) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO notification_new_sale_summaries
+                (tenant_id, sale_count, gross_revenue, last_marketplace,
+                 last_order_id, last_event_id, last_event_at, updated_at)
+                VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+                """)) {
+            statement.setString(1, tenantId);
+            statement.setBigDecimal(2, money(amount));
+            statement.setString(3, marketplace);
+            statement.setString(4, orderId);
+            statement.setString(5, eventId);
+            statement.setTimestamp(6, Timestamp.from(occurredAt));
+            statement.setTimestamp(7, updatedAt);
+            statement.executeUpdate();
         }
     }
 
@@ -321,7 +463,29 @@ public class JdbcNotificationRepository implements NotificationRepository {
         );
     }
 
+    private TenantNewSaleSummary readNewSaleSummary(ResultSet resultSet) throws SQLException {
+        Timestamp lastEventAt = resultSet.getTimestamp("last_event_at");
+        return new TenantNewSaleSummary(
+                resultSet.getString("tenant_id"),
+                resultSet.getLong("sale_count"),
+                resultSet.getBigDecimal("gross_revenue"),
+                resultSet.getString("last_marketplace"),
+                resultSet.getString("last_order_id"),
+                resultSet.getString("last_event_id"),
+                lastEventAt == null ? null : lastEventAt.toInstant()
+        );
+    }
+
     private Timestamp timestamp(Instant value) {
         return value == null ? null : Timestamp.from(value);
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private boolean isDuplicate(SQLException exception) {
+        String sqlState = exception.getSQLState();
+        return sqlState != null && sqlState.startsWith("23");
     }
 }

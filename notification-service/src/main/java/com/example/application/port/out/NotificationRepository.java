@@ -4,7 +4,10 @@ import com.example.domain.model.DeliveryStatus;
 import com.example.domain.model.NotificationChannel;
 import com.example.domain.model.NotificationMessage;
 import com.example.domain.model.NotificationPreference;
+import com.example.domain.model.TenantNewSaleSummary;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +23,10 @@ public interface NotificationRepository {
     List<NotificationPreference> listWeeklyAccountantReportPreferences();
 
     NotificationMessage save(NotificationMessage notification);
+
+    boolean recordNewSaleEvent(String eventId, String tenantId, String marketplace, String orderId, BigDecimal amount, Instant occurredAt);
+
+    Optional<TenantNewSaleSummary> findNewSaleSummary(String tenantId);
 
     void recordDelivery(String notificationId, NotificationChannel channel, DeliveryStatus status, String errorMessage);
 

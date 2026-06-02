@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -30,9 +31,7 @@ import java.util.StringJoiner;
 
 @ApplicationScoped
 public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .build();
+    private HttpClient httpClient;
 
     @Inject
     ObjectMapper objectMapper;
@@ -60,6 +59,19 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
 
     @ConfigProperty(name = "auth.keycloak.admin-password")
     String adminPassword;
+
+    @ConfigProperty(name = "auth.http-client.connect-timeout-ms")
+    long connectTimeoutMs;
+
+    @ConfigProperty(name = "auth.http-client.request-timeout-ms")
+    long requestTimeoutMs;
+
+    @PostConstruct
+    void initHttpClient() {
+        httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+    }
 
     @Override
     public KeycloakTokenResponse exchangeCode(String code) {
@@ -152,7 +164,7 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(oidcEndpoint(realm, "userinfo")))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(requestTimeout())
                     .header("Accept", "application/json")
                     .header("Authorization", "Bearer " + accessToken)
                     .GET()
@@ -260,7 +272,7 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(requestTimeout())
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(form(formValues)))
@@ -278,7 +290,7 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(requestTimeout())
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + bearerToken)
@@ -297,7 +309,7 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(requestTimeout())
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + bearerToken)
@@ -329,7 +341,7 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(adminEndpoint("/users?email=" + encode(email.trim()) + "&exact=true")))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(requestTimeout())
                     .header("Accept", "application/json")
                     .header("Authorization", "Bearer " + adminToken)
                     .GET()
@@ -502,6 +514,10 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private Duration requestTimeout() {
+        return Duration.ofMillis(requestTimeoutMs);
     }
 
     private boolean isBlank(String value) {

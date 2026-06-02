@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -51,6 +52,38 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(403)
                 .body("message", is("invalid_internal_token"));
+    }
+
+    @Test
+    void clicksignWebhookAcceptsValidHmacAndStoresEvent() {
+        String payload = clicksignPayload("document_closed", "clicksign-document-123");
+
+        given()
+                .contentType("application/json")
+                .header("Content-Hmac", contentHmac(payload))
+                .body(payload)
+                .when().post("/reports/webhooks/clicksign")
+                .then()
+                .statusCode(200)
+                .body("event_name", is("document_closed"))
+                .body("account_key", is("clicksign-account-123"))
+                .body("envelope_id", is("clicksign-envelope-123"))
+                .body("document_key", is("clicksign-document-123"))
+                .body("processing_status", is("DOCUMENT_CLOSED"));
+    }
+
+    @Test
+    void clicksignWebhookRejectsInvalidHmac() {
+        String payload = clicksignPayload("sign", "clicksign-document-invalid");
+
+        given()
+                .contentType("application/json")
+                .header("Content-Hmac", "sha256=invalid")
+                .body(payload)
+                .when().post("/reports/webhooks/clicksign")
+                .then()
+                .statusCode(403)
+                .body("message", is("clicksign_hmac_invalid"));
     }
 
     @Test
@@ -281,6 +314,37 @@ class ExampleResourceTest {
     }
 
     @Test
+    void dreCalculationCanBeQueuedAndConsulted() {
+        String tenantId = "tenant-reporting-dre-async";
+
+        String jobId = given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "from": "2026-05-01",
+                          "to": "2026-05-31"
+                        }
+                        """)
+                .when().post("/reports/tenants/{tenantId}/dre/jobs", tenantId)
+                .then()
+                .statusCode(202)
+                .body("tenant_id", is(tenantId))
+                .body("status", is("QUEUED"))
+                .body("from", is("2026-05-01"))
+                .body("to", is("2026-05-31"))
+                .extract().path("job_id");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre/jobs/{jobId}", tenantId, jobId)
+                .then()
+                .statusCode(200)
+                .body("job_id", is(jobId))
+                .body("status", is("QUEUED"));
+    }
+
+    @Test
     void expenseUploadSignatureUsesCloudinaryConfiguration() {
         String tenantId = "tenant-reporting-cloudinary";
 
@@ -413,6 +477,28 @@ class ExampleResourceTest {
         return entryPayload(tenantId, orderId, platform, status, paymentMethod, "199.90", "173.50", "26.40", "0.00");
     }
 
+    private String clicksignPayload(String eventName, String documentKey) {
+        return """
+                {
+                  "event": {
+                    "name": "%s",
+                    "data": {
+                      "account": {
+                        "key": "clicksign-account-123"
+                      },
+                      "envelope": {
+                        "id": "clicksign-envelope-123"
+                      }
+                    },
+                    "occurred_at": "2026-06-01T01:15:00.000-03:00"
+                  },
+                  "document": {
+                    "key": "%s"
+                  }
+                }
+                """.formatted(eventName, documentKey);
+    }
+
     private String entryPayload(String tenantId, String orderId, String platform, String status, String paymentMethod,
                                 String grossValue, String receivedValue, String feeValue, String receivableValue) {
         return """
@@ -520,6 +606,16 @@ class ExampleResourceTest {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec("dev-only-change-me-please-32-bytes-minimum".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private String contentHmac(String payload) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec("test-webhook-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return "sha256=" + HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }

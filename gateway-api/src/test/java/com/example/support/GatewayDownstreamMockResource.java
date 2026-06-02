@@ -61,6 +61,7 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
                   "query": %s,
                   "authorization": %s,
                   "billing_webhook_token": %s,
+                  "content_hmac": %s,
                   "body": %s
                 }
                 """.formatted(
@@ -69,6 +70,7 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
                 json(exchange.getRequestURI().getRawQuery() == null ? "" : exchange.getRequestURI().getRawQuery()),
                 json(exchange.getRequestHeaders().getFirst("Authorization")),
                 json(exchange.getRequestHeaders().getFirst("X-Billing-Webhook-Token")),
+                json(exchange.getRequestHeaders().getFirst("Content-Hmac")),
                 json(requestBody)
         );
 

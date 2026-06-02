@@ -132,6 +132,20 @@ class ExampleResourceTest {
     }
 
     @Test
+    void forwardsClicksignContentHmacToReportingService() {
+        given()
+                .contentType("application/json")
+                .header("Content-Hmac", "sha256=test-clicksign-hmac")
+                .body("{\"event\":{\"name\":\"document_closed\"}}")
+                .when().post("/api/reports/webhooks/clicksign")
+                .then()
+                .statusCode(200)
+                .body("method", is("POST"))
+                .body("path", is("/reports/webhooks/clicksign"))
+                .body("content_hmac", is("sha256=test-clicksign-hmac"));
+    }
+
+    @Test
     void forwardsBinaryReportExportsWithoutChangingBody() {
         byte[] body = given()
                 .header("Authorization", "Bearer test-token")

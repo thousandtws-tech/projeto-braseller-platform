@@ -18,7 +18,6 @@ Microservice Quarkus para notificacoes, alertas e comunicacao com usuarios.
 - `quarkus-scheduler`: jobs recorrentes.
 - `quarkus-rest-client-jackson`: base para consultar outros microservices quando os contratos estiverem disponiveis.
 - `quarkus-jdbc-postgresql` e `quarkus-flyway`: persistencia e migrations.
-- `quarkus-messaging-kafka` e `quarkus-kafka-streams`: consumo de eventos, KStream e KTable materializada.
 
 ## Endpoints
 
@@ -28,7 +27,7 @@ Microservice Quarkus para notificacoes, alertas e comunicacao com usuarios.
 | `GET` | `/notifications/tenants/{tenantId}/preferences` | Consultar preferencias |
 | `PUT` | `/notifications/tenants/{tenantId}/preferences` | Atualizar preferencias, e-mail do usuario e e-mail do contador |
 | `GET` | `/notifications/tenants/{tenantId}` | Listar notificacoes |
-| `GET` | `/notifications/tenants/{tenantId}/new-sale-summary` | Resumo materializado via Kafka Streams/KTable |
+| `GET` | `/notifications/tenants/{tenantId}/new-sale-summary` | Resumo de vendas mantido em tabela propria |
 | `PATCH` | `/notifications/tenants/{tenantId}/{notificationId}/read` | Marcar como lida |
 | `POST` | `/notifications/tenants/{tenantId}/clear-read` | Arquivar lidas |
 | `POST` | `/notifications/events/new-sale` | Evento de nova venda |
@@ -44,18 +43,9 @@ Os endpoints `/notifications/tenants/{tenantId}/...` exigem Bearer JWT emitido p
 - `CONTADOR`: pode consultar dados do proprio tenant, mas nao pode executar acoes de escrita.
 - `/notifications/events/**`: aceita apenas `X-Internal-Token` para chamadas service-to-service e fica bloqueado no gateway publico.
 
-## Kafka
+## Eventos internos
 
-O servico tambem consome eventos Kafka de nova venda pelo topico `brasaller.notifications.new-sale.v1`, com grupo `notification-service`. Mensagens que falharem no processamento sao encaminhadas para `brasaller.notifications.new-sale.dlq.v1`.
-
-Kafka Streams fica habilitado no mesmo servico para analytics em tempo real:
-
-- KStream de entrada: `brasaller.notifications.new-sale.v1`.
-- KTable materializada: `tenant-new-sale-summary-store`.
-- Topico compactado de saida: `brasaller.analytics.tenant-new-sale-summary.v1`.
-- Endpoint de consulta: `GET /notifications/tenants/{tenantId}/new-sale-summary`.
-
-A KTable mantem `saleCount`, `grossRevenue`, ultimo pedido, ultimo evento e timestamp do ultimo evento por tenant.
+O servico recebe eventos por REST interno em `/notifications/events/**`, sempre protegidos por `X-Internal-Token`. O resumo de nova venda e mantido nas tabelas `notification_new_sale_events` e `notification_new_sale_summaries`, com idempotencia por `event_id`.
 
 ## Configuracao de e-mail
 

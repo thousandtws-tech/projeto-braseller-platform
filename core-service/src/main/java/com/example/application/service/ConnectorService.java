@@ -4,10 +4,16 @@ import com.example.application.command.ConnectorAuthenticationCommand;
 import com.example.application.command.ConnectorRefreshTokenCommand;
 import com.example.application.exception.ConnectorNotFoundException;
 import com.example.application.exception.ConnectorValidationException;
+import com.example.application.exception.NotFoundException;
 import com.example.application.event.NewSaleEvent;
+import com.example.application.event.ReportEntryUpsertRequestedEvent;
+import com.example.application.event.SyncAllRequestedEvent;
+import com.example.application.port.out.ConnectorSyncJobRepository;
+import com.example.application.port.out.ConnectorSyncQueue;
 import com.example.application.port.out.ConnectorRegistry;
 import com.example.application.port.out.DomainEventPublisher;
 import com.example.application.port.out.MarketplaceConnector;
+import com.example.application.port.out.ReportEntryEventPublisher;
 import com.example.domain.model.connector.ConnectorDescriptor;
 import com.example.domain.model.connector.ConnectorStatus;
 import com.example.domain.model.connector.ConnectorToken;
@@ -18,25 +24,43 @@ import com.example.domain.model.connector.OrderFilters;
 import com.example.domain.model.connector.OrderStatus;
 import com.example.domain.model.connector.PaymentInfo;
 import com.example.domain.model.connector.StandardOrder;
+import com.example.domain.model.connector.SyncAccepted;
+import com.example.domain.model.connector.SyncJob;
 import com.example.domain.model.connector.SyncResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @ApplicationScoped
 public class ConnectorService {
+    private static final ZoneId SAO_PAULO = ZoneId.of("America/Sao_Paulo");
+    private static final int DEFAULT_SYNC_LOOKBACK_SECONDS = 86400;
+    private static final int DEFAULT_SYNC_ORDER_LIMIT = 200;
+
     private final ConnectorRegistry connectorRegistry;
     private final DomainEventPublisher domainEventPublisher;
+    private final ConnectorSyncQueue connectorSyncQueue;
+    private final ConnectorSyncJobRepository connectorSyncJobRepository;
+    private final ReportEntryEventPublisher reportEntryEventPublisher;
 
     @Inject
-    public ConnectorService(ConnectorRegistry connectorRegistry, DomainEventPublisher domainEventPublisher) {
+    public ConnectorService(
+            ConnectorRegistry connectorRegistry,
+            DomainEventPublisher domainEventPublisher,
+            ConnectorSyncQueue connectorSyncQueue,
+            ConnectorSyncJobRepository connectorSyncJobRepository,
+            ReportEntryEventPublisher reportEntryEventPublisher) {
         this.connectorRegistry = connectorRegistry;
         this.domainEventPublisher = domainEventPublisher;
+        this.connectorSyncQueue = connectorSyncQueue;
+        this.connectorSyncJobRepository = connectorSyncJobRepository;
+        this.reportEntryEventPublisher = reportEntryEventPublisher;
     }
 
     public List<ConnectorDescriptor> list() {
@@ -87,11 +111,51 @@ public class ConnectorService {
     }
 
     public SyncResult syncAll(String connectorName, String tenantId, String recipientEmail, Instant since) {
-        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return performSyncAll(connectorName, tenantId, recipientEmail, since);
+    }
+
+    public SyncAccepted requestSyncAll(String connectorName, String tenantId, String recipientEmail, Instant since) {
         MarketplaceConnector marketplaceConnector = connector(connectorName);
-        SyncResult result = marketplaceConnector.syncAll(normalizedTenantId, since == null ? Instant.now().minusSeconds(86400) : since);
-        publishNewSaleEvents(marketplaceConnector, normalizedTenantId, recipientEmail);
-        return result;
+        String normalizedTenantId = requireText(tenantId, "tenantId");
+        Instant resolvedSince = resolveSince(since);
+        SyncAllRequestedEvent event = SyncAllRequestedEvent.create(
+                marketplaceConnector.name(),
+                normalizedTenantId,
+                recipientEmail,
+                resolvedSince
+        );
+        connectorSyncJobRepository.createQueued(event);
+        connectorSyncQueue.enqueue(event);
+        return new SyncAccepted(
+                event.eventId(),
+                "QUEUED",
+                event.connectorName(),
+                event.tenantId(),
+                event.since(),
+                event.requestedAt()
+        );
+    }
+
+    public SyncResult processSyncAll(SyncAllRequestedEvent event) {
+        if (event == null) {
+            throw new ConnectorValidationException("sync event is required");
+        }
+        if (!connectorSyncJobRepository.tryMarkProcessing(event.eventId())) {
+            return null;
+        }
+        try {
+            SyncResult result = performSyncAll(event.connectorName(), event.tenantId(), event.recipientEmail(), event.since());
+            connectorSyncJobRepository.markCompleted(event.eventId(), result);
+            return result;
+        } catch (RuntimeException exception) {
+            connectorSyncJobRepository.markFailed(event.eventId(), exception.getMessage());
+            throw exception;
+        }
+    }
+
+    public SyncJob syncJob(String tenantId, String jobId) {
+        return connectorSyncJobRepository.find(requireText(tenantId, "tenantId"), requireText(jobId, "jobId"))
+                .orElseThrow(() -> new NotFoundException("sync_job_not_found"));
     }
 
     public ConnectorStatus getStatus(String connectorName, String tenantId) {
@@ -104,8 +168,33 @@ public class ConnectorService {
                 .orElseThrow(() -> new ConnectorNotFoundException(normalizedName));
     }
 
-    private void publishNewSaleEvents(MarketplaceConnector marketplaceConnector, String tenantId, String recipientEmail) {
-        marketplaceConnector.getOrders(tenantId, new OrderFilters(null, null, OrderStatus.PAID, 50)).stream()
+    private SyncResult performSyncAll(String connectorName, String tenantId, String recipientEmail, Instant since) {
+        String normalizedTenantId = requireText(tenantId, "tenantId");
+        MarketplaceConnector marketplaceConnector = connector(connectorName);
+        Instant resolvedSince = resolveSince(since);
+        SyncResult result = marketplaceConnector.syncAll(normalizedTenantId, resolvedSince);
+        List<StandardOrder> syncedOrders = marketplaceConnector.getOrders(
+                normalizedTenantId,
+                new OrderFilters(
+                        resolvedSince.atZone(SAO_PAULO).toLocalDate(),
+                        null,
+                        null,
+                        Math.max(DEFAULT_SYNC_ORDER_LIMIT, result.ordersSynced())
+                )
+        );
+        publishReportEntryEvents(normalizedTenantId, syncedOrders);
+        publishNewSaleEvents(normalizedTenantId, recipientEmail, syncedOrders);
+        return result;
+    }
+
+    private void publishReportEntryEvents(String tenantId, List<StandardOrder> orders) {
+        orders.forEach(order -> reportEntryEventPublisher.publishReportEntryUpsert(
+                ReportEntryUpsertRequestedEvent.fromOrder(tenantId, order)
+        ));
+    }
+
+    private void publishNewSaleEvents(String tenantId, String recipientEmail, List<StandardOrder> orders) {
+        orders.stream()
                 .filter(order -> order.status() == OrderStatus.PAID)
                 .forEach(order -> domainEventPublisher.publishNewSale(NewSaleEvent.create(
                         UUID.randomUUID().toString(),
@@ -115,6 +204,10 @@ public class ConnectorService {
                         order.orderId(),
                         order.grossValue()
                 )));
+    }
+
+    private Instant resolveSince(Instant since) {
+        return since == null ? Instant.now().minusSeconds(DEFAULT_SYNC_LOOKBACK_SECONDS) : since;
     }
 
     private String requireText(String value, String fieldName) {

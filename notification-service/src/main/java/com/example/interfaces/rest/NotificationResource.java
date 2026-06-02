@@ -112,21 +112,15 @@ public class NotificationResource {
 
     @GET
     @Path("/tenants/{tenantId}/new-sale-summary")
-    @Operation(summary = "Consultar resumo de vendas", description = "Retorna o agregado materializado por Kafka Streams/KTable para novas vendas do tenant.")
+    @Operation(summary = "Consultar resumo de vendas", description = "Retorna o agregado de novas vendas mantido no banco do notification-service.")
     @SecurityRequirement(name = "bearerAuth")
     public Response newSaleSummary(
             @HeaderParam("Authorization") String authorizationHeader,
             @PathParam("tenantId") String tenantId) {
         tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
-        try {
-            TenantNewSaleSummary summary = newSaleSummaryQuery.getTenantSummary(tenantId)
-                    .orElseGet(() -> TenantNewSaleSummary.empty(tenantId));
-            return Response.ok(summary).build();
-        } catch (IllegalStateException exception) {
-            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new RestError("kafka_stream_store_not_ready"))
-                    .build();
-        }
+        TenantNewSaleSummary summary = newSaleSummaryQuery.getTenantSummary(tenantId)
+                .orElseGet(() -> TenantNewSaleSummary.empty(tenantId));
+        return Response.ok(summary).build();
     }
 
     @PATCH
@@ -162,6 +156,9 @@ public class NotificationResource {
     public Response newSale(@HeaderParam("X-Internal-Token") String internalToken, NewSaleRequest request) {
         internalServiceAuthorizer.requireInternal(internalToken);
         return optionalResponse(notificationService.notifyNewSale(new NewSaleNotificationCommand(
+                request.eventId(),
+                request.eventType(),
+                request.occurredAt(),
                 request.tenantId(),
                 request.recipientEmail(),
                 request.marketplace(),
@@ -237,7 +234,15 @@ public class NotificationResource {
     }
 
     @Schema(name = "NewSaleNotificationRequest")
-    public record NewSaleRequest(String tenantId, String recipientEmail, String marketplace, String orderId, BigDecimal amount) {
+    public record NewSaleRequest(
+            String eventId,
+            String eventType,
+            java.time.Instant occurredAt,
+            String tenantId,
+            String recipientEmail,
+            String marketplace,
+            String orderId,
+            BigDecimal amount) {
     }
 
     @Schema(name = "MlPaymentReleaseNotificationRequest")

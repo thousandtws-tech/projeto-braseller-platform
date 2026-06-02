@@ -12,7 +12,8 @@ import com.example.domain.model.connector.InvoiceInfo;
 import com.example.domain.model.connector.OrderStatus;
 import com.example.domain.model.connector.PaymentInfo;
 import com.example.domain.model.connector.StandardOrder;
-import com.example.domain.model.connector.SyncResult;
+import com.example.domain.model.connector.SyncAccepted;
+import com.example.domain.model.connector.SyncJob;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -23,6 +24,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -145,15 +147,32 @@ public class ConnectorResource {
 
     @POST
     @Path("/{connectorName}/sync-all")
-    @Operation(summary = "Sincronizar tudo", description = "Executa syncAll(desde) do conector pelo nome.")
+    @Operation(summary = "Enfileirar sincronizacao", description = "Cria um job em banco para executar syncAll(desde) do conector em background.")
     @SecurityRequirement(name = "bearerAuth")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = SyncAllRequest.class)))
-    public SyncResult syncAll(
+    public Response syncAll(
             @HeaderParam("Authorization") String authorizationHeader,
             @PathParam("connectorName") String connectorName,
             SyncAllRequest request) {
         TenantContext context = tenantAuthorizationService.requireWritable(authorizationHeader);
-        return connectorService.syncAll(connectorName, context.tenantId(), context.email(), request.since());
+        SyncAccepted accepted = connectorService.requestSyncAll(
+                connectorName,
+                context.tenantId(),
+                context.email(),
+                request == null ? null : request.since()
+        );
+        return Response.accepted(accepted).build();
+    }
+
+    @GET
+    @Path("/sync-jobs/{jobId}")
+    @Operation(summary = "Consultar job de sincronizacao", description = "Retorna status e resultado do processamento assincrono de syncAll.")
+    @SecurityRequirement(name = "bearerAuth")
+    public SyncJob syncJob(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("jobId") String jobId) {
+        TenantContext context = tenantAuthorizationService.requireReadable(authorizationHeader);
+        return connectorService.syncJob(context.tenantId(), jobId);
     }
 
     @GET

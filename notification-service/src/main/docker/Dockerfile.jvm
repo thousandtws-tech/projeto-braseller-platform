@@ -26,7 +26,6 @@ COPY --from=build --chown=185 /workspace/target/quarkus-app/lib/ /deployments/li
 COPY --from=build --chown=185 /workspace/target/quarkus-app/*.jar /deployments/
 COPY --from=build --chown=185 /workspace/target/quarkus-app/app/ /deployments/app/
 COPY --from=build --chown=185 /workspace/target/quarkus-app/quarkus/ /deployments/quarkus/
-RUN mkdir -p /deployments/kafka-streams && chown -R 185:0 /deployments/kafka-streams
 
 EXPOSE 8080
 USER 185

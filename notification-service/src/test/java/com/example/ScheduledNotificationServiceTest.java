@@ -14,6 +14,7 @@ import com.example.domain.model.NotificationType;
 import com.example.domain.model.PaymentReleaseAlert;
 import com.example.domain.model.ReportingFinancialSummary;
 import com.example.domain.model.ScheduledNotificationResult;
+import com.example.domain.model.TenantNewSaleSummary;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -108,6 +109,16 @@ class ScheduledNotificationServiceTest {
         public NotificationMessage save(NotificationMessage notification) {
             notifications.add(notification);
             return notification;
+        }
+
+        @Override
+        public boolean recordNewSaleEvent(String eventId, String tenantId, String marketplace, String orderId, BigDecimal amount, Instant occurredAt) {
+            return true;
+        }
+
+        @Override
+        public Optional<TenantNewSaleSummary> findNewSaleSummary(String tenantId) {
+            return Optional.empty();
         }
 
         @Override

@@ -50,7 +50,7 @@ Contrato obrigatorio de todo conector:
 - `getOrderDetail(id)`: detalhes completos de um pedido.
 - `getPayments(orderId)`: dados de pagamento e liberacao.
 - `getFees(orderId)`: taxas e comissoes.
-- `syncAll(desde)`: sincronizacao completa desde uma data.
+- `syncAll(desde)`: sincronizacao completa desde uma data, enfileirada para processamento assincrono.
 - `getStatus()`: status da conexao.
 
 Contrato opcional:
@@ -68,6 +68,7 @@ Endpoints do Core:
 - `GET /core/connectors/{connectorName}/orders/{orderId}/fees`.
 - `GET /core/connectors/{connectorName}/invoices`.
 - `POST /core/connectors/{connectorName}/sync-all`.
+- `GET /core/connectors/sync-jobs/{jobId}`.
 - `GET /core/connectors/{connectorName}/status`.
 
 O conector `sandbox` foi incluido para validar o contrato sem depender de marketplace real. Novos marketplaces entram como adapters que implementam a porta `MarketplaceConnector`; `getInvoices()` e default opcional para plataformas sem NF. O frontend nunca recebe nem envia `access_token` ou `refresh_token` de marketplace; os endpoints de autenticacao retornam apenas status/conexao e vencimento.
@@ -121,17 +122,17 @@ Contratos principais:
 
 Consultas em `/notifications/tenants/{tenantId}/...` exigem Bearer JWT do mesmo tenant. Atualizacoes exigem papel de escrita. Endpoints `/notifications/events/**` sao service-to-service, protegidos por `X-Internal-Token`, e bloqueados em `/api/notifications/events/**` pelo gateway.
 
-## Mensageria Kafka
+## Processamento Interno sem Broker
 
-O ambiente Docker sobe um broker Kafka local em `localhost:9092` e cria os topicos versionados usados pelos microservices.
+Para o MVP cloud, o projeto nao usa broker externo. A decisao atual e manter o processamento simples com recursos do proprio Quarkus e PostgreSQL:
 
-- `core-service` publica eventos de nova venda em `brasaller.notifications.new-sale.v1` ao executar `POST /core/connectors/{connectorName}/sync-all`.
-- `notification-service` consome o topico com o grupo `notification-service` e cria a notificacao conforme as preferencias do tenant.
-- `notification-service` tambem executa Kafka Streams sobre o mesmo topico, mantendo a KTable `tenant-new-sale-summary-store` com resumo de vendas por tenant.
-- A KTable publica atualizacoes no topico compactado `brasaller.analytics.tenant-new-sale-summary.v1` e pode ser consultada em `GET /notifications/tenants/{tenantId}/new-sale-summary`.
-- Falhas de processamento sao enviadas para `brasaller.notifications.new-sale.dlq.v1`.
+- chamadas REST internas protegidas por `X-Internal-Token` entre microservices;
+- jobs recorrentes com Quarkus Scheduler;
+- tabelas de job/outbox no PostgreSQL quando houver necessidade de retry, status e idempotencia;
+- notificacoes internas ainda podem ser criadas por `/notifications/events/**`, mas esses endpoints continuam bloqueados no gateway publico;
+- lancamentos do Core para Reporting podem seguir pelo endpoint interno `/reports/internal/entries`.
 
-Variaveis principais: `KAFKA_BOOTSTRAP_SERVERS`, `BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE`, `BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_DLQ`, `BRASALLER_KAFKA_TOPIC_NOTIFICATION_NEW_SALE_SUMMARY`, `KAFKA_NOTIFICATION_GROUP_ID`, `KAFKA_STREAMS_APPLICATION_ID` e `KAFKA_STREAMS_APPLICATION_SERVER`. No Compose, os servicos usam `kafka:9093` pela rede interna Docker.
+Essa abordagem reduz custo e operacao no inicio. Se o volume crescer, a arquitetura deve manter portas internas para permitir trocar o mecanismo por broker gerenciado no futuro.
 
 ## Modulo Reporting
 
@@ -144,11 +145,11 @@ Funcionalidades iniciais:
 - Filtros por periodo, plataforma, forma de pagamento e status.
 - Tabela de lancamentos com busca, ordenacao e paginacao.
 - Graficos de evolucao mensal e comparativo entre plataformas.
-- Nucleo fiscal MVP com regime tributario, despesas com anexo Cloudinary e DRE simplificada.
+- Nucleo fiscal MVP com regime tributario, despesas com anexo Cloudinary e DRE simplificada sob demanda.
 - Motor unico de exportacao em PDF, Excel `.xlsx` e CSV.
 - Relatorio mensal consolidado com todos os marketplaces.
 - Relatorio por plataforma/modulo, incluindo Excel com abas por marketplace.
-- Endpoint interno para ingestao de lancamentos normalizados.
+- Ingestao de lancamentos normalizados por endpoint interno protegido.
 
 Contratos principais:
 
@@ -163,19 +164,22 @@ Contratos principais:
 - `GET|POST /reports/tenants/{tenantId}/expenses`: lista/lanca despesas com anexo Cloudinary obrigatorio.
 - `GET|PUT|DELETE /reports/tenants/{tenantId}/expenses/{expenseId}`: detalha, atualiza ou remove despesa.
 - `GET /reports/tenants/{tenantId}/dre`: gera DRE simplificada por periodo.
+- `POST /reports/tenants/{tenantId}/dre/jobs`: enfileira calculo de DRE por periodo.
+- `GET /reports/tenants/{tenantId}/dre/jobs/{jobId}`: consulta status/resultado do job de DRE.
 - `GET /reports/tenants/{tenantId}/closings/{month}`: consulta assinatura do fechamento mensal.
 - `POST /reports/tenants/{tenantId}/closings/{month}/sign`: contador assina e trava o periodo `YYYY-MM`.
+- `POST /reports/webhooks/clicksign`: recebe eventos Clicksign via `Content-Hmac` para auditoria e conciliacao do fechamento contabil.
 - `GET /reports/tenants/{tenantId}/exports/monthly?month=YYYY-MM&format=pdf|xlsx|csv`: exportacao mensal consolidada.
 - `GET /reports/tenants/{tenantId}/exports/platforms/{platform}?from=YYYY-MM-DD&to=YYYY-MM-DD&format=pdf|xlsx|csv`: exportacao por marketplace/modulo.
-- `POST /reports/internal/entries`: ingestao interna protegida por `X-Internal-Token`.
+- `POST /reports/internal/entries`: ingestao interna protegida por `X-Internal-Token` mantida para integracoes service-to-service.
 
 Consultas em `/reports/tenants/{tenantId}/...` exigem Bearer JWT do mesmo tenant. `ADMIN`, `VENDEDOR` e `CONTADOR` podem consultar. O perfil fiscal e as despesas sao escrita de `ADMIN`/`VENDEDOR`; `CONTADOR` acessa em modo leitura. Endpoints `/reports/internal/**` sao service-to-service e ficam bloqueados no gateway publico.
 
 Decisao de arquitetura da Fase 1: nao foi criado microservice novo para fiscal/contabil. O escopo atual depende diretamente do read model financeiro do `reporting-service` e ainda e manual/simplificado. Um `accounting-service` separado fica reservado para uma etapa com apuracao fiscal propria, NF-e/SPED, conciliacao bancaria ou workflow contabil independente.
 
-Regras criticas aplicadas: despesas sem comprovante nao sao aceitas para DRE; fechamento assinado pelo contador trava lancamentos/despesas daquele mes; valores financeiros usam `DECIMAL(10,2)` no banco; tokens de marketplace sao criptografados com AES-256 no Core.
+Regras criticas aplicadas: despesas sem comprovante nao sao aceitas para DRE; fechamento assinado pelo contador trava lancamentos/despesas daquele mes; valores financeiros usam `DECIMAL(10,2)` no banco; tokens de marketplace sao criptografados com AES-256 no Core. A assinatura digital real do balanco/DRE sera coletada via Clicksign.
 
-Pendencias documentadas: estoque/CMV por XML, CNAE/faixas fiscais detalhadas, DRE materializada/versionada, RLS nativo PostgreSQL, assinatura digital real, upload Cloudinary no frontend, Shopee, Amazon, Open Finance/OFX e conciliacao bancaria. A lista completa fica em `docs/technical-architecture-current.md`.
+Pendencias documentadas: estoque/CMV por XML, CNAE/faixas fiscais detalhadas, versionamento final/assinatura da DRE via Clicksign, RLS nativo PostgreSQL, upload Cloudinary no frontend, Shopee, Amazon, Open Finance/OFX e conciliacao bancaria. A lista completa fica em `docs/technical-architecture-current.md`.
 
 ## Gateway API
 
@@ -195,6 +199,11 @@ Headers propagados: `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept`, `C
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/verify-services.ps1
 ```
+
+## Performance e Observabilidade
+
+O guia [docs/performance-guide.md](docs/performance-guide.md) documenta limites de runtime, pool JDBC, health/readiness, Prometheus, testes de carga com `hey`, leitura de p95/p99 e checklist de validacao.
+Os SLOs iniciais por rota estao em [docs/slo.md](docs/slo.md). Antes de subir ambiente fora de desenvolvimento, valide um arquivo local de segredos com `.\scripts\security\validate-prod-secrets.ps1 -EnvFile .env.production` ou use `.\scripts\production\start-compose-prod.ps1 -EnvFile .env.production -Build`.
 
 ## Subir ambiente local
 
