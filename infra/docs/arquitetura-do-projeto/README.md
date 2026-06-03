@@ -19,11 +19,12 @@ Documentação técnica completa da plataforma Brasaller, gerada em Junho/2026.
 | [03-banco-de-dados-erd.md](03-banco-de-dados-erd.md) | ERD de todos os bancos de dados por serviço |
 | [04-fluxos-e-sequencias.md](04-fluxos-e-sequencias.md) | Diagramas de sequência dos 10 fluxos principais |
 | [05-seguranca-e-integrações.md](05-seguranca-e-integrações.md) | Modelo de segurança, integrações externas, env vars |
+| [06-ai-agent-service.md](06-ai-agent-service.md) | AI Agent Service: arquitetura, ERD, eventos, ferramentas, LLM, exemplos JSON |
 
 ## Resumo Rápido
 
 **Plataforma:** SaaS multi-tenant para gestão financeira de vendedores em marketplaces  
-**Backend:** 7 microserviços Quarkus 3.35.4 / Java 21  
+**Backend:** 8 microserviços Quarkus 3.35.4 / Java 21  
 **Frontend:** Angular 18+ (standalone)  
 **Banco:** PostgreSQL Neon (1 banco por serviço)  
 **Cloud:** Azure Container Apps + Terraform  
@@ -40,5 +41,6 @@ Documentação técnica completa da plataforma Brasaller, gerada em Junho/2026.
 | core-service | 8081 | Conectores marketplace, pedidos |
 | reporting-service | 8087 | Dashboard, DRE, relatórios |
 | notification-service | 8083 | Emails, alertas, in-app |
+| ai-agent-service | 8086 | Agentes autônomos de IA, decisões, memória |
 
 > Todos os diagramas usam [Mermaid](https://mermaid.js.org/) — renderizados no GitHub, GitLab, Notion e VS Code (extensão Mermaid Preview).
