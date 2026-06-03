@@ -99,3 +99,34 @@ terraform output container_app_fqdns
 ```
 
 O primeiro endpoint publico esperado e o `gateway-api`; os demais apps ficam acessiveis apenas dentro do Container Apps Environment.
+
+## Alta disponibilidade e escala
+
+O Azure Container Apps ja distribui o trafego entre replicas saudaveis no ingress do proprio ambiente. Esta stack configura esse balanceamento com replicas minimas, autoscale por concorrencia HTTP, probes e desligamento gracioso:
+
+- `gateway-api`: minimo 3 replicas, maximo 20, escala acima de 60 requisicoes concorrentes por replica.
+- Microservicos internos: minimo 2 replicas, maximo entre 8 e 10, escala entre 30 e 40 requisicoes concorrentes por replica.
+- `startup_probe` evita matar uma revisao enquanto Quarkus/Flyway ainda esta iniciando.
+- `readiness_probe` tira replicas nao prontas do trafego.
+- `termination_grace_period_seconds = 60` e `GRACEFUL_SHUTDOWN_TIMEOUT = 60S` reduzem perda de requisicoes durante deploy/restart.
+
+Para ajustar capacidade sem editar os arquivos, use overrides no `prod.auto.tfvars`:
+
+```hcl
+service_min_replicas = {
+  "gateway-api"     = 4
+  "billing-service" = 3
+}
+
+service_max_replicas = {
+  "gateway-api"        = 30
+  "reporting-service" = 15
+}
+
+service_http_concurrent_requests = {
+  "gateway-api"        = 50
+  "reporting-service" = 20
+}
+```
+
+Use thresholds menores para escalar mais cedo quando houver lentidao; use valores maiores quando as replicas estiverem com CPU, memoria e banco folgados. Depois do `apply`, acompanhe `Replicas`, `Requests`, `Response Time`, CPU e memoria no Azure Portal ou Log Analytics antes de subir limites de forma agressiva.

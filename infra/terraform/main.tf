@@ -110,8 +110,16 @@ resource "azurerm_container_app" "services" {
   }
 
   template {
-    min_replicas = each.value.min_replicas
-    max_replicas = each.value.max_replicas
+    min_replicas                     = each.value.min_replicas
+    max_replicas                     = each.value.max_replicas
+    polling_interval_in_seconds      = var.container_app_scale_polling_interval_seconds
+    cooldown_period_in_seconds       = var.container_app_scale_cooldown_seconds
+    termination_grace_period_seconds = var.container_app_termination_grace_period_seconds
+
+    http_scale_rule {
+      name                = "http-concurrency"
+      concurrent_requests = tostring(each.value.http_concurrent_requests)
+    }
 
     container {
       name   = each.key
@@ -119,11 +127,21 @@ resource "azurerm_container_app" "services" {
       cpu    = each.value.cpu
       memory = each.value.memory
 
+      startup_probe {
+        transport               = "HTTP"
+        port                    = 8080
+        path                    = "/q/health/live"
+        initial_delay           = 10
+        interval_seconds        = 5
+        timeout                 = 5
+        failure_count_threshold = 24
+      }
+
       liveness_probe {
         transport               = "HTTP"
         port                    = 8080
         path                    = "/q/health/live"
-        initial_delay           = 30
+        initial_delay           = 60
         interval_seconds        = 30
         timeout                 = 5
         failure_count_threshold = 3

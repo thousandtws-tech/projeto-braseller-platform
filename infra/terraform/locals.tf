@@ -27,69 +27,114 @@ locals {
 
   service_database_names = merge(local.default_service_database_names, var.service_database_names)
 
-  services = {
+  default_service_scaling = {
     "auth-service" = {
-      context          = "auth-service"
-      database         = local.service_database_names["auth-service"]
-      ingress_external = false
-      min_replicas     = 1
-      max_replicas     = 5
-      cpu              = 0.5
-      memory           = "1Gi"
+      min_replicas             = 2
+      max_replicas             = 8
+      http_concurrent_requests = 40
     }
     "user-service" = {
-      context          = "user-service"
-      database         = local.service_database_names["user-service"]
-      ingress_external = false
-      min_replicas     = 1
-      max_replicas     = 5
-      cpu              = 0.5
-      memory           = "1Gi"
+      min_replicas             = 2
+      max_replicas             = 8
+      http_concurrent_requests = 40
     }
     "billing-service" = {
-      context          = "billing-service"
-      database         = local.service_database_names["billing-service"]
-      ingress_external = false
-      min_replicas     = 1
-      max_replicas     = 5
-      cpu              = 0.5
-      memory           = "1Gi"
+      min_replicas             = 2
+      max_replicas             = 8
+      http_concurrent_requests = 30
     }
     "core-service" = {
-      context          = "core-service"
-      database         = local.service_database_names["core-service"]
-      ingress_external = false
-      min_replicas     = 1
-      max_replicas     = 5
-      cpu              = 1.0
-      memory           = "2Gi"
+      min_replicas             = 2
+      max_replicas             = 10
+      http_concurrent_requests = 30
     }
     "reporting-service" = {
-      context          = "reporting-service"
-      database         = local.service_database_names["reporting-service"]
-      ingress_external = false
-      min_replicas     = 1
-      max_replicas     = 5
-      cpu              = 1.0
-      memory           = "2Gi"
+      min_replicas             = 2
+      max_replicas             = 10
+      http_concurrent_requests = 30
     }
     "notification-service" = {
-      context          = "notification-service"
-      database         = local.service_database_names["notification-service"]
-      ingress_external = false
-      min_replicas     = 1
-      max_replicas     = 5
-      cpu              = 0.5
-      memory           = "1Gi"
+      min_replicas             = 2
+      max_replicas             = 8
+      http_concurrent_requests = 30
     }
     "gateway-api" = {
-      context          = "gateway-api"
-      database         = local.service_database_names["gateway-api"]
-      ingress_external = true
-      min_replicas     = 2
-      max_replicas     = 10
-      cpu              = 1.0
-      memory           = "2Gi"
+      min_replicas             = 3
+      max_replicas             = 20
+      http_concurrent_requests = 60
+    }
+  }
+
+  services = {
+    "auth-service" = {
+      context                  = "auth-service"
+      database                 = local.service_database_names["auth-service"]
+      ingress_external         = false
+      min_replicas             = lookup(var.service_min_replicas, "auth-service", local.default_service_scaling["auth-service"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "auth-service", local.default_service_scaling["auth-service"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "auth-service", local.default_service_scaling["auth-service"].http_concurrent_requests)
+      cpu                      = 0.5
+      memory                   = "1Gi"
+    }
+    "user-service" = {
+      context                  = "user-service"
+      database                 = local.service_database_names["user-service"]
+      ingress_external         = false
+      min_replicas             = lookup(var.service_min_replicas, "user-service", local.default_service_scaling["user-service"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "user-service", local.default_service_scaling["user-service"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "user-service", local.default_service_scaling["user-service"].http_concurrent_requests)
+      cpu                      = 0.5
+      memory                   = "1Gi"
+    }
+    "billing-service" = {
+      context                  = "billing-service"
+      database                 = local.service_database_names["billing-service"]
+      ingress_external         = false
+      min_replicas             = lookup(var.service_min_replicas, "billing-service", local.default_service_scaling["billing-service"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "billing-service", local.default_service_scaling["billing-service"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "billing-service", local.default_service_scaling["billing-service"].http_concurrent_requests)
+      cpu                      = 0.5
+      memory                   = "1Gi"
+    }
+    "core-service" = {
+      context                  = "core-service"
+      database                 = local.service_database_names["core-service"]
+      ingress_external         = false
+      min_replicas             = lookup(var.service_min_replicas, "core-service", local.default_service_scaling["core-service"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "core-service", local.default_service_scaling["core-service"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "core-service", local.default_service_scaling["core-service"].http_concurrent_requests)
+      cpu                      = 1.0
+      memory                   = "2Gi"
+    }
+    "reporting-service" = {
+      context                  = "reporting-service"
+      database                 = local.service_database_names["reporting-service"]
+      ingress_external         = false
+      min_replicas             = lookup(var.service_min_replicas, "reporting-service", local.default_service_scaling["reporting-service"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "reporting-service", local.default_service_scaling["reporting-service"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "reporting-service", local.default_service_scaling["reporting-service"].http_concurrent_requests)
+      cpu                      = 1.0
+      memory                   = "2Gi"
+    }
+    "notification-service" = {
+      context                  = "notification-service"
+      database                 = local.service_database_names["notification-service"]
+      ingress_external         = false
+      min_replicas             = lookup(var.service_min_replicas, "notification-service", local.default_service_scaling["notification-service"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "notification-service", local.default_service_scaling["notification-service"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "notification-service", local.default_service_scaling["notification-service"].http_concurrent_requests)
+      cpu                      = 0.5
+      memory                   = "1Gi"
+    }
+    "gateway-api" = {
+      context                  = "gateway-api"
+      database                 = local.service_database_names["gateway-api"]
+      ingress_external         = true
+      min_replicas             = lookup(var.service_min_replicas, "gateway-api", local.default_service_scaling["gateway-api"].min_replicas)
+      max_replicas             = lookup(var.service_max_replicas, "gateway-api", local.default_service_scaling["gateway-api"].max_replicas)
+      http_concurrent_requests = lookup(var.service_http_concurrent_requests, "gateway-api", local.default_service_scaling["gateway-api"].http_concurrent_requests)
+      cpu                      = 1.0
+      memory                   = "2Gi"
     }
   }
 
@@ -104,6 +149,8 @@ locals {
 
   common_env_plain = {
     HTTP_PORT                 = "8080"
+    HTTP_IDLE_TIMEOUT         = var.http_idle_timeout
+    HTTP_MAX_BODY_SIZE        = var.http_max_body_size
     DB_KIND                   = "postgresql"
     DB_POOL_MIN_SIZE          = tostring(var.db_pool_min_size)
     DB_POOL_MAX_SIZE          = tostring(var.db_pool_max_size)
@@ -202,7 +249,9 @@ locals {
       NOTIFICATION_SERVICE_OPENAPI_URL = "/api/notifications/q/openapi"
       REPORTING_SERVICE_OPENAPI_URL    = "/api/reports/q/openapi"
 
-      SWAGGER_UI_ENABLED = "true"
+      GATEWAY_DOWNSTREAM_CONNECT_TIMEOUT_MS = tostring(var.gateway_downstream_connect_timeout_ms)
+      GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS    = tostring(var.gateway_downstream_read_timeout_ms)
+      SWAGGER_UI_ENABLED                    = "true"
     }
   }
 

@@ -527,16 +527,91 @@ variable "swagger_ui_enabled" {
   default     = true
 }
 
+variable "service_min_replicas" {
+  description = "Optional minimum replica overrides by Container App service name."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for replicas in values(var.service_min_replicas) : replicas >= 0])
+    error_message = "service_min_replicas values must be greater than or equal to 0."
+  }
+}
+
+variable "service_max_replicas" {
+  description = "Optional maximum replica overrides by Container App service name."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for replicas in values(var.service_max_replicas) : replicas >= 1])
+    error_message = "service_max_replicas values must be greater than or equal to 1."
+  }
+}
+
+variable "service_http_concurrent_requests" {
+  description = "HTTP concurrent request threshold used by Azure Container Apps autoscaling, by service name."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for requests in values(var.service_http_concurrent_requests) : requests >= 1])
+    error_message = "service_http_concurrent_requests values must be greater than or equal to 1."
+  }
+}
+
+variable "container_app_scale_polling_interval_seconds" {
+  description = "Azure Container Apps autoscaler polling interval in seconds."
+  type        = number
+  default     = 15
+}
+
+variable "container_app_scale_cooldown_seconds" {
+  description = "Azure Container Apps autoscaler cooldown period in seconds."
+  type        = number
+  default     = 60
+}
+
+variable "container_app_termination_grace_period_seconds" {
+  description = "Seconds Azure Container Apps waits after SIGTERM before forcibly killing a replica."
+  type        = number
+  default     = 60
+}
+
+variable "http_idle_timeout" {
+  description = "Quarkus HTTP idle timeout passed to all services."
+  type        = string
+  default     = "30S"
+}
+
+variable "http_max_body_size" {
+  description = "Quarkus HTTP max body size passed to all services."
+  type        = string
+  default     = "2M"
+}
+
 variable "graceful_shutdown_timeout" {
   description = "Graceful shutdown timeout passed to Quarkus."
   type        = string
-  default     = "30S"
+  default     = "60S"
 }
 
 variable "app_max_worker_threads" {
   description = "Quarkus max worker threads per service."
   type        = number
   default     = 32
+}
+
+variable "gateway_downstream_connect_timeout_ms" {
+  description = "Gateway connect timeout for internal microservice calls."
+  type        = number
+  default     = 2000
+}
+
+variable "gateway_downstream_read_timeout_ms" {
+  description = "Gateway read timeout for internal microservice calls."
+  type        = number
+  default     = 30000
 }
 
 variable "extra_env" {
