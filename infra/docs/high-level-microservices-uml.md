@@ -1,6 +1,3 @@
-# High Level Architecture - Microservices BraSeller
-
-Este documento desenha a arquitetura high level dos microservices atuais do repositorio e a logica principal de cada um. Os diagramas usam Mermaid/UML para serem renderizados no GitHub, IDEs compativeis ou em ferramentas Mermaid.
 
 ## Visao Geral
 
