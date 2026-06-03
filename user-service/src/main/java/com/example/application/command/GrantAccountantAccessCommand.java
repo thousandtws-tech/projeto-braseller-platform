@@ -1,5 +1,11 @@
 package com.example.application.command;
 
-public record GrantAccountantAccessCommand(String tenantId, String email, String fullName, String temporaryPassword,
-                                           String grantedByUserId) {
-}
+public record GrantAccountantAccessCommand(
+        String tenantId,
+        String email,
+        String firstName,
+        String lastName,
+        String fullName,
+        String temporaryPassword,
+        String grantedByUserId
+) {}

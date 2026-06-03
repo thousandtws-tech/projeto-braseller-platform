@@ -186,7 +186,11 @@ locals {
       AUTH_HTTP_CONNECT_TIMEOUT_MS    = tostring(var.auth_http_connect_timeout_ms)
       AUTH_HTTP_REQUEST_TIMEOUT_MS    = tostring(var.auth_http_request_timeout_ms)
     }
-    "user-service"    = {}
+    "user-service" = {
+      KEYCLOAK_ADMIN_URL      = var.keycloak_base_url
+      KEYCLOAK_ADMIN_REALM    = var.keycloak_realm
+      KEYCLOAK_ADMIN_USERNAME = var.keycloak_admin_username
+    }
     "billing-service" = {}
     "core-service" = {
       NOTIFICATION_SERVICE_URL                   = local.internal_service_urls["notification-service"]
@@ -260,7 +264,9 @@ locals {
       KEYCLOAK_CLIENT_SECRET  = "keycloak-client-secret"
       KEYCLOAK_ADMIN_PASSWORD = "keycloak-admin-password"
     }
-    "user-service" = {}
+    "user-service" = {
+      KEYCLOAK_ADMIN_PASSWORD = "keycloak-admin-password"
+    }
     "billing-service" = {
       BILLING_WEBHOOK_TOKEN = "billing-webhook-token"
     }

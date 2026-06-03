@@ -15,12 +15,15 @@ import com.example.domain.model.IdentityVerification;
 import com.example.domain.model.RegisteredTenant;
 import com.example.domain.model.StoredUserCredentials;
 import com.example.domain.model.UserView;
+import com.example.infrastructure.keycloak.KeycloakAdminClient;
+import com.example.infrastructure.keycloak.KeycloakIntegrationException;
 import com.example.infrastructure.persistence.RepositoryException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @ApplicationScoped
 public class UserIdentityService {
@@ -34,6 +37,9 @@ public class UserIdentityService {
 
     @Inject
     InternalServiceAuthorizer internalServiceAuthorizer;
+
+    @Inject
+    KeycloakAdminClient keycloakAdminClient;
 
     public RegisteredTenant registerTenant(RegisterTenantCommand command) {
         if (isBlank(command.legalName()) || isBlank(command.adminName()) || isBlank(command.email()) || isWeakPassword(command.password())) {
@@ -54,16 +60,50 @@ public class UserIdentityService {
     }
 
     public AccountantAccessView grantAccountantAccess(GrantAccountantAccessCommand command) {
-        if (isBlank(command.email()) || isBlank(command.fullName()) || isBlank(command.grantedByUserId())) {
-            throw new ValidationException("email, fullName and grantedByUserId are required");
+        if (isBlank(command.email()) || isBlank(command.firstName()) || isBlank(command.lastName())
+                || isBlank(command.grantedByUserId())) {
+            throw new ValidationException("email, firstName, lastName and grantedByUserId are required");
         }
 
+        String accountantUserId = UUID.randomUUID().toString();
+        String email      = command.email().trim();
+        String firstName  = command.firstName().trim();
+        String lastName   = command.lastName().trim();
+        String fullName   = command.fullName() != null ? command.fullName().trim() : firstName + " " + lastName;
+        String rawPassword = command.temporaryPassword() != null ? command.temporaryPassword() : DEFAULT_TEMPORARY_PASSWORD;
+
+        // 1. Tenta criar o usuário no Keycloak primeiro
+        Optional<String> keycloakSubject;
+        try {
+            keycloakSubject = keycloakAdminClient.createAccountantUser(
+                    accountantUserId, command.tenantId(), email, firstName, lastName, rawPassword);
+        } catch (KeycloakIntegrationException e) {
+            throw new ValidationException("Falha ao criar usuario no Keycloak: " + e.getMessage());
+        }
+
+        // 2. Determina provider/status conforme resultado do Keycloak
+        String provider        = keycloakSubject.isPresent() ? "KEYCLOAK" : "PASSWORD";
+        String providerSubject = keycloakSubject.orElse(null);
+        String status          = keycloakSubject.isPresent() ? "ACTIVE"   : "INVITED";
+
+        // Usuários Keycloak não usam senha local; armazenamos hash de valor inacessível
+        String passwordHash = keycloakSubject.isPresent()
+                ? "KEYCLOAK_MANAGED_" + UUID.randomUUID()
+                : passwordHasher.hash(rawPassword);
+
+        // 3. Persiste localmente
         try {
             return userIdentityRepository.grantAccountantAccess(
+                    accountantUserId,
                     command.tenantId(),
-                    command.email().trim(),
-                    command.fullName().trim(),
-                    passwordHasher.hash(command.temporaryPassword() == null ? DEFAULT_TEMPORARY_PASSWORD : command.temporaryPassword()),
+                    email,
+                    fullName,
+                    firstName,
+                    lastName,
+                    passwordHash,
+                    provider,
+                    providerSubject,
+                    status,
                     command.grantedByUserId()
             );
         } catch (RepositoryException exception) {

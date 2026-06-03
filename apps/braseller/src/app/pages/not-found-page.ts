@@ -14,7 +14,7 @@ import { RouterLink } from '@angular/router';
         O endereço digitado não existe em nossa arquitetura de rotas ou foi removido definitivamente.
       </p>
       <a
-        routerLink="/admin/dashboard"
+        routerLink="/dashboard"
         class="inline-flex items-center gap-1.5 px-5 py-2 bg-[#0052ff] hover:bg-[#003ecc] text-white text-xs font-bold rounded-full transition-colors"
       >
         Retornar ao Dashboard

@@ -38,7 +38,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             connection.setAutoCommit(false);
             try {
                 insertTenant(connection, tenantId, legalName, tradeName);
-                insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, passwordHash, "PASSWORD", null, "ACTIVE");
+                insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, null, null, passwordHash, "PASSWORD", null, "ACTIVE");
                 insertRole(connection, tenantId, userId, UserRole.ADMIN);
                 insertRole(connection, tenantId, userId, UserRole.VENDEDOR);
                 connection.commit();
@@ -60,13 +60,18 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
 
     @Override
     public AccountantAccessView grantAccountantAccess(
+            String accountantUserId,
             String tenantId,
             String accountantEmail,
-            String accountantName,
-            String temporaryPasswordHash,
+            String accountantFullName,
+            String firstName,
+            String lastName,
+            String passwordHash,
+            String provider,
+            String providerSubject,
+            String status,
             String grantedByUserId
     ) {
-        String accountantUserId = UUID.randomUUID().toString();
         String accessId = UUID.randomUUID().toString();
         String normalizedEmail = normalizeEmail(accountantEmail);
 
@@ -75,8 +80,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             try {
                 requireTenant(connection, tenantId);
                 requireUser(connection, tenantId, grantedByUserId);
-                insertUser(connection, accountantUserId, tenantId, accountantEmail, normalizedEmail, accountantName,
-                        temporaryPasswordHash, "PASSWORD", null, "INVITED");
+                insertUser(connection, accountantUserId, tenantId, accountantEmail, normalizedEmail,
+                        accountantFullName, firstName, lastName, passwordHash, provider, providerSubject, status);
                 insertRole(connection, tenantId, accountantUserId, UserRole.CONTADOR);
 
                 try (PreparedStatement statement = connection.prepareStatement("""
@@ -237,6 +242,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             String email,
             String normalizedEmail,
             String fullName,
+            String firstName,
+            String lastName,
             String passwordHash,
             String provider,
             String providerSubject,
@@ -244,22 +251,24 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     ) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO user_accounts
-                (id, tenant_id, email, email_normalized, full_name, password_hash, provider, provider_subject,
-                 preferred_username, email_verified, status, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, tenant_id, email, email_normalized, full_name, first_name, last_name,
+                 password_hash, provider, provider_subject, preferred_username, email_verified, status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, userId);
             statement.setString(2, tenantId);
             statement.setString(3, email);
             statement.setString(4, normalizedEmail);
             statement.setString(5, fullName);
-            statement.setString(6, passwordHash);
-            statement.setString(7, provider);
-            statement.setString(8, providerSubject);
-            statement.setString(9, email);
-            statement.setBoolean(10, true);
-            statement.setString(11, status);
-            statement.setTimestamp(12, Timestamp.from(Instant.now()));
+            statement.setString(6, firstName);
+            statement.setString(7, lastName);
+            statement.setString(8, passwordHash);
+            statement.setString(9, provider);
+            statement.setString(10, providerSubject);
+            statement.setString(11, email);
+            statement.setBoolean(12, true);
+            statement.setString(13, status);
+            statement.setTimestamp(14, Timestamp.from(Instant.now()));
             statement.executeUpdate();
         }
     }

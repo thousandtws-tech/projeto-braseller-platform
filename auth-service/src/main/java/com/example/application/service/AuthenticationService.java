@@ -58,9 +58,33 @@ public class AuthenticationService {
 
         KeycloakTokenResponse tokenResponse = keycloakOAuthClient.passwordGrant(command.email(), command.password());
         KeycloakIdentity keycloakIdentity = keycloakOAuthClient.userInfo(tokenResponse.accessToken());
+
+        // Keycloak autenticou com sucesso. Se o identity ainda não existe em auth_identities
+        // (ex: contador criado via user-service), provisiona just-in-time a partir do user-service.
         AuthIdentity identity = authIdentityRepository.findIdentityByEmail(keycloakIdentity.email())
-                .orElseThrow(() -> new AuthenticationException("invalid_credentials"));
+                .orElseGet(() -> provisionIdentityFromUserService(keycloakIdentity));
+
         return finishKeycloakSession(identity, keycloakIdentity, tokenResponse);
+    }
+
+    /**
+     * Just-in-time provisioning para usuários válidos no Keycloak e no user-service
+     * que ainda não possuem registro em auth_identities (ex: contadores criados via API).
+     */
+    private AuthIdentity provisionIdentityFromUserService(KeycloakIdentity keycloakIdentity) {
+        return userIdentityGateway.syncExternalProfile(new SyncExternalProfileCommand(
+                        keycloakIdentity.email(),
+                        "KEYCLOAK",
+                        keycloakIdentity.subject(),
+                        keycloakIdentity.fullName(),
+                        keycloakIdentity.preferredUsername(),
+                        keycloakIdentity.firstName(),
+                        keycloakIdentity.lastName(),
+                        keycloakIdentity.pictureUrl(),
+                        keycloakIdentity.emailVerified()
+                ))
+                .map(authIdentityRepository::synchronize)
+                .orElseThrow(() -> new AuthenticationException("invalid_credentials"));
     }
 
     public AuthTokenSet loginOrRegisterWithKeycloak(KeycloakIdentity keycloakIdentity, String tenantName,

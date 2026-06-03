@@ -29,12 +29,7 @@ import { TrackByUtils } from '../../../shared/utils/track-by.utils';
             <tr class="hover:bg-[#f7f7f7]/50 transition-all">
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full" 
-                    [class.bg-[#ffe600]]="order.platform === 'ml'"
-                    [class.bg-[#ee4d2d]]="order.platform === 'shopee'"
-                    [class.bg-[#0052ff]]="order.platform === 'amazon'"
-                    [class.bg-[#05b169]]="order.platform === 'manual'"
-                  ></span>
+                  <span class="w-2.5 h-2.5 rounded-full" [ngClass]="platformColorClass(order.platform)"></span>
                   <div>
                     <span class="font-mono font-bold text-gray-900 block leading-tight">{{ order.id }}</span>
                     <span class="text-[10px] text-[#7c828a] uppercase tracking-wider font-semibold">{{ order.platform.toUpperCase() }}</span>
@@ -99,4 +94,14 @@ export class OrdersTable {
 
   // TrackBy compartilhado reutilizando o helper estático de performance DOM
   orderTrackBy = TrackByUtils.byId<Order>();
+
+  platformColorClass(platform: string): string {
+    const normalized = platform.toLowerCase().replace(/[\s_]+/g, '-');
+    if (normalized === 'ml' || normalized === 'mercadolivre' || normalized === 'mercado-livre') return 'bg-[#ffe600]';
+    if (normalized === 'sandbox') return 'bg-[#0052ff]';
+    if (normalized === 'shopee') return 'bg-[#ee4d2d]';
+    if (normalized === 'amazon') return 'bg-[#0052ff]';
+    if (normalized === 'manual') return 'bg-[#05b169]';
+    return 'bg-[#7c828a]';
+  }
 }

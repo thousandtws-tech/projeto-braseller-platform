@@ -40,6 +40,16 @@ export class ApiService {
   }
 
   /**
+   * GET de arquivo/binario mantendo interceptors de autenticação.
+   */
+  getBlob(path: string, params: Record<string, string | number | boolean | string[] | number[] | boolean[]> = {}, customHeaders?: HttpHeaders): Observable<Blob> {
+    const httpParams = this.buildParams(params);
+    return this.http.get(`${this.baseUrl}/${path}`, { params: httpParams, headers: customHeaders, responseType: 'blob' }).pipe(
+      catchError((error: HttpErrorResponse) => this.handleError(error))
+    );
+  }
+
+  /**
    * POST de recursos
    */
   post<T>(path: string, body: unknown, customHeaders?: HttpHeaders): Observable<T> {

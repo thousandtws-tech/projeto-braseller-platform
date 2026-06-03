@@ -54,7 +54,9 @@ export interface AccountantAccessView {
 
 export interface GrantAccountantAccessRequest {
   email: string;
-  fullName: string;
+  fullName: string;        // firstName + ' ' + lastName — mantido por compatibilidade
+  firstName: string;       // obrigatório pelo Keycloak (realm brasaller)
+  lastName: string;        // obrigatório pelo Keycloak (realm brasaller)
   temporaryPassword: string;
 }
 

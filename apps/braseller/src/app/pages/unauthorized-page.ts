@@ -14,7 +14,7 @@ import { RouterLink } from '@angular/router';
         Seu privilégio de perfil (role) ativo não possui permissões fiscais homologadas para conferência desta rota de auditoria.
       </p>
       <a
-        routerLink="/admin/dashboard"
+        routerLink="/dashboard"
         class="inline-flex items-center gap-1.5 px-5 py-2 bg-[#0a0b0d] hover:bg-[#1c1f24] text-white text-xs font-bold rounded-full transition-colors"
       >
         Retornar de Forma Segura

@@ -108,11 +108,14 @@ public class UserResource {
             GrantAccountantAccessRequest request) {
         try {
             TenantContext context = tenantAuthorizationService.requireAdmin(authorizationHeader, tenantId);
+            String fullName = (request.firstName() + " " + request.lastName()).trim();
             return Response.status(Response.Status.CREATED)
                     .entity(userIdentityService.grantAccountantAccess(new GrantAccountantAccessCommand(
                             tenantId,
                             request.email(),
-                            request.fullName(),
+                            request.firstName(),
+                            request.lastName(),
+                            fullName,
                             request.temporaryPassword(),
                             context.userId()
                     )))
@@ -235,9 +238,14 @@ public class UserResource {
     public record RegisterTenantRequest(String legalName, String tradeName, String adminName, String email, String password) {
     }
 
-    @Schema(name = "GrantAccountantAccessRequest", description = "Dados para conceder acesso secundario ao contador.")
-    public record GrantAccountantAccessRequest(String email, String fullName, String temporaryPassword) {
-    }
+    @Schema(name = "GrantAccountantAccessRequest", description = "Dados para conceder acesso secundario ao contador. firstName e lastName sao obrigatorios pelo Keycloak (realm brasaller).")
+    public record GrantAccountantAccessRequest(
+            String email,
+            String firstName,
+            String lastName,
+            String temporaryPassword
+    ) {}
+
 
     @Schema(name = "VerifyPasswordRequest", description = "Credenciais validadas internamente pelo auth-service.")
     public record VerifyPasswordRequest(String email, String password) {
