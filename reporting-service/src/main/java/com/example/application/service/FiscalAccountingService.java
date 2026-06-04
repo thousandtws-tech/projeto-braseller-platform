@@ -275,7 +275,7 @@ public class FiscalAccountingService {
 
     private ExpenseAttachment normalizeAttachment(ExpenseAttachment attachment) {
         if (attachment == null) {
-            throw new ValidationException("expense_attachment_required");
+            return null;
         }
         String publicId = trimToNull(attachment.publicId());
         String secureUrl = trimToNull(attachment.secureUrl());
@@ -290,7 +290,7 @@ public class FiscalAccountingService {
                 && contentType == null
                 && sizeBytes == null;
         if (empty) {
-            throw new ValidationException("expense_attachment_required");
+            return null;
         }
         if (publicId == null) {
             throw new ValidationException("attachment_public_id_required");
