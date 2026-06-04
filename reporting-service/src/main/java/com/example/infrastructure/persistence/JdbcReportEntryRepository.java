@@ -572,6 +572,7 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
 
     private record FilterSql(String whereClause, List<Object> parameters) {
         private FilterSql {
+            whereClause = (whereClause == null ? "" : whereClause.stripTrailing()) + " ";
             parameters = List.copyOf(parameters);
         }
     }

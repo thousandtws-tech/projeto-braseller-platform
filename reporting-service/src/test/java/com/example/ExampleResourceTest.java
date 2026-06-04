@@ -1,13 +1,19 @@
 package com.example;
 
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.sql.DataSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
@@ -25,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
 class ExampleResourceTest {
+    @Inject
+    DataSource dataSource;
+
     @Test
     void statusEndpointReturnsServiceName() {
         given()
@@ -300,6 +309,14 @@ class ExampleResourceTest {
 
         given()
                 .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/expenses?from=2026-05-01&to=2026-05-31&page=0&size=20", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total", is(2))
+                .body("items.category", hasItems("PACKAGING", "BANK_FEE"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
                 .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
                 .then()
                 .statusCode(200)
@@ -311,6 +328,20 @@ class ExampleResourceTest {
                 .body("net_result", is(319.00F))
                 .body("expense_count", is(2))
                 .body("expenses_by_category.category", hasItems("PACKAGING", "BANK_FEE"));
+    }
+
+    @Test
+    void expensesListToleratesLegacyCategoryValues() {
+        String tenantId = "tenant-reporting-legacy-expense";
+        insertExpenseWithCategory(tenantId, "Embalagem");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/expenses?from=2026-06-01&to=2026-06-30&page=0&size=20", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total", is(1))
+                .body("items.category", hasItems("OTHER"));
     }
 
     @Test
@@ -555,6 +586,33 @@ class ExampleResourceTest {
                   %s
                 }
                 """.formatted(category, description, amount, attachment);
+    }
+
+    private void insertExpenseWithCategory(String tenantId, String category) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO expense_entries
+                     (id, tenant_id, expense_date, category, description, amount,
+                      attachment_public_id, attachment_secure_url, attachment_resource_type,
+                      attachment_original_filename, attachment_content_type, attachment_size_bytes,
+                      created_at, updated_at)
+                     VALUES (?, ?, DATE '2026-06-04', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                     """)) {
+            statement.setString(1, "00000000-0000-4000-8000-000000000001");
+            statement.setString(2, tenantId);
+            statement.setString(3, category);
+            statement.setString(4, "Despesa legada");
+            statement.setBigDecimal(5, new BigDecimal("25.00"));
+            statement.setString(6, "brasaller/despesas/legacy");
+            statement.setString(7, "https://res.cloudinary.com/brasaller/image/upload/v1/despesas/legacy.pdf");
+            statement.setString(8, "image");
+            statement.setString(9, "legacy.pdf");
+            statement.setString(10, "application/pdf");
+            statement.setLong(11, 2048L);
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not insert legacy expense", exception);
+        }
     }
 
     private String publicEntryPayload(String platform, String orderId, String status, String paymentMethod,

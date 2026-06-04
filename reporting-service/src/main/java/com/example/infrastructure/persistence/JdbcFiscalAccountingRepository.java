@@ -27,6 +27,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -220,7 +221,7 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     totals.add(new ExpenseCategoryTotal(
-                            ExpenseCategory.valueOf(resultSet.getString("category")),
+                            readCategory(resultSet.getString("category")),
                             resultSet.getBigDecimal("amount"),
                             resultSet.getLong("entry_count")
                     ));
@@ -413,13 +414,29 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
                 resultSet.getString("id"),
                 resultSet.getString("tenant_id"),
                 resultSet.getDate("expense_date").toLocalDate(),
-                ExpenseCategory.valueOf(resultSet.getString("category")),
+                readCategory(resultSet.getString("category")),
                 resultSet.getString("description"),
                 resultSet.getBigDecimal("amount"),
                 readAttachment(resultSet),
-                resultSet.getTimestamp("created_at").toInstant(),
-                resultSet.getTimestamp("updated_at").toInstant()
+                readInstant(resultSet, "created_at"),
+                readInstant(resultSet, "updated_at")
         );
+    }
+
+    private ExpenseCategory readCategory(String value) {
+        if (value == null || value.isBlank()) {
+            return ExpenseCategory.OTHER;
+        }
+        try {
+            return ExpenseCategory.valueOf(value.trim());
+        } catch (IllegalArgumentException exception) {
+            return ExpenseCategory.OTHER;
+        }
+    }
+
+    private Instant readInstant(ResultSet resultSet, String column) throws SQLException {
+        Timestamp timestamp = resultSet.getTimestamp(column);
+        return timestamp == null ? Instant.EPOCH : timestamp.toInstant();
     }
 
     private ExpenseAttachment readAttachment(ResultSet resultSet) throws SQLException {
@@ -564,6 +581,7 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
 
     private record FilterSql(String whereClause, List<Object> parameters) {
         private FilterSql {
+            whereClause = (whereClause == null ? "" : whereClause.stripTrailing()) + " ";
             parameters = List.copyOf(parameters);
         }
     }

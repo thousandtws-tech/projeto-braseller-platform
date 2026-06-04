@@ -28,7 +28,7 @@ const CATEGORIES = [
 ]
 
 interface ExpenseFormProps {
-  onSuccess?: () => void
+  onSuccess?: (expenseDate?: string) => void
 }
 
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
@@ -51,10 +51,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     formRef.current?.reset()
     const timer = window.setTimeout(() => {
       setFileName(null)
-      onSuccess?.()
+      onSuccess?.(state.expenseDate)
     }, 800)
     return () => window.clearTimeout(timer)
-  }, [state]) // onSuccess omitted: stable callback, runs only once on success
+  }, [state, onSuccess])
 
   return (
     <form ref={formRef} action={formAction} className="space-y-3">
@@ -159,7 +159,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer"
           >
             <Paperclip className="size-3.5 shrink-0" />
-            Anexar comprovante (opcional)
+            Anexar comprovante
           </label>
         )}
       </div>

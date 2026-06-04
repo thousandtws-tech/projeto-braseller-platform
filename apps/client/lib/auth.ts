@@ -17,6 +17,11 @@ export async function getSession(): Promise<UserSession | null> {
     if (parts.length !== 3) throw new Error('invalid jwt format')
 
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+    const exp = typeof payload.exp === 'number' ? payload.exp : Number(payload.exp)
+
+    if (Number.isFinite(exp) && exp > 0 && exp * 1000 <= Date.now()) {
+      return null
+    }
 
     // Mapeia claims do JWT real da gateway (sub/userId, name/fullName) com fallbacks
     const session: UserSession = {

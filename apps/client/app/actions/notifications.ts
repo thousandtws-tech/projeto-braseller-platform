@@ -4,10 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { getToken, getSession } from '@/lib/auth'
 import type { NotificationPreferences } from '@/types'
 
-const GATEWAY_URL =
-  process.env.GATEWAY_URL ??
-  process.env.NEXT_PUBLIC_GATEWAY_URL ??
-  'http://localhost:8080'
+const GATEWAY_URL = process.env.GATEWAY_URL 
+
 
 async function getAuthContext() {
   const [token, session] = await Promise.all([getToken(), getSession()])

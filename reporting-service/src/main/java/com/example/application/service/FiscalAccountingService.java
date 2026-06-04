@@ -244,13 +244,17 @@ public class FiscalAccountingService {
         if (command == null) {
             throw new ValidationException("expense is required");
         }
+        ExpenseAttachment attachment = normalizeAttachment(command.attachment());
+        if (attachment == null) {
+            throw new ValidationException("expense_attachment_required");
+        }
         return new CreateExpenseCommand(
                 requireText(command.tenantId(), "tenantId"),
                 command.expenseDate() == null ? LocalDate.now() : command.expenseDate(),
                 command.category() == null ? ExpenseCategory.OTHER : command.category(),
                 requireText(command.description(), "description"),
                 moneyPositive(command.amount()),
-                normalizeAttachment(command.attachment())
+                attachment
         );
     }
 

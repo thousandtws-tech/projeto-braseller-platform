@@ -27,7 +27,16 @@ import type {
   AccountingClosing,
 } from '@/types'
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8080'
+function resolveGatewayUrl() {
+  const raw =
+    process.env.GATEWAY_URL ??
+    process.env.NEXT_PUBLIC_GATEWAY_URL ??
+    'http://localhost:8080'
+
+  return raw.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '')
+}
+
+const GATEWAY_URL = resolveGatewayUrl()
 
 // Empty values used when the API returns no usable data.
 const EMPTY_DASHBOARD: DashboardView = {
@@ -105,8 +114,14 @@ async function apiFetch<T>(
     requestInit.next = options?.next ?? { revalidate: 30 }
   }
 
-  const res = await fetch(`${GATEWAY_URL}${path}`, requestInit)
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`)
+  const url = `${GATEWAY_URL}${path}`
+  const res = await fetch(url, requestInit)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(
+      `API ${res.status} ${res.statusText}: ${url}${body ? ` - ${body.slice(0, 500)}` : ''}`
+    )
+  }
   return res.json()
 }
 

@@ -4,15 +4,21 @@ import { refresh, revalidatePath } from 'next/cache'
 import { getToken, getSession } from '@/lib/auth'
 import type { FiscalProfile, CloudinaryUploadSignature } from '@/types'
 
-const GATEWAY_URL =
-  process.env.GATEWAY_URL ??
-  process.env.NEXT_PUBLIC_GATEWAY_URL ??
-  'http://localhost:8080'
+function resolveGatewayUrl() {
+  const raw =
+    process.env.GATEWAY_URL ??
+    process.env.NEXT_PUBLIC_GATEWAY_URL ??
+    'http://localhost:8080'
+
+  return raw.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '')
+}
+
+const GATEWAY_URL = resolveGatewayUrl()
 
 // ─── Expense actions ──────────────────────────────────────────────────────────
 
 type ExpenseState =
-  | { success: true }
+  | { success: true; expenseDate: string }
   | { success: false; error: string }
   | null
 
@@ -29,22 +35,27 @@ export async function createExpenseAction(
   formData: FormData
 ): Promise<ExpenseState> {
   const [token, session] = await Promise.all([getToken(), getSession()])
-  if (!token || !session) return { success: false, error: 'Sessão expirada.' }
+  if (!token || !session?.tenantId) return { success: false, error: 'Sessão expirada.' }
 
   const file = formData.get('file') as File | null
   const description     = (formData.get('description') as string)?.trim()
   const category        = (formData.get('category') as string)?.trim()
-  const amount          = parseFloat(formData.get('amount') as string)
+  const rawAmount       = String(formData.get('amount') ?? '').trim().replace(',', '.')
   const expense_date    = (formData.get('expense_date') as string) ||
     new Date().toISOString().split('T')[0]
+  const validAmount = /^\d+(\.\d{1,2})?$/.test(rawAmount) && Number(rawAmount) > 0
 
-  if (!description || !category || isNaN(amount) || amount <= 0) {
+  if (!description || !category || !validAmount) {
     return { success: false, error: 'Preencha todos os campos corretamente.' }
+  }
+
+  if (!file || file.size <= 0) {
+    return { success: false, error: 'Anexe o comprovante da despesa.' }
   }
 
   let attachment: Record<string, unknown> | undefined
 
-  // Upload do comprovante para o Cloudinary (se fornecido)
+  // Upload do comprovante obrigatorio para o Cloudinary
   if (file && file.size > 0) {
     try {
       // 1. Obter assinatura do reports-service
@@ -85,7 +96,7 @@ export async function createExpenseAction(
 
   // 3. Criar a despesa no reports-service
   try {
-    const body: Record<string, unknown> = { expense_date, category, description, amount }
+    const body: Record<string, unknown> = { expense_date, category, description, amount: rawAmount }
     if (attachment) body.attachment = attachment
 
     const res = await fetch(
@@ -102,8 +113,13 @@ export async function createExpenseAction(
       const msg = (err.message ?? err.details) as string | undefined
       return { success: false, error: expenseErrorMessage(msg) }
     }
+    const created = await res.json().catch(() => null) as { expense_date?: string } | null
+    const createdExpenseDate = created?.expense_date ?? expense_date
+
+    revalidatePath('/despesas')
+    revalidatePath('/dre')
     refresh()
-    return { success: true }
+    return { success: true, expenseDate: createdExpenseDate }
   } catch {
     return { success: false, error: 'Serviço indisponível.' }
   }
@@ -111,13 +127,15 @@ export async function createExpenseAction(
 
 export async function deleteExpenseAction(expenseId: string): Promise<void> {
   const [token, session] = await Promise.all([getToken(), getSession()])
-  if (!token || !session) return
+  if (!token || !session?.tenantId) return
 
   await fetch(
     `${GATEWAY_URL}/api/reports/tenants/${session.tenantId}/expenses/${expenseId}`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
   ).catch(() => null)
 
+  revalidatePath('/despesas')
+  revalidatePath('/dre')
   refresh()
 }
 

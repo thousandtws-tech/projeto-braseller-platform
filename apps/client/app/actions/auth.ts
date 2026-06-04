@@ -4,10 +4,8 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { COOKIE_NAME } from '@/lib/auth'
 
-const GATEWAY_URL =
-  process.env.GATEWAY_URL ??
-  process.env.NEXT_PUBLIC_GATEWAY_URL ??
-  'http://localhost:8080'
+const GATEWAY_URL = process.env.GATEWAY_URL 
+
 
 type AuthState = { error: string } | null
 

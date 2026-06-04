@@ -6,10 +6,8 @@ import { getToken, COOKIE_NAME } from '@/lib/auth'
 import { syncConnector, getSyncJob } from '@/lib/api'
 import type { SyncJob } from '@/types'
 
-const GATEWAY_URL =
-  process.env.GATEWAY_URL ??
-  process.env.NEXT_PUBLIC_GATEWAY_URL ??
-  'http://localhost:8080'
+const GATEWAY_URL = process.env.GATEWAY_URL 
+
 
 // Limpa cookie e redireciona para login quando o JWT expirou
 async function handleExpired(): Promise<never> {

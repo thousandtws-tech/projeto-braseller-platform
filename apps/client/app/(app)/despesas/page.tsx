@@ -60,6 +60,7 @@ export default async function DespesasPage({
 
   let items: Awaited<ReturnType<typeof getReportsExpenses>>['items'] = []
   let totalCount = 0
+  let loadError: string | null = null
 
   if (session?.tenantId) {
     try {
@@ -72,9 +73,20 @@ export default async function DespesasPage({
       })
       items = data.items ?? []
       totalCount = data.total ?? 0
-    } catch {
-      // fall through — show empty state
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.warn('[despesas] Failed to load expenses', {
+        tenantId: session.tenantId,
+        from,
+        to,
+        category: category || undefined,
+        page,
+        error: errorMessage,
+      })
+      loadError = 'Não foi possível carregar as despesas cadastradas. Verifique a conexão com a API.'
     }
+  } else {
+    loadError = 'Não foi possível identificar a empresa da sessão.'
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -107,9 +119,11 @@ export default async function DespesasPage({
         <div>
           <h2 className="text-xl font-semibold">Despesas</h2>
           <p className="text-sm text-muted-foreground">
-            {totalCount > 0
-              ? `${totalCount} registro${totalCount !== 1 ? 's' : ''} · Total: ${formatCurrency(periodTotal)}`
-              : 'Nenhuma despesa no período selecionado'}
+            {loadError
+              ? loadError
+              : totalCount > 0
+                ? `${totalCount} registro${totalCount !== 1 ? 's' : ''} · Total: ${formatCurrency(periodTotal)}`
+                : 'Nenhuma despesa no período selecionado'}
           </p>
         </div>
         <ExpenseFormSheet />
@@ -142,7 +156,14 @@ export default async function DespesasPage({
       {/* Expenses table */}
       <Card>
         <CardContent className="p-0">
-          {items.length === 0 ? (
+          {loadError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-sm font-medium text-destructive">Erro ao carregar despesas</p>
+              <p className="text-xs text-muted-foreground/60 mt-1 max-w-md">
+                {loadError}
+              </p>
+            </div>
+          ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-sm font-medium text-muted-foreground">Nenhuma despesa encontrada</p>
               <p className="text-xs text-muted-foreground/60 mt-1">

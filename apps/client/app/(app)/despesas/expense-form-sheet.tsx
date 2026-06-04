@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
@@ -14,7 +15,19 @@ import {
 } from '@/components/ui/sheet'
 import { ExpenseForm } from './expense-form'
 
+function monthBounds(dateValue?: string) {
+  const date = dateValue ? new Date(`${dateValue}T00:00:00`) : new Date()
+  const year = date.getFullYear()
+  const month = date.getMonth()
+
+  return {
+    from: new Date(year, month, 1).toISOString().split('T')[0],
+    to: new Date(year, month + 1, 0).toISOString().split('T')[0],
+  }
+}
+
 export function ExpenseFormSheet() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [formKey, setFormKey] = useState(0)
 
@@ -23,7 +36,14 @@ export function ExpenseFormSheet() {
     if (!isOpen) setFormKey((k) => k + 1)
   }
 
-  const handleSuccess = useCallback(() => setOpen(false), [])
+  const handleSuccess = useCallback((expenseDate?: string) => {
+    const { from, to } = monthBounds(expenseDate)
+    const params = new URLSearchParams({ from, to })
+
+    setOpen(false)
+    router.push(`/despesas?${params}`)
+    router.refresh()
+  }, [router])
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>

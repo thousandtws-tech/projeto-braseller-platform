@@ -2,10 +2,8 @@
 
 import { getToken, getSession } from '@/lib/auth'
 
-const GATEWAY_URL =
-  process.env.GATEWAY_URL ??
-  process.env.NEXT_PUBLIC_GATEWAY_URL ??
-  'http://localhost:8080'
+const GATEWAY_URL = process.env.GATEWAY_URL 
+
 
 type ActionState = { success: true; message: string } | { success: false; error: string } | null
 
