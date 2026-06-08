@@ -117,6 +117,15 @@ public class CoreOutboxDispatcher {
                 event.status(),
                 event.releaseDate(),
                 event.buyerName(),
+                event.items().stream()
+                        .map(item -> new ReportEntryIngestRequest.Item(
+                                item.sku(),
+                                item.title(),
+                                item.quantity(),
+                                item.unitValue(),
+                                item.grossValue()
+                        ))
+                        .toList(),
                 event.invoiceNumber()
         );
         try (Response response = reportingRestClient.ingest(internalToken, request)) {

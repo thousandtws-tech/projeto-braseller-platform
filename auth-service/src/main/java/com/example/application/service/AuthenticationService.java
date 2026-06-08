@@ -1,5 +1,9 @@
 package com.example.application.service;
 
+import java.util.UUID;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import com.example.application.command.LoginCommand;
 import com.example.application.command.RefreshTokenCommand;
 import com.example.application.command.RegisterCommand;
@@ -16,11 +20,9 @@ import com.example.domain.model.AuthTokenSet;
 import com.example.domain.model.IssuedTokens;
 import com.example.domain.model.KeycloakIdentity;
 import com.example.domain.model.KeycloakTokenResponse;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import java.util.UUID;
 
 @ApplicationScoped
 public class AuthenticationService {
@@ -59,18 +61,12 @@ public class AuthenticationService {
         KeycloakTokenResponse tokenResponse = keycloakOAuthClient.passwordGrant(command.email(), command.password());
         KeycloakIdentity keycloakIdentity = keycloakOAuthClient.userInfo(tokenResponse.accessToken());
 
-        // Keycloak autenticou com sucesso. Se o identity ainda não existe em auth_identities
-        // (ex: contador criado via user-service), provisiona just-in-time a partir do user-service.
         AuthIdentity identity = authIdentityRepository.findIdentityByEmail(keycloakIdentity.email())
                 .orElseGet(() -> provisionIdentityFromUserService(keycloakIdentity));
 
         return finishKeycloakSession(identity, keycloakIdentity, tokenResponse);
     }
 
-    /**
-     * Just-in-time provisioning para usuários válidos no Keycloak e no user-service
-     * que ainda não possuem registro em auth_identities (ex: contadores criados via API).
-     */
     private AuthIdentity provisionIdentityFromUserService(KeycloakIdentity keycloakIdentity) {
         return userIdentityGateway.syncExternalProfile(new SyncExternalProfileCommand(
                         keycloakIdentity.email(),
@@ -109,7 +105,19 @@ public class AuthenticationService {
                 tenantName.trim(),
                 isBlank(keycloakIdentity.fullName()) ? keycloakIdentity.email() : keycloakIdentity.fullName(),
                 keycloakIdentity.email(),
-                generatedExternalPassword()
+                generatedExternalPassword(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         ));
         return authIdentityRepository.synchronize(identity);
     }

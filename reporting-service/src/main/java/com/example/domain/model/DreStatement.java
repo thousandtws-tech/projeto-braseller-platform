@@ -15,8 +15,11 @@ public record DreStatement(
         @JsonProperty("gross_revenue") BigDecimal grossRevenue,
         @JsonProperty("marketplace_fees") BigDecimal marketplaceFees,
         @JsonProperty("estimated_taxes") BigDecimal estimatedTaxes,
+        @JsonProperty("cmv") BigDecimal cmv,
         @JsonProperty("operating_expenses") BigDecimal operatingExpenses,
+        @JsonProperty("banking_expenses") BigDecimal bankingExpenses,
         @JsonProperty("net_result") BigDecimal netResult,
+        @JsonProperty("distributable_profit") BigDecimal distributableProfit,
         @JsonProperty("sales_count") long salesCount,
         @JsonProperty("expense_count") long expenseCount,
         @JsonProperty("expenses_by_category") List<ExpenseCategoryTotal> expensesByCategory) {

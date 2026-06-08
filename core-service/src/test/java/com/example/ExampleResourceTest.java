@@ -5,21 +5,29 @@ import io.agroal.api.AgroalDataSource;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import com.example.application.event.ReportEntryUpsertRequestedEvent;
 import com.example.application.port.out.MarketplaceConnector;
+import com.example.domain.enums.PaymentMethod;
+import com.example.domain.model.connector.FeeInfo;
 import com.example.domain.model.connector.InvoiceFilters;
+import com.example.domain.model.connector.OrderStatus;
+import com.example.domain.model.connector.StandardOrder;
 import com.example.infrastructure.connector.mercadolivre.JdbcMercadoLivreTokenRepository;
 import com.example.infrastructure.connector.mercadolivre.MercadoLivreConnectorToken;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.restassured.RestAssured.given;
@@ -99,6 +107,51 @@ class ExampleResourceTest {
                 .body("[0].buyer_name", is("Comprador Sandbox"))
                 .body("[0].items[0].sku", is("SKU-001"))
                 .body("[0].invoice_number", is("NF-SANDBOX-1001"));
+    }
+
+    @Test
+    void reportEntryUsesFeeSplitIncludingShippingCost() {
+        StandardOrder order = new StandardOrder(
+                "ORDER-SPLIT-1001",
+                "marketplace",
+                LocalDate.of(2026, 5, 21),
+                new BigDecimal("100.00"),
+                BigDecimal.ZERO,
+                new BigDecimal("100.00"),
+                PaymentMethod.PIX,
+                LocalDate.of(2026, 5, 21),
+                null,
+                OrderStatus.PAID,
+                "Comprador Teste",
+                List.of(),
+                "NF-ORDER-SPLIT-1001"
+        );
+
+        ReportEntryUpsertRequestedEvent event = ReportEntryUpsertRequestedEvent.fromOrder(
+                "tenant-123",
+                order,
+                List.of(
+                        new FeeInfo(order.orderId(), "commission_fee", "Comissao", new BigDecimal("12.00")),
+                        new FeeInfo(order.orderId(), "shipping_cost", "Frete", new BigDecimal("8.00"))
+                )
+        );
+
+        org.hamcrest.MatcherAssert.assertThat(event.grossValue(), is(new BigDecimal("100.00")));
+        org.hamcrest.MatcherAssert.assertThat(event.feeValue(), is(new BigDecimal("20.00")));
+        org.hamcrest.MatcherAssert.assertThat(event.receivableValue(), is(new BigDecimal("80.00")));
+        org.hamcrest.MatcherAssert.assertThat(event.receivedValue(), is(new BigDecimal("0.00")));
+    }
+
+    @Test
+    void feeInfoStandardizesShippingAliasesAndDebitAmounts() {
+        FeeInfo shippingFee = new FeeInfo("ORDER-FEE-1001", "shipping_fee", "Frete", new BigDecimal("-7.505"));
+        FeeInfo saleFee = new FeeInfo("ORDER-FEE-1001", "sale_fee", "Comissao", new BigDecimal("12"));
+
+        org.hamcrest.MatcherAssert.assertThat(shippingFee.type(), is(FeeInfo.SHIPPING_COST));
+        org.hamcrest.MatcherAssert.assertThat(shippingFee.isShippingCost(), is(true));
+        org.hamcrest.MatcherAssert.assertThat(shippingFee.amount(), is(new BigDecimal("7.51")));
+        org.hamcrest.MatcherAssert.assertThat(saleFee.type(), is(FeeInfo.COMMISSION_FEE));
+        org.hamcrest.MatcherAssert.assertThat(saleFee.amount(), is(new BigDecimal("12.00")));
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.example.application.port.out;
 
 import com.example.application.command.CreateExpenseCommand;
+import com.example.application.command.CreateProfitDistributionCommand;
 import com.example.application.command.SignAccountingPeriodCommand;
 import com.example.application.command.UpdateExpenseCommand;
 import com.example.application.command.UpsertFiscalProfileCommand;
@@ -10,6 +11,8 @@ import com.example.domain.model.ExpenseEntry;
 import com.example.domain.model.ExpenseFilter;
 import com.example.domain.model.ExpensePage;
 import com.example.domain.model.FiscalProfile;
+import com.example.domain.model.ProfitAvailability;
+import com.example.domain.model.ProfitDistribution;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,4 +46,10 @@ public interface FiscalAccountingRepository {
     Optional<AccountingPeriodClosing> findClosing(String tenantId, YearMonth periodMonth);
 
     boolean isPeriodClosed(String tenantId, LocalDate date);
+
+    ProfitAvailability profitAvailability(String tenantId);
+
+    List<ProfitDistribution> listProfitDistributions(String tenantId, YearMonth periodMonth);
+
+    ProfitDistribution createProfitDistribution(CreateProfitDistributionCommand command);
 }

@@ -16,6 +16,10 @@ public class TenantAuthorizationService {
     @Inject
     AccessTokenVerifier accessTokenVerifier;
 
+    public TenantContext requireAuthenticated(String authorizationHeader) {
+        return accessTokenVerifier.verify(authorizationHeader);
+    }
+
     public TenantContext requireTenant(String authorizationHeader, String tenantId) {
         TenantContext context = accessTokenVerifier.verify(authorizationHeader);
         if (!context.tenantId().equals(tenantId)) {

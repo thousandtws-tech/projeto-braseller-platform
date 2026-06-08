@@ -34,6 +34,9 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class JdbcReportEntryRepository implements ReportEntryRepository {
+    private static final String FINANCIAL_STATUS_WHERE = " AND status IN ('PAID', 'PENDING_RELEASE', 'RECEIVED') ";
+    private static final BigDecimal MONEY_ZERO = new BigDecimal("0.00");
+
     @Inject
     DataSource dataSource;
 
@@ -73,7 +76,7 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
                     COALESCE(SUM(receivable_value), 0) AS receivable_value,
                     COUNT(*) AS entry_count
                 FROM report_entries
-                """ + filterSql.whereClause();
+                """ + financialWhereClause(filterSql);
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             bind(statement, filterSql.parameters());
@@ -218,7 +221,7 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
                     COALESCE(SUM(receivable_value), 0) AS receivable_value,
                     COUNT(*) AS entry_count
                 FROM report_entries
-                """ + filterSql.whereClause() + """
+                """ + financialWhereClause(filterSql) + """
                 GROUP BY EXTRACT(YEAR FROM sale_date), EXTRACT(MONTH FROM sale_date)
                 ORDER BY year_value ASC, month_value ASC
                 """;
@@ -258,7 +261,7 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
                     COALESCE(SUM(receivable_value), 0) AS receivable_value,
                     COUNT(*) AS entry_count
                 FROM report_entries
-                """ + filterSql.whereClause() + """
+                """ + financialWhereClause(filterSql) + """
                 GROUP BY platform
                 ORDER BY gross_value DESC, platform ASC
                 """;
@@ -441,6 +444,10 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
         return new FilterSql(where.toString(), parameters);
     }
 
+    private String financialWhereClause(FilterSql filterSql) {
+        return filterSql.whereClause() + FINANCIAL_STATUS_WHERE;
+    }
+
     private ReportFilter safeFilter(ReportFilter filter) {
         return filter == null
                 ? new ReportFilter(null, null, null, null, null, null, null, null, null, null)
@@ -466,24 +473,39 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
     }
 
     private ReportEntry readEntry(ResultSet resultSet) throws SQLException {
+        ReportEntryStatus status = ReportEntryStatus.valueOf(resultSet.getString("status"));
+        BigDecimal grossValue = money(resultSet, "gross_value");
+        BigDecimal receivedValue = money(resultSet, "received_value");
+        BigDecimal feeValue = money(resultSet, "fee_value");
+        BigDecimal receivableValue = money(resultSet, "receivable_value");
+        if (isFinancialReversal(status)) {
+            grossValue = MONEY_ZERO;
+            receivedValue = MONEY_ZERO;
+            feeValue = MONEY_ZERO;
+            receivableValue = MONEY_ZERO;
+        }
         return new ReportEntry(
                 resultSet.getString("id"),
                 resultSet.getString("tenant_id"),
                 resultSet.getString("platform"),
                 resultSet.getString("order_id"),
                 resultSet.getDate("sale_date").toLocalDate(),
-                money(resultSet, "gross_value"),
-                money(resultSet, "received_value"),
-                money(resultSet, "fee_value"),
-                money(resultSet, "receivable_value"),
+                grossValue,
+                receivedValue,
+                feeValue,
+                receivableValue,
                 PaymentMethod.valueOf(resultSet.getString("payment_method")),
-                ReportEntryStatus.valueOf(resultSet.getString("status")),
+                status,
                 localDate(resultSet, "release_date"),
                 resultSet.getString("buyer_name"),
                 resultSet.getString("invoice_number"),
                 resultSet.getTimestamp("created_at").toInstant(),
                 resultSet.getTimestamp("updated_at").toInstant()
         );
+    }
+
+    private boolean isFinancialReversal(ReportEntryStatus status) {
+        return status == ReportEntryStatus.CANCELLED || status == ReportEntryStatus.REFUNDED;
     }
 
     private BigDecimal money(ResultSet resultSet, String columnName) throws SQLException {

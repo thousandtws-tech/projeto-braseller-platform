@@ -30,6 +30,8 @@ import com.example.domain.model.connector.SyncResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -85,14 +87,24 @@ public class ConnectorService {
     }
 
     public List<StandardOrder> getOrders(String connectorName, String tenantId, LocalDate from, LocalDate to, OrderStatus status, Integer limit) {
-        return connector(connectorName).getOrders(
-                requireText(tenantId, "tenantId"),
+        MarketplaceConnector marketplaceConnector = connector(connectorName);
+        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return marketplaceConnector.getOrders(
+                normalizedTenantId,
                 new OrderFilters(from, to, status, limit == null ? 50 : limit)
-        );
+        ).stream()
+                .map(order -> withFeeSplit(marketplaceConnector, normalizedTenantId, order))
+                .toList();
     }
 
     public StandardOrder getOrderDetail(String connectorName, String tenantId, String orderId) {
-        return connector(connectorName).getOrderDetail(requireText(tenantId, "tenantId"), requireText(orderId, "orderId"));
+        MarketplaceConnector marketplaceConnector = connector(connectorName);
+        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return withFeeSplit(
+                marketplaceConnector,
+                normalizedTenantId,
+                marketplaceConnector.getOrderDetail(normalizedTenantId, requireText(orderId, "orderId"))
+        );
     }
 
     public List<PaymentInfo> getPayments(String connectorName, String tenantId, String orderId) {
@@ -181,7 +193,9 @@ public class ConnectorService {
                         null,
                         Math.max(DEFAULT_SYNC_ORDER_LIMIT, result.ordersSynced())
                 )
-        );
+        ).stream()
+                .map(order -> withFeeSplit(marketplaceConnector, normalizedTenantId, order))
+                .toList();
         publishReportEntryEvents(normalizedTenantId, syncedOrders);
         publishNewSaleEvents(normalizedTenantId, recipientEmail, syncedOrders);
         return result;
@@ -204,6 +218,45 @@ public class ConnectorService {
                         order.orderId(),
                         order.grossValue()
                 )));
+    }
+
+    private StandardOrder withFeeSplit(MarketplaceConnector connector, String tenantId, StandardOrder order) {
+        if (order == null) {
+            return null;
+        }
+        BigDecimal feeValue = effectiveFeeValue(order, connector.getFees(tenantId, order.orderId()));
+        BigDecimal grossValue = money(order.grossValue());
+        return new StandardOrder(
+                order.orderId(),
+                order.platform(),
+                order.date(),
+                grossValue,
+                feeValue,
+                grossValue.subtract(feeValue).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                order.paymentMethod(),
+                order.paymentDate(),
+                order.releaseDate(),
+                order.status(),
+                order.buyerName(),
+                order.items(),
+                order.invoiceNumber()
+        );
+    }
+
+    private BigDecimal effectiveFeeValue(StandardOrder order, List<FeeInfo> fees) {
+        BigDecimal feeTotal = BigDecimal.ZERO;
+        if (fees != null) {
+            for (FeeInfo fee : fees) {
+                if (fee != null && fee.hasAmount()) {
+                    feeTotal = feeTotal.add(fee.amount());
+                }
+            }
+        }
+        return money(feeTotal.compareTo(BigDecimal.ZERO) > 0 ? feeTotal : order.platformFee());
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 
     private Instant resolveSince(Instant since) {

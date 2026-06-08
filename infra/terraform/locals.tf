@@ -201,6 +201,17 @@ locals {
       MERCADOLIVRE_CONNECT_TIMEOUT_MS            = tostring(var.mercadolivre_connect_timeout_ms)
       MERCADOLIVRE_REQUEST_TIMEOUT_MS            = tostring(var.mercadolivre_request_timeout_ms)
       MERCADOLIVRE_REFRESH_SKEW_SECONDS          = tostring(var.mercadolivre_refresh_skew_seconds)
+      MERCADOLIVRE_RETRY_MAX_ATTEMPTS            = tostring(var.mercadolivre_retry_max_attempts)
+      MERCADOLIVRE_RETRY_INITIAL_DELAY_MS        = tostring(var.mercadolivre_retry_initial_delay_ms)
+      MERCADOLIVRE_RETRY_MAX_DELAY_MS            = tostring(var.mercadolivre_retry_max_delay_ms)
+      SHOPEE_PARTNER_ID                          = tostring(var.shopee_partner_id)
+      SHOPEE_CONNECT_TIMEOUT_MS                  = tostring(var.shopee_connect_timeout_ms)
+      SHOPEE_REQUEST_TIMEOUT_MS                  = tostring(var.shopee_request_timeout_ms)
+      SHOPEE_RETRY_MAX_ATTEMPTS                  = tostring(var.shopee_retry_max_attempts)
+      AMAZON_CLIENT_ID                           = var.amazon_client_id
+      AMAZON_CONNECT_TIMEOUT_MS                  = tostring(var.amazon_connect_timeout_ms)
+      AMAZON_REQUEST_TIMEOUT_MS                  = tostring(var.amazon_request_timeout_ms)
+      AMAZON_RETRY_MAX_ATTEMPTS                  = tostring(var.amazon_retry_max_attempts)
       NOTIFICATION_SERVICE_CONNECT_TIMEOUT_MS    = tostring(var.notification_service_connect_timeout_ms)
       NOTIFICATION_SERVICE_READ_TIMEOUT_MS       = tostring(var.notification_service_read_timeout_ms)
       REPORTING_SERVICE_CONNECT_TIMEOUT_MS       = tostring(var.reporting_service_connect_timeout_ms)
@@ -273,6 +284,10 @@ locals {
     "core-service" = {
       CONNECTOR_TOKEN_ENCRYPTION_KEY = "connector-token-encryption-key"
       MERCADOLIVRE_CLIENT_SECRET     = "mercadolivre-client-secret"
+      SHOPEE_PARTNER_KEY             = "shopee-partner-key"
+      AMAZON_CLIENT_SECRET           = "amazon-client-secret"
+      AMAZON_AWS_ACCESS_KEY          = "amazon-aws-access-key"
+      AMAZON_AWS_SECRET_KEY          = "amazon-aws-secret-key"
     }
     "reporting-service" = {
       CLOUDINARY_API_SECRET    = "cloudinary-api-secret"
@@ -337,6 +352,10 @@ locals {
       "keycloak-client-secret"         = var.keycloak_client_secret
       "keycloak-admin-password"        = var.keycloak_admin_password
       "mercadolivre-client-secret"     = var.mercadolivre_client_secret
+      "shopee-partner-key"             = var.shopee_partner_key
+      "amazon-client-secret"           = var.amazon_client_secret
+      "amazon-aws-access-key"          = var.amazon_aws_access_key
+      "amazon-aws-secret-key"          = var.amazon_aws_secret_key
       "cloudinary-api-secret"          = var.cloudinary_api_secret
       "clicksign-access-token"         = var.clicksign_access_token
       "clicksign-webhook-secret"       = var.clicksign_webhook_secret

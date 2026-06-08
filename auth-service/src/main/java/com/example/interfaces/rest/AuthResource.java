@@ -65,7 +65,19 @@ public class AuthResource {
                     request.tenantName(),
                     request.fullName(),
                     request.email(),
-                    request.password()
+                    request.password(),
+                    request.cnpj(),
+                    request.legalName(),
+                    request.tradeName(),
+                    request.cnaeCode(),
+                    request.cnaeDescription(),
+                    request.addressStreet(),
+                    request.addressNumber(),
+                    request.addressComplement(),
+                    request.addressNeighborhood(),
+                    request.addressCity(),
+                    request.addressState(),
+                    request.addressZipCode()
             ))).build();
         } catch (ValidationException exception) {
             return badRequest(exception.getMessage());
@@ -213,7 +225,24 @@ public class AuthResource {
     }
 
     @Schema(name = "AuthRegisterRequest", description = "Dados para criar tenant e usuario administrador inicial.")
-    public record RegisterRequest(String tenantName, String fullName, String email, String password) {
+    public record RegisterRequest(
+            String tenantName,
+            String fullName,
+            String email,
+            String password,
+            String cnpj,
+            String legalName,
+            String tradeName,
+            String cnaeCode,
+            String cnaeDescription,
+            String addressStreet,
+            String addressNumber,
+            String addressComplement,
+            String addressNeighborhood,
+            String addressCity,
+            String addressState,
+            String addressZipCode
+    ) {
     }
 
     @Schema(name = "AuthLoginRequest", description = "Credenciais de e-mail/senha autenticadas no Keycloak.")

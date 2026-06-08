@@ -50,11 +50,21 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     @Override
     public AuthIdentity registerTenant(RegisterCommand command) {
         UserTenantRegistrationRequest userRequest = new UserTenantRegistrationRequest(
-                command.tenantName().trim(),
-                command.tenantName().trim(),
+                firstNonBlank(command.legalName(), command.tenantName()).trim(),
+                firstNonBlank(command.tradeName(), command.tenantName()).trim(),
                 command.fullName().trim(),
                 command.email().trim(),
-                command.password()
+                command.password(),
+                blankToNull(command.cnpj()),
+                blankToNull(command.cnaeCode()),
+                blankToNull(command.cnaeDescription()),
+                blankToNull(command.addressStreet()),
+                blankToNull(command.addressNumber()),
+                blankToNull(command.addressComplement()),
+                blankToNull(command.addressNeighborhood()),
+                blankToNull(command.addressCity()),
+                blankToNull(command.addressState()),
+                blankToNull(command.addressZipCode())
         );
         HttpResponse<String> response = send("/users/tenants/register", userRequest, false);
         if (response.statusCode() != 201) {
@@ -153,6 +163,14 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
         return userServiceUrl.endsWith("/") ? userServiceUrl.substring(0, userServiceUrl.length() - 1) : userServiceUrl;
     }
 
+    private String firstNonBlank(String first, String fallback) {
+        return first == null || first.isBlank() ? fallback : first;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private AuthIdentity toAuthIdentity(UserResponse user) {
         return new AuthIdentity(
                 user.id(),
@@ -168,7 +186,8 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
                 user.firstName(),
                 user.lastName(),
                 user.pictureUrl(),
-                user.emailVerified()
+                user.emailVerified(),
+                user.accountantTenantIds()
         );
     }
 
@@ -187,11 +206,28 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
                 verification.firstName(),
                 verification.lastName(),
                 verification.pictureUrl(),
-                verification.emailVerified()
+                verification.emailVerified(),
+                verification.accountantTenantIds()
         );
     }
 
-    public record UserTenantRegistrationRequest(String legalName, String tradeName, String adminName, String email, String password) {
+    public record UserTenantRegistrationRequest(
+            String legalName,
+            String tradeName,
+            String adminName,
+            String email,
+            String password,
+            String cnpj,
+            String cnaeCode,
+            String cnaeDescription,
+            String addressStreet,
+            String addressNumber,
+            String addressComplement,
+            String addressNeighborhood,
+            String addressCity,
+            String addressState,
+            String addressZipCode
+    ) {
     }
 
     public record VerifyPasswordRequest(String email, String password) {
@@ -210,13 +246,14 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
 
     public record UserResponse(String id, String tenantId, String email, String fullName, String preferredUsername,
                                String firstName, String lastName, String pictureUrl, boolean emailVerified,
-                               String provider, String providerSubject, String status, List<String> roles) {
+                               String provider, String providerSubject, String status, List<String> roles,
+                               List<String> accountantTenantIds) {
     }
 
     public record IdentityVerificationResponse(String userId, String tenantId, String email, String fullName,
                                                String preferredUsername, String firstName, String lastName,
                                                String pictureUrl, boolean emailVerified, String provider,
-                                               String providerSubject, List<String> roles) {
+                                               String providerSubject, List<String> roles, List<String> accountantTenantIds) {
     }
 
     public record ErrorResponse(String message) {

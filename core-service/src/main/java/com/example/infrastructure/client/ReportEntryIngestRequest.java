@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public record ReportEntryIngestRequest(
         @JsonProperty("tenant_id") String tenantId,
@@ -18,5 +19,18 @@ public record ReportEntryIngestRequest(
         @JsonProperty("status") String status,
         @JsonProperty("release_date") LocalDate releaseDate,
         @JsonProperty("buyer_name") String buyerName,
+        @JsonProperty("items") List<Item> items,
         @JsonProperty("invoice_number") String invoiceNumber) {
+
+    public ReportEntryIngestRequest {
+        items = items == null ? List.of() : List.copyOf(items);
+    }
+
+    public record Item(
+            @JsonProperty("sku") String sku,
+            @JsonProperty("title") String title,
+            @JsonProperty("quantity") BigDecimal quantity,
+            @JsonProperty("unit_value") BigDecimal unitValue,
+            @JsonProperty("gross_value") BigDecimal grossValue) {
+    }
 }

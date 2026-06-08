@@ -1,8 +1,10 @@
 package com.example.application.port.out;
 
 import com.example.domain.model.AccountantAccessView;
+import com.example.domain.model.AccountantClientView;
 import com.example.domain.model.RegisteredTenant;
 import com.example.domain.model.StoredUserCredentials;
+import com.example.domain.model.TenantCompanyProfile;
 import com.example.domain.model.UserView;
 
 import java.util.List;
@@ -11,7 +13,7 @@ import java.util.Optional;
 public interface UserIdentityRepository {
 
     RegisteredTenant registerTenant(String legalName, String tradeName, String adminName,
-                                    String email, String passwordHash);
+                                    String email, String passwordHash, TenantCompanyProfile companyProfile);
 
     /**
      * Persiste o usuário contador e o registro de acesso.
@@ -43,6 +45,14 @@ public interface UserIdentityRepository {
     );
 
     List<UserView> listTenantUsers(String tenantId);
+
+    List<AccountantClientView> listAccountantClients(String userId, String email);
+
+    List<AccountantClientView> listAllBpoClients();
+
+    List<String> listAccountantTenantIds(String userId, String email);
+
+    Optional<UserView> findUserByEmail(String email);
 
     Optional<StoredUserCredentials> findActiveCredentialsByEmail(String email);
 

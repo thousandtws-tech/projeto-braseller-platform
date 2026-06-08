@@ -1,5 +1,6 @@
 package com.example.infrastructure.connector.mercadolivre;
 
+import com.example.application.exception.ConnectorRateLimitException;
 import com.example.application.exception.ConnectorValidationException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,6 +8,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,9 +21,12 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.concurrent.ThreadLocalRandom;
 
 @ApplicationScoped
 public class MercadoLivreApiClient {
+    private static final Logger LOG = Logger.getLogger(MercadoLivreApiClient.class);
+
     private HttpClient httpClient;
 
     @Inject
@@ -35,6 +40,15 @@ public class MercadoLivreApiClient {
 
     @ConfigProperty(name = "mercadolivre.api.request-timeout-ms", defaultValue = "15000")
     long requestTimeoutMs;
+
+    @ConfigProperty(name = "mercadolivre.api.retry-max-attempts", defaultValue = "3")
+    int retryMaxAttempts;
+
+    @ConfigProperty(name = "mercadolivre.api.retry-initial-delay-ms", defaultValue = "1000")
+    long retryInitialDelayMs;
+
+    @ConfigProperty(name = "mercadolivre.api.retry-max-delay-ms", defaultValue = "30000")
+    long retryMaxDelayMs;
 
     @PostConstruct
     void initHttpClient() {
@@ -87,23 +101,55 @@ public class MercadoLivreApiClient {
     }
 
     private JsonNode send(HttpRequest request) {
-        try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            JsonNode body = parse(response.body());
-            if (response.statusCode() >= 400) {
-                String message = text(body, "message");
-                if (message.isBlank()) {
-                    message = text(body, "error");
+        for (int attempt = 1; attempt <= retryMaxAttempts; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+                if (response.statusCode() == 429) {
+                    if (attempt == retryMaxAttempts) {
+                        throw new ConnectorRateLimitException("mercado_livre_rate_limit_exhausted");
+                    }
+                    long delayMs = retryDelayMs(response, attempt);
+                    LOG.warnf("Mercado Livre rate limit hit (attempt %d/%d), retrying in %d ms", attempt, retryMaxAttempts, delayMs);
+                    Thread.sleep(delayMs);
+                    continue;
                 }
-                throw new ConnectorValidationException("mercado_livre_api_error: " + response.statusCode() + " " + message);
+
+                JsonNode body = parse(response.body());
+                if (response.statusCode() >= 400) {
+                    String message = text(body, "message");
+                    if (message.isBlank()) {
+                        message = text(body, "error");
+                    }
+                    throw new ConnectorValidationException("mercado_livre_api_error: " + response.statusCode() + " " + message);
+                }
+                return body;
+
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (IOException e) {
+                throw new ConnectorValidationException("mercado_livre_api_unavailable");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ConnectorValidationException("mercado_livre_api_interrupted");
             }
-            return body;
-        } catch (IOException exception) {
-            throw new ConnectorValidationException("mercado_livre_api_unavailable");
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new ConnectorValidationException("mercado_livre_api_interrupted");
         }
+        throw new ConnectorRateLimitException("mercado_livre_rate_limit_exhausted");
+    }
+
+    private long retryDelayMs(HttpResponse<?> response, int attempt) {
+        // Respect Retry-After header sent by ML API (value in seconds)
+        String retryAfter = response.headers().firstValue("Retry-After").orElse(null);
+        if (retryAfter != null) {
+            try {
+                long serverDelayMs = Long.parseLong(retryAfter.trim()) * 1000L;
+                return Math.min(serverDelayMs, retryMaxDelayMs);
+            } catch (NumberFormatException ignored) {}
+        }
+        // Exponential backoff with jitter: 1s, 2s, 4s, ... capped at retryMaxDelayMs
+        long exponential = retryInitialDelayMs * (1L << (attempt - 1));
+        long jitter = (long) (ThreadLocalRandom.current().nextDouble() * retryInitialDelayMs);
+        return Math.min(exponential + jitter, retryMaxDelayMs);
     }
 
     private JsonNode parse(String body) throws IOException {

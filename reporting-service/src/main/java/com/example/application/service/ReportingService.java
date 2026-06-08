@@ -24,6 +24,8 @@ import java.util.List;
 
 @ApplicationScoped
 public class ReportingService {
+    private static final BigDecimal ZERO = new BigDecimal("0.00");
+
     private final ReportEntryRepository repository;
     private final FiscalAccountingRepository fiscalAccountingRepository;
 
@@ -87,6 +89,23 @@ public class ReportingService {
         BigDecimal grossValue = money(command.grossValue());
         BigDecimal feeValue = money(command.feeValue());
         ReportEntryStatus status = command.status() == null ? ReportEntryStatus.PAID : command.status();
+        if (isFinancialReversal(status)) {
+            return new UpsertReportEntryCommand(
+                    tenantId,
+                    platform,
+                    orderId,
+                    saleDate,
+                    ZERO,
+                    ZERO,
+                    ZERO,
+                    ZERO,
+                    command.paymentMethod() == null ? com.example.domain.model.PaymentMethod.OTHER : command.paymentMethod(),
+                    status,
+                    null,
+                    blankToNull(command.buyerName()),
+                    blankToNull(command.invoiceNumber())
+            );
+        }
         BigDecimal receivedValue = command.receivedValue() == null
                 ? defaultReceivedValue(grossValue, feeValue, status)
                 : money(command.receivedValue());
@@ -109,6 +128,10 @@ public class ReportingService {
                 blankToNull(command.buyerName()),
                 blankToNull(command.invoiceNumber())
         );
+    }
+
+    private boolean isFinancialReversal(ReportEntryStatus status) {
+        return status == ReportEntryStatus.CANCELLED || status == ReportEntryStatus.REFUNDED;
     }
 
     private BigDecimal defaultReceivedValue(BigDecimal grossValue, BigDecimal feeValue, ReportEntryStatus status) {

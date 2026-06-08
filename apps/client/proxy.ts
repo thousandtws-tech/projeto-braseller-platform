@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { COOKIE_NAME } from '@/lib/auth'
+import { COOKIE_NAME } from '@/entities/session/server/session'
 
-const PROTECTED = ['/dashboard', '/lancamentos', '/despesas', '/dre', '/conectores', '/notificacoes', '/configuracoes', '/contador', '/plano', '/conectores/callback']
+const PROTECTED = ['/dashboard', '/lancamentos', '/despesas', '/estoque', '/extrato', '/dre', '/conectores', '/notificacoes', '/configuracoes', '/contador', '/plano', '/conectores/callback']
 const AUTH_ONLY = ['/login', '/register']
 
 function decodeBase64Url(value: string) {
@@ -23,7 +23,15 @@ function isExpiredToken(token: string) {
   }
 }
 
+function isServerActionRequest(request: NextRequest) {
+  return request.method === 'POST' && request.headers.has('next-action')
+}
+
 export function proxy(request: NextRequest) {
+  if (isServerActionRequest(request)) {
+    return NextResponse.next()
+  }
+
   const { pathname } = request.nextUrl
   const token = request.cookies.get(COOKIE_NAME)?.value
   const tokenExpired = token ? isExpiredToken(token) : false

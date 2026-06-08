@@ -1,9 +1,7 @@
 import { redirect } from 'next/navigation'
-import { Sidebar } from '@/components/layout/sidebar'
-import { Header } from '@/components/layout/header'
-import { getSession } from '@/lib/auth'
-import { getToken } from '@/lib/auth'
-import { getNotifications } from '@/lib/api'
+import { Header, Sidebar } from '@/widgets/app-shell'
+import { getSession, getToken } from '@/entities/session/server/session'
+import { getNotifications } from '@/shared/api/gateway'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()

@@ -3,6 +3,7 @@ package com.example.infrastructure.connector;
 import com.example.application.command.ConnectorAuthenticationCommand;
 import com.example.application.command.ConnectorRefreshTokenCommand;
 import com.example.application.port.out.MarketplaceConnector;
+import com.example.domain.enums.PaymentMethod;
 import com.example.domain.model.connector.ConnectorConnectionStatus;
 import com.example.domain.model.connector.ConnectorDescriptor;
 import com.example.domain.model.connector.ConnectorStatus;
@@ -13,7 +14,6 @@ import com.example.domain.model.connector.InvoiceInfo;
 import com.example.domain.model.connector.OrderFilters;
 import com.example.domain.model.connector.OrderStatus;
 import com.example.domain.model.connector.PaymentInfo;
-import com.example.domain.model.connector.PaymentMethod;
 import com.example.domain.model.connector.StandardOrder;
 import com.example.domain.model.connector.StandardOrderItem;
 import com.example.domain.model.connector.SyncResult;
@@ -97,7 +97,7 @@ public class SandboxMarketplaceConnector implements MarketplaceConnector {
     public List<FeeInfo> getFees(String tenantId, String orderId) {
         return List.of(
                 new FeeInfo(orderId, "platform_fee", "Taxa de venda da plataforma", new BigDecimal("18.90")),
-                new FeeInfo(orderId, "shipping_fee", "Repasse logistico", new BigDecimal("7.50"))
+                new FeeInfo(orderId, "shipping_cost", "Repasse logistico", new BigDecimal("7.50"))
         );
     }
 

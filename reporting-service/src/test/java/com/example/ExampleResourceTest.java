@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -27,6 +28,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.Matchers.contains;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
@@ -323,11 +325,241 @@ class ExampleResourceTest {
                 .body("tax_regime", is("LUCRO_PRESUMIDO"))
                 .body("gross_revenue", is(500.00F))
                 .body("marketplace_fees", is(65.00F))
-                .body("estimated_taxes", is(56.00F))
+                .body("estimated_tax_rate", is(0.0593F))
+                .body("estimated_taxes", is(29.65F))
                 .body("operating_expenses", is(60.00F))
-                .body("net_result", is(319.00F))
+                .body("net_result", is(345.35F))
                 .body("expense_count", is(2))
                 .body("expenses_by_category.category", hasItems("PACKAGING", "BANK_FEE"));
+    }
+
+    @Test
+    void dreCalculatesSimplesNacionalEffectiveRateByRevenueBracket() {
+        String tenantId = "tenant-reporting-tax-simples";
+        ingest(tenantId, "TAX-SIMPLES-1001", "mercado-livre", "RECEIVED", "PIX", "200000.00", "200000.00", "0.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(fiscalProfilePayload("SIMPLES_NACIONAL", "0.0000"))
+                .when().put("/reports/tenants/{tenantId}/fiscal-profile", tenantId)
+                .then()
+                .statusCode(200);
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("tax_regime", is("SIMPLES_NACIONAL"))
+                .body("gross_revenue", is(200000.00F))
+                .body("estimated_tax_rate", is(0.0433F))
+                .body("estimated_taxes", is(8660.00F))
+                .body("net_result", is(191340.00F));
+    }
+
+    @Test
+    void dreCalculatesLucroRealOverAccountingProfitAndRevenueTaxes() {
+        String tenantId = "tenant-reporting-tax-real";
+        ingest(tenantId, "TAX-REAL-1001", "mercado-livre", "RECEIVED", "PIX", "100000.00", "90000.00", "10000.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(fiscalProfilePayload("LUCRO_REAL", "0.0000"))
+                .when().put("/reports/tenants/{tenantId}/fiscal-profile", tenantId)
+                .then()
+                .statusCode(200);
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("tax_regime", is("LUCRO_REAL"))
+                .body("gross_revenue", is(100000.00F))
+                .body("marketplace_fees", is(10000.00F))
+                .body("estimated_tax_rate", is(0.3785F))
+                .body("estimated_taxes", is(37850.00F))
+                .body("net_result", is(52150.00F));
+    }
+
+    @Test
+    void stockItemsUseSnakeCaseMoneyFieldsAndNfeImportUpdatesQuantity() {
+        String tenantId = "tenant-reporting-stock";
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body(stockItemPayload("MANUAL-001", "Produto manual", "12.34"))
+                .when().post("/reports/tenants/{tenantId}/stock/items", tenantId)
+                .then()
+                .statusCode(200)
+                .body("tenant_id", is(tenantId))
+                .body("sku", is("MANUAL-001"))
+                .body("unit_cost", is(12.34F))
+                .body("quantity", is(0.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("text/xml")
+                .body(nfeXml("NFE-001", "Produto NF-e", "3.0000", "7.50", "22.50"))
+                .when().post("/reports/tenants/{tenantId}/stock/nfe-import", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total_cost", is(22.50F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/stock/items", tenantId)
+                .then()
+                .statusCode(200)
+                .body("find { it.sku == 'MANUAL-001' }.unit_cost", is(12.34F))
+                .body("find { it.sku == 'MANUAL-001' }.quantity", is(0.00F))
+                .body("find { it.sku == 'NFE-001' }.unit_cost", is(7.50F))
+                .body("find { it.sku == 'NFE-001' }.quantity", is(3.0000F));
+    }
+
+    @Test
+    void salesWithItemsCreateIdempotentStockExitAndFeedCmv() {
+        String tenantId = "tenant-reporting-cmv-stock-exit";
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("text/xml")
+                .body(nfeXml("SKU-CMV", "Produto com CMV", "5.0000", "10.00", "50.00"))
+                .when().post("/reports/tenants/{tenantId}/stock/nfe-import", tenantId)
+                .then()
+                .statusCode(200);
+
+        ingestWithItem(tenantId, "CMV-1001", "mercado-livre", "RECEIVED", "PIX",
+                "100.00", "85.00", "15.00", "0.00", "SKU-CMV", "2.0000");
+        ingestWithItem(tenantId, "CMV-1001", "mercado-livre", "RECEIVED", "PIX",
+                "100.00", "85.00", "15.00", "0.00", "SKU-CMV", "2.0000");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/stock/items", tenantId)
+                .then()
+                .statusCode(200)
+                .body("find { it.sku == 'SKU-CMV' }.quantity", is(3.0000F))
+                .body("find { it.sku == 'SKU-CMV' }.unit_cost", is(10.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_revenue", is(100.00F))
+                .body("marketplace_fees", is(15.00F))
+                .body("cmv", is(20.00F))
+                .body("net_result", is(65.00F))
+                .body("distributable_profit", is(65.00F));
+    }
+
+    @Test
+    void cancelledSaleReversesStockExitAndCmvIdempotently() {
+        String tenantId = "tenant-reporting-cmv-stock-reversal";
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("text/xml")
+                .body(nfeXml("SKU-REV", "Produto cancelado", "5.0000", "10.00", "50.00"))
+                .when().post("/reports/tenants/{tenantId}/stock/nfe-import", tenantId)
+                .then()
+                .statusCode(200);
+
+        ingestWithItem(tenantId, "CMV-CANCEL-1001", "mercado-livre", "RECEIVED", "PIX",
+                "100.00", "85.00", "15.00", "0.00", "SKU-REV", "2.0000");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("cmv", is(20.00F));
+
+        ingestWithItem(tenantId, "CMV-CANCEL-1001", "mercado-livre", "CANCELLED", "PIX",
+                "100.00", "85.00", "15.00", "0.00", "SKU-REV", "2.0000");
+        ingestWithItem(tenantId, "CMV-CANCEL-1001", "mercado-livre", "CANCELLED", "PIX",
+                "100.00", "85.00", "15.00", "0.00", "SKU-REV", "2.0000");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/entries?search=CMV-CANCEL-1001", tenantId)
+                .then()
+                .statusCode(200)
+                .body("items[0].status", is("CANCELLED"))
+                .body("items[0].gross_value", is(0.00F))
+                .body("items[0].received_value", is(0.00F))
+                .body("items[0].fee_value", is(0.00F))
+                .body("items[0].receivable_value", is(0.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/stock/items", tenantId)
+                .then()
+                .statusCode(200)
+                .body("find { it.sku == 'SKU-REV' }.quantity", is(5.0000F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/dre?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_revenue", is(0.00F))
+                .body("cmv", is(0.00F))
+                .body("net_result", is(0.00F))
+                .body("distributable_profit", is(0.00F));
+    }
+
+    @Test
+    void cancelledAndRefundedLegacyValuesAreIgnoredByFinancialAggregates() {
+        String tenantId = "tenant-reporting-cancelled-revenue-summary";
+        ingest(tenantId, "ACTIVE-1001", "mercado-livre", "RECEIVED", "PIX", "100.00", "85.00", "15.00", "0.00");
+        insertReportEntry(tenantId, "LEGACY-CANCEL-1002", "shopee", "CANCELLED", "300.00", "0.00", "45.00", "0.00");
+        insertReportEntry(tenantId, "LEGACY-REFUND-1003", "amazon", "REFUNDED", "80.00", "70.00", "10.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/summary?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_value", is(100.00F))
+                .body("received_value", is(85.00F))
+                .body("fee_value", is(15.00F))
+                .body("receivable_value", is(0.00F))
+                .body("entry_count", is(1));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/entries?search=LEGACY-CANCEL-1002", tenantId)
+                .then()
+                .statusCode(200)
+                .body("items[0].status", is("CANCELLED"))
+                .body("items[0].gross_value", is(0.00F))
+                .body("items[0].received_value", is(0.00F))
+                .body("items[0].fee_value", is(0.00F))
+                .body("items[0].receivable_value", is(0.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/charts/platform-comparison?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("size()", is(1))
+                .body("[0].platform", is("mercado-livre"))
+                .body("[0].gross_value", is(100.00F))
+                .body("[0].entry_count", is(1));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/charts/monthly-evolution?from=2026-05-01&to=2026-05-31", tenantId)
+                .then()
+                .statusCode(200)
+                .body("size()", is(1))
+                .body("[0].gross_value", is(100.00F))
+                .body("[0].entry_count", is(1));
     }
 
     @Test
@@ -450,6 +682,109 @@ class ExampleResourceTest {
     }
 
     @Test
+    void signedClosingReleasesProfitAndDistributionConsumesBalance() {
+        String tenantId = "tenant-reporting-profit-available";
+        ingest(tenantId, "PROFIT-1001", "mercado-livre", "RECEIVED", "PIX", "300.00", "255.00", "45.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "signature_hash": "sha256:lucro-disponivel-maio"
+                        }
+                        """)
+                .when().post("/reports/tenants/{tenantId}/closings/2026-05/sign", tenantId)
+                .then()
+                .statusCode(200)
+                .body("distributable_profit", is(255.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().get("/reports/tenants/{tenantId}/profit/available", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total_released_profit", is(255.00F))
+                .body("total_distributed_profit", is(0))
+                .body("available_profit", is(255.00F))
+                .body("periods[0].period_month", is("2026-05"))
+                .body("periods[0].available_profit", is(255.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "period_month": "2026-05",
+                          "amount": 100.00,
+                          "distributed_at": "2026-06-08",
+                          "recipient_name": "Socio administrador",
+                          "notes": "Retirada mensal"
+                        }
+                        """)
+                .when().post("/reports/tenants/{tenantId}/profit/distributions", tenantId)
+                .then()
+                .statusCode(201)
+                .body("tenant_id", is(tenantId))
+                .body("period_month", is("2026-05"))
+                .body("amount", is(100.00F))
+                .body("created_by_email", is("seller@brasaller.test"));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .when().get("/reports/tenants/{tenantId}/profit/available", tenantId)
+                .then()
+                .statusCode(200)
+                .body("total_released_profit", is(255.00F))
+                .body("total_distributed_profit", is(100.00F))
+                .body("available_profit", is(155.00F))
+                .body("periods[0].distributed_profit", is(100.00F))
+                .body("periods[0].available_profit", is(155.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .when().get("/reports/tenants/{tenantId}/profit/distributions?month=2026-05", tenantId)
+                .then()
+                .statusCode(200)
+                .body("size()", is(1))
+                .body("[0].recipient_name", is("Socio administrador"));
+    }
+
+    @Test
+    void profitDistributionCannotExceedSignedClosingBalance() {
+        String tenantId = "tenant-reporting-profit-limit";
+        ingest(tenantId, "PROFIT-LIMIT-1001", "mercado-livre", "RECEIVED", "PIX", "120.00", "110.00", "10.00", "0.00");
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "CONTADOR"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "signature_hash": "sha256:lucro-limite-maio"
+                        }
+                        """)
+                .when().post("/reports/tenants/{tenantId}/closings/2026-05/sign", tenantId)
+                .then()
+                .statusCode(200)
+                .body("distributable_profit", is(110.00F));
+
+        given()
+                .header("Authorization", "Bearer " + token(tenantId, "ADMIN"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "period_month": "2026-05",
+                          "amount": 111.00,
+                          "distributed_at": "2026-06-08"
+                        }
+                        """)
+                .when().post("/reports/tenants/{tenantId}/profit/distributions", tenantId)
+                .then()
+                .statusCode(400)
+                .body("message", is("insufficient_distributable_profit"));
+    }
+
+    @Test
     void accountantCanReadDreButCannotWriteFiscalData() {
         String tenantId = "tenant-reporting-fiscal-accountant";
         ingest(tenantId, "DRE-ACC-1001", "sandbox", "RECEIVED", "PIX", "100.00", "90.00", "10.00", "0.00");
@@ -493,12 +828,119 @@ class ExampleResourceTest {
                 .body("gross_value", is(120.00F));
     }
 
+    @Test
+    void accountantCanReadGrantedBpoTenantButCannotWriteIt() {
+        String primaryTenantId = "tenant-reporting-bpo-primary";
+        String clientTenantId = "tenant-reporting-bpo-client";
+        ingest(clientTenantId, "BPO-1001", "mercado-livre", "RECEIVED", "PIX", "240.00", "210.00", "30.00", "0.00");
+
+        String accountantToken = token(primaryTenantId, List.of(clientTenantId), "CONTADOR");
+
+        given()
+                .header("Authorization", "Bearer " + accountantToken)
+                .when().get("/reports/tenants/{tenantId}/summary", clientTenantId)
+                .then()
+                .statusCode(200)
+                .body("gross_value", is(240.00F));
+
+        given()
+                .header("Authorization", "Bearer " + accountantToken)
+                .contentType("application/json")
+                .body(fiscalProfilePayload("SIMPLES_NACIONAL", "0.0600"))
+                .when().put("/reports/tenants/{tenantId}/fiscal-profile", clientTenantId)
+                .then()
+                .statusCode(403)
+                .body("message", is("tenant_mismatch"));
+    }
+
+    @Test
+    void accountantCanBatchSignGrantedBpoClientClosings() {
+        String primaryTenantId = "tenant-reporting-bpo-batch-primary";
+        String firstClientTenantId = "tenant-reporting-bpo-batch-client-a";
+        String secondClientTenantId = "tenant-reporting-bpo-batch-client-b";
+        ingest(firstClientTenantId, "BPO-BATCH-1001", "mercado-livre", "RECEIVED", "PIX", "300.00", "270.00", "30.00", "0.00");
+        ingest(secondClientTenantId, "BPO-BATCH-2001", "shopee", "RECEIVED", "PIX", "500.00", "430.00", "70.00", "0.00");
+
+        String accountantToken = token(primaryTenantId, List.of(firstClientTenantId, secondClientTenantId), "CONTADOR");
+
+        given()
+                .header("Authorization", "Bearer " + accountantToken)
+                .contentType("application/json")
+                .body("""
+                        {
+                          "tenant_ids": ["%s", "%s"],
+                          "signature_hash": "sha256:bpo-lote-junho"
+                        }
+                        """.formatted(firstClientTenantId, secondClientTenantId))
+                .when().post("/reports/bpo/closings/2026-06/batch-sign")
+                .then()
+                .statusCode(200)
+                .body("period_month", is("2026-06"))
+                .body("requested_count", is(2))
+                .body("signed_count", is(2))
+                .body("skipped_count", is(0))
+                .body("failed_count", is(0))
+                .body("results.status", contains("SIGNED", "SIGNED"))
+                .body("results.closing.tenant_id", contains(firstClientTenantId, secondClientTenantId));
+
+        given()
+                .header("Authorization", "Bearer " + accountantToken)
+                .contentType("application/json")
+                .body("""
+                        {
+                          "tenant_ids": ["%s", "%s"],
+                          "signature_hash": "sha256:bpo-lote-junho-retry"
+                        }
+                        """.formatted(firstClientTenantId, secondClientTenantId))
+                .when().post("/reports/bpo/closings/2026-06/batch-sign")
+                .then()
+                .statusCode(200)
+                .body("signed_count", is(0))
+                .body("skipped_count", is(2))
+                .body("results.status", contains("SKIPPED", "SKIPPED"));
+    }
+
+    @Test
+    void batchBpoClosingRejectsTenantOutsideAccountantPortfolio() {
+        String primaryTenantId = "tenant-reporting-bpo-batch-forbidden-primary";
+        String grantedTenantId = "tenant-reporting-bpo-batch-granted";
+        String forbiddenTenantId = "tenant-reporting-bpo-batch-forbidden";
+        String accountantToken = token(primaryTenantId, List.of(grantedTenantId), "CONTADOR");
+
+        given()
+                .header("Authorization", "Bearer " + accountantToken)
+                .contentType("application/json")
+                .body("""
+                        {
+                          "tenant_ids": ["%s", "%s"],
+                          "signature_hash": "sha256:bpo-forbidden"
+                        }
+                        """.formatted(grantedTenantId, forbiddenTenantId))
+                .when().post("/reports/bpo/closings/2026-06/batch-sign")
+                .then()
+                .statusCode(403)
+                .body("message", is("tenant_mismatch"));
+    }
+
     private void ingest(String tenantId, String orderId, String platform, String status, String paymentMethod,
                         String grossValue, String receivedValue, String feeValue, String receivableValue) {
         given()
                 .contentType("application/json")
                 .header("X-Internal-Token", "dev-internal-token-change-me")
                 .body(entryPayload(tenantId, orderId, platform, status, paymentMethod, grossValue, receivedValue, feeValue, receivableValue))
+                .when().post("/reports/internal/entries")
+                .then()
+                .statusCode(201);
+    }
+
+    private void ingestWithItem(String tenantId, String orderId, String platform, String status, String paymentMethod,
+                                String grossValue, String receivedValue, String feeValue, String receivableValue,
+                                String sku, String quantity) {
+        given()
+                .contentType("application/json")
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .body(entryPayloadWithItem(tenantId, orderId, platform, status, paymentMethod,
+                        grossValue, receivedValue, feeValue, receivableValue, sku, quantity))
                 .when().post("/reports/internal/entries")
                 .then()
                 .statusCode(201);
@@ -550,6 +992,38 @@ class ExampleResourceTest {
                 }
                 """.formatted(tenantId, platform, orderId, grossValue, receivedValue, feeValue, receivableValue,
                 paymentMethod, status, orderId);
+    }
+
+    private String entryPayloadWithItem(String tenantId, String orderId, String platform, String status, String paymentMethod,
+                                        String grossValue, String receivedValue, String feeValue, String receivableValue,
+                                        String sku, String quantity) {
+        return """
+                {
+                  "tenant_id": "%s",
+                  "platform": "%s",
+                  "order_id": "%s",
+                  "sale_date": "2026-05-21",
+                  "gross_value": %s,
+                  "received_value": %s,
+                  "fee_value": %s,
+                  "receivable_value": %s,
+                  "payment_method": "%s",
+                  "status": "%s",
+                  "release_date": "2026-06-04",
+                  "buyer_name": "Comprador Teste",
+                  "items": [
+                    {
+                      "sku": "%s",
+                      "title": "Produto com CMV",
+                      "quantity": %s,
+                      "unit_value": 50.00,
+                      "gross_value": %s
+                    }
+                  ],
+                  "invoice_number": "NF-%s"
+                }
+                """.formatted(tenantId, platform, orderId, grossValue, receivedValue, feeValue, receivableValue,
+                paymentMethod, status, sku, quantity, grossValue, orderId);
     }
 
     private String fiscalProfilePayload(String taxRegime, String estimatedTaxRate) {
@@ -615,6 +1089,33 @@ class ExampleResourceTest {
         }
     }
 
+    private void insertReportEntry(String tenantId, String orderId, String platform, String status,
+                                   String grossValue, String receivedValue, String feeValue, String receivableValue) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO report_entries
+                     (id, tenant_id, platform, order_id, sale_date, gross_value, received_value,
+                      fee_value, receivable_value, payment_method, status, release_date,
+                      buyer_name, invoice_number, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, DATE '2026-05-21', ?, ?, ?, ?, 'PIX', ?, DATE '2026-06-04',
+                             'Comprador Legado', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                     """)) {
+            statement.setString(1, "legacy-" + orderId);
+            statement.setString(2, tenantId);
+            statement.setString(3, platform);
+            statement.setString(4, orderId);
+            statement.setBigDecimal(5, new BigDecimal(grossValue));
+            statement.setBigDecimal(6, new BigDecimal(receivedValue));
+            statement.setBigDecimal(7, new BigDecimal(feeValue));
+            statement.setBigDecimal(8, new BigDecimal(receivableValue));
+            statement.setString(9, status);
+            statement.setString(10, "NF-" + orderId);
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not insert legacy report entry", exception);
+        }
+    }
+
     private String publicEntryPayload(String platform, String orderId, String status, String paymentMethod,
                                       String grossValue, String receivedValue, String feeValue, String receivableValue) {
         return """
@@ -636,13 +1137,61 @@ class ExampleResourceTest {
                 paymentMethod, status, orderId);
     }
 
+    private String stockItemPayload(String sku, String description, String unitCost) {
+        return """
+                {
+                  "sku": "%s",
+                  "description": "%s",
+                  "unit_cost": "%s"
+                }
+                """.formatted(sku, description, unitCost);
+    }
+
+    private String nfeXml(String sku, String description, String quantity, String unitCost, String totalCost) {
+        return """
+                <NFe>
+                  <infNFe>
+                    <ide>
+                      <serie>1</serie>
+                      <nNF>12345</nNF>
+                      <dhEmi>2026-05-20T10:00:00-03:00</dhEmi>
+                    </ide>
+                    <emit>
+                      <xNome>Fornecedor Teste</xNome>
+                    </emit>
+                    <det nItem="1">
+                      <prod>
+                        <cProd>%s</cProd>
+                        <xProd>%s</xProd>
+                        <qCom>%s</qCom>
+                        <vUnCom>%s</vUnCom>
+                        <vProd>%s</vProd>
+                      </prod>
+                    </det>
+                    <total>
+                      <ICMSTot>
+                        <vNF>%s</vNF>
+                      </ICMSTot>
+                    </total>
+                  </infNFe>
+                </NFe>
+                """.formatted(sku, description, quantity, unitCost, totalCost, totalCost);
+    }
+
     private String token(String tenantId, String... roles) {
+        return token(tenantId, List.of(), roles);
+    }
+
+    private String token(String tenantId, List<String> accountantTenantIds, String... roles) {
         String header = encode("""
                 {"alg":"HS256","typ":"JWT"}
                 """);
         long expiration = Instant.now().plusSeconds(300).getEpochSecond();
         String groups = Arrays.stream(roles)
                 .map(role -> "\"" + role + "\"")
+                .collect(Collectors.joining(", "));
+        String accountantTenants = accountantTenantIds.stream()
+                .map(tenant -> "\"" + tenant + "\"")
                 .collect(Collectors.joining(", "));
         String payload = encode("""
                 {
@@ -652,9 +1201,10 @@ class ExampleResourceTest {
                   "tenant_id": "%s",
                   "user_id": "user-123",
                   "email": "seller@brasaller.test",
-                  "groups": [%s]
+                  "groups": [%s],
+                  "accountant_tenant_ids": [%s]
                 }
-                """.formatted(expiration, tenantId, groups));
+                """.formatted(expiration, tenantId, groups, accountantTenants));
         String signature = sign(header + "." + payload);
         return header + "." + payload + "." + signature;
     }

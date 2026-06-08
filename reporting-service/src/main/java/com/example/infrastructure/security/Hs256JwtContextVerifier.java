@@ -55,8 +55,9 @@ public class Hs256JwtContextVerifier implements AccessTokenVerifier {
         if (roles.isEmpty()) {
             roles = listClaim(claims, "roles");
         }
+        List<String> accountantTenantIds = listClaim(claims, "accountant_tenant_ids");
         boolean readOnly = roles.contains("CONTADOR") && !roles.contains("ADMIN");
-        return new TenantContext(tenantId, userId, email, roles, readOnly);
+        return new TenantContext(tenantId, userId, email, roles, readOnly, accountantTenantIds);
     }
 
     private void verifySignature(String[] parts) {

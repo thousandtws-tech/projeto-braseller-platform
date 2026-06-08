@@ -337,6 +337,100 @@ variable "mercadolivre_refresh_skew_seconds" {
   default     = 300
 }
 
+variable "shopee_partner_id" {
+  description = "Shopee Open Platform partner ID (app ID)."
+  type        = number
+  default     = 0
+}
+
+variable "shopee_partner_key" {
+  description = "Shopee Open Platform partner key (app secret)."
+  type        = string
+  sensitive   = true
+  default     = "not-configured"
+}
+
+variable "shopee_connect_timeout_ms" {
+  description = "Shopee API connect timeout in milliseconds."
+  type        = number
+  default     = 5000
+}
+
+variable "shopee_request_timeout_ms" {
+  description = "Shopee API request timeout in milliseconds."
+  type        = number
+  default     = 15000
+}
+
+variable "shopee_retry_max_attempts" {
+  description = "Max retry attempts on Shopee API 429 responses."
+  type        = number
+  default     = 3
+}
+
+variable "amazon_client_id" {
+  description = "Amazon SP-API LWA client ID."
+  type        = string
+  default     = "not-configured"
+}
+
+variable "amazon_client_secret" {
+  description = "Amazon SP-API LWA client secret."
+  type        = string
+  sensitive   = true
+  default     = "not-configured"
+}
+
+variable "amazon_aws_access_key" {
+  description = "AWS IAM access key for Amazon SP-API SigV4 signing."
+  type        = string
+  sensitive   = true
+  default     = "not-configured"
+}
+
+variable "amazon_aws_secret_key" {
+  description = "AWS IAM secret key for Amazon SP-API SigV4 signing."
+  type        = string
+  sensitive   = true
+  default     = "not-configured"
+}
+
+variable "amazon_connect_timeout_ms" {
+  description = "Amazon SP-API connect timeout in milliseconds."
+  type        = number
+  default     = 5000
+}
+
+variable "amazon_request_timeout_ms" {
+  description = "Amazon SP-API request timeout in milliseconds."
+  type        = number
+  default     = 15000
+}
+
+variable "amazon_retry_max_attempts" {
+  description = "Max retry attempts on Amazon SP-API 429 responses."
+  type        = number
+  default     = 3
+}
+
+variable "mercadolivre_retry_max_attempts" {
+  description = "Max retry attempts on Mercado Livre API 429 responses."
+  type        = number
+  default     = 3
+}
+
+variable "mercadolivre_retry_initial_delay_ms" {
+  description = "Initial backoff delay in milliseconds for Mercado Livre API retries."
+  type        = number
+  default     = 1000
+}
+
+variable "mercadolivre_retry_max_delay_ms" {
+  description = "Maximum backoff delay in milliseconds for Mercado Livre API retries."
+  type        = number
+  default     = 30000
+}
+
 variable "cloudinary_cloud_name" {
   description = "Cloudinary cloud name used by reporting-service."
   type        = string

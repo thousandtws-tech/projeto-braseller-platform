@@ -42,6 +42,7 @@ public class JwtTokenService implements TokenIssuer {
                 .claim("user_id", identity.userId())
                 .claim("email", identity.email())
                 .claim("roles", identity.roles())
+                .claim("accountant_tenant_ids", identity.accountantTenantIds())
                 .signWithSecret(secret);
         return new IssuedTokens(accessToken, accessExpiresAt);
     }

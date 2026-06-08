@@ -1,11 +1,13 @@
 package com.example.infrastructure.persistence;
 
 import com.example.application.command.CreateExpenseCommand;
+import com.example.application.command.CreateProfitDistributionCommand;
 import com.example.application.command.SignAccountingPeriodCommand;
 import com.example.application.command.UpdateExpenseCommand;
 import com.example.application.command.UpsertFiscalProfileCommand;
 import com.example.application.exception.AccountingPeriodClosedException;
 import com.example.application.exception.NotFoundException;
+import com.example.application.exception.ValidationException;
 import com.example.application.port.out.FiscalAccountingRepository;
 import com.example.domain.model.AccountingPeriodClosing;
 import com.example.domain.model.ExpenseAttachment;
@@ -15,6 +17,9 @@ import com.example.domain.model.ExpenseEntry;
 import com.example.domain.model.ExpenseFilter;
 import com.example.domain.model.ExpensePage;
 import com.example.domain.model.FiscalProfile;
+import com.example.domain.model.ProfitAvailability;
+import com.example.domain.model.ProfitDistribution;
+import com.example.domain.model.ProfitPeriodBalance;
 import com.example.domain.model.TaxRegime;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -263,8 +268,8 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
             }
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO accounting_period_closings
-                    (tenant_id, period_month, signed_by_user_id, signed_by_email, signature_hash, signed_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (tenant_id, period_month, signed_by_user_id, signed_by_email, signature_hash, signed_at, distributable_profit)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """)) {
                 statement.setString(1, command.tenantId());
                 statement.setDate(2, Date.valueOf(periodStart(command.periodMonth())));
@@ -272,6 +277,7 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
                 statement.setString(4, command.signedByEmail());
                 statement.setString(5, command.signatureHash());
                 statement.setTimestamp(6, Timestamp.from(java.time.Instant.now()));
+                statement.setBigDecimal(7, command.distributableProfit());
                 statement.executeUpdate();
             }
             return findClosing(connection, command.tenantId(), command.periodMonth())
@@ -299,6 +305,132 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
             return isPeriodClosed(connection, tenantId, date);
         } catch (SQLException exception) {
             throw new RepositoryException("Could not verify accounting period", exception);
+        }
+    }
+
+    @Override
+    public ProfitAvailability profitAvailability(String tenantId) {
+        try (Connection connection = dataSource.getConnection()) {
+            List<ProfitPeriodBalance> periods = new ArrayList<>();
+            BigDecimal totalReleased = BigDecimal.ZERO;
+            BigDecimal totalDistributed = BigDecimal.ZERO;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT c.period_month,
+                           c.signed_at,
+                           c.distributable_profit,
+                           COALESCE(SUM(d.amount), 0) AS distributed_profit
+                    FROM accounting_period_closings c
+                    LEFT JOIN profit_distributions d
+                        ON d.tenant_id = c.tenant_id
+                       AND d.period_month = c.period_month
+                    WHERE c.tenant_id = ?
+                    GROUP BY c.period_month, c.signed_at, c.distributable_profit
+                    ORDER BY c.period_month DESC
+                    """)) {
+                statement.setString(1, tenantId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    while (resultSet.next()) {
+                        BigDecimal distributable = money(resultSet.getBigDecimal("distributable_profit"));
+                        BigDecimal distributed = money(resultSet.getBigDecimal("distributed_profit"));
+                        BigDecimal available = distributable.subtract(distributed);
+                        if (available.compareTo(BigDecimal.ZERO) < 0) {
+                            available = BigDecimal.ZERO;
+                        }
+                        totalReleased = totalReleased.add(distributable);
+                        totalDistributed = totalDistributed.add(distributed);
+                        periods.add(new ProfitPeriodBalance(
+                                YearMonth.from(resultSet.getDate("period_month").toLocalDate()).toString(),
+                                resultSet.getTimestamp("signed_at").toInstant(),
+                                distributable,
+                                distributed,
+                                money(available)
+                        ));
+                    }
+                }
+            }
+            BigDecimal available = totalReleased.subtract(totalDistributed);
+            if (available.compareTo(BigDecimal.ZERO) < 0) {
+                available = BigDecimal.ZERO;
+            }
+            return new ProfitAvailability(tenantId, money(totalReleased), money(totalDistributed), money(available), periods);
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not calculate profit availability", exception);
+        }
+    }
+
+    @Override
+    public List<ProfitDistribution> listProfitDistributions(String tenantId, YearMonth periodMonth) {
+        String sql = """
+                SELECT id, tenant_id, period_month, amount, distributed_at, recipient_name,
+                       notes, created_by_user_id, created_by_email, created_at
+                FROM profit_distributions
+                WHERE tenant_id = ?
+                """ + (periodMonth == null ? "" : " AND period_month = ? ") + """
+                ORDER BY distributed_at DESC, created_at DESC, id ASC
+                """;
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, tenantId);
+            if (periodMonth != null) {
+                statement.setDate(2, Date.valueOf(periodStart(periodMonth)));
+            }
+            List<ProfitDistribution> distributions = new ArrayList<>();
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    distributions.add(readProfitDistribution(resultSet));
+                }
+            }
+            return distributions;
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not list profit distributions", exception);
+        }
+    }
+
+    @Override
+    public ProfitDistribution createProfitDistribution(CreateProfitDistributionCommand command) {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AccountingPeriodClosing closing = findClosing(connection, command.tenantId(), command.periodMonth())
+                        .orElseThrow(() -> new NotFoundException("accounting_period_closing_not_found"));
+                BigDecimal distributed = sumDistributedProfit(connection, command.tenantId(), command.periodMonth());
+                BigDecimal available = money(closing.distributableProfit()).subtract(distributed);
+                if (command.amount().compareTo(available) > 0) {
+                    throw new ValidationException("insufficient_distributable_profit");
+                }
+
+                String id = UUID.randomUUID().toString();
+                Timestamp now = Timestamp.from(Instant.now());
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO profit_distributions
+                        (id, tenant_id, period_month, amount, distributed_at, recipient_name, notes,
+                         created_by_user_id, created_by_email, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """)) {
+                    statement.setString(1, id);
+                    statement.setString(2, command.tenantId());
+                    statement.setDate(3, Date.valueOf(periodStart(command.periodMonth())));
+                    statement.setBigDecimal(4, command.amount());
+                    statement.setDate(5, Date.valueOf(command.distributedAt()));
+                    statement.setString(6, command.recipientName());
+                    statement.setString(7, command.notes());
+                    statement.setString(8, command.createdByUserId());
+                    statement.setString(9, command.createdByEmail());
+                    statement.setTimestamp(10, now);
+                    statement.executeUpdate();
+                }
+                ProfitDistribution distribution = findProfitDistribution(connection, command.tenantId(), id)
+                        .orElseThrow(() -> new RepositoryException("Could not find saved profit distribution", null));
+                connection.commit();
+                return distribution;
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not create profit distribution", exception);
         }
     }
 
@@ -508,7 +640,7 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
 
     private Optional<AccountingPeriodClosing> findClosing(Connection connection, String tenantId, YearMonth periodMonth) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT tenant_id, period_month, signed_by_user_id, signed_by_email, signature_hash, signed_at
+                SELECT tenant_id, period_month, signed_by_user_id, signed_by_email, signature_hash, signed_at, distributable_profit
                 FROM accounting_period_closings
                 WHERE tenant_id = ? AND period_month = ?
                 """)) {
@@ -531,8 +663,61 @@ public class JdbcFiscalAccountingRepository implements FiscalAccountingRepositor
                 resultSet.getString("signed_by_user_id"),
                 resultSet.getString("signed_by_email"),
                 resultSet.getString("signature_hash"),
-                resultSet.getTimestamp("signed_at").toInstant()
+                resultSet.getTimestamp("signed_at").toInstant(),
+                resultSet.getBigDecimal("distributable_profit")
         );
+    }
+
+    private Optional<ProfitDistribution> findProfitDistribution(Connection connection, String tenantId, String id) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT id, tenant_id, period_month, amount, distributed_at, recipient_name,
+                       notes, created_by_user_id, created_by_email, created_at
+                FROM profit_distributions
+                WHERE tenant_id = ? AND id = ?
+                """)) {
+            statement.setString(1, tenantId);
+            statement.setString(2, id);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(readProfitDistribution(resultSet));
+            }
+        }
+    }
+
+    private ProfitDistribution readProfitDistribution(ResultSet resultSet) throws SQLException {
+        return new ProfitDistribution(
+                resultSet.getString("id"),
+                resultSet.getString("tenant_id"),
+                YearMonth.from(resultSet.getDate("period_month").toLocalDate()).toString(),
+                money(resultSet.getBigDecimal("amount")),
+                resultSet.getDate("distributed_at").toLocalDate(),
+                resultSet.getString("recipient_name"),
+                resultSet.getString("notes"),
+                resultSet.getString("created_by_user_id"),
+                resultSet.getString("created_by_email"),
+                resultSet.getTimestamp("created_at").toInstant()
+        );
+    }
+
+    private BigDecimal sumDistributedProfit(Connection connection, String tenantId, YearMonth periodMonth) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COALESCE(SUM(amount), 0) AS total
+                FROM profit_distributions
+                WHERE tenant_id = ? AND period_month = ?
+                """)) {
+            statement.setString(1, tenantId);
+            statement.setDate(2, Date.valueOf(periodStart(periodMonth)));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return money(resultSet.getBigDecimal("total"));
+            }
+        }
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2);
     }
 
     private void ensurePeriodOpen(Connection connection, String tenantId, LocalDate date) throws SQLException {

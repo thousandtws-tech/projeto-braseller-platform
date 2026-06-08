@@ -7,9 +7,12 @@ import com.example.application.command.VerifyPasswordCommand;
 import com.example.application.exception.ConflictException;
 import com.example.application.exception.ForbiddenException;
 import com.example.application.exception.ValidationException;
+import com.example.application.service.CompanyLookupService;
 import com.example.application.service.TenantAuthorizationService;
 import com.example.application.service.UserIdentityService;
 import com.example.domain.model.AccountantAccessView;
+import com.example.domain.model.AccountantClientView;
+import com.example.domain.model.CompanyLookupView;
 import com.example.domain.model.IdentityVerification;
 import com.example.domain.model.RegisteredTenant;
 import com.example.domain.model.TenantContext;
@@ -47,6 +50,9 @@ public class UserResource {
     @Inject
     TenantAuthorizationService tenantAuthorizationService;
 
+    @Inject
+    CompanyLookupService companyLookupService;
+
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     @Operation(summary = "Status do user-service", description = "Verifica se o user-service esta respondendo.")
@@ -75,7 +81,17 @@ public class UserResource {
                             request.tradeName(),
                             request.adminName(),
                             request.email(),
-                            request.password()
+                            request.password(),
+                            request.cnpj(),
+                            request.cnaeCode(),
+                            request.cnaeDescription(),
+                            request.addressStreet(),
+                            request.addressNumber(),
+                            request.addressComplement(),
+                            request.addressNeighborhood(),
+                            request.addressCity(),
+                            request.addressState(),
+                            request.addressZipCode()
                     )))
                     .build();
         } catch (ValidationException exception) {
@@ -144,6 +160,48 @@ public class UserResource {
             @PathParam("tenantId") String tenantId) {
         tenantAuthorizationService.requireTenant(authorizationHeader, tenantId);
         return userIdentityService.listTenantMembers(tenantId);
+    }
+
+    @GET
+    @Path("/company-lookup/cnpj/{cnpj}")
+    @Operation(summary = "Consultar empresa por CNPJ", description = "Busca dados cadastrais basicos na BrasilAPI/Minha Receita para preencher o cadastro automaticamente.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Empresa encontrada.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = CompanyLookupView.class))),
+            @APIResponse(responseCode = "400", description = "CNPJ invalido.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "404", description = "CNPJ nao encontrado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
+    })
+    public Response lookupCompanyByCnpj(@PathParam("cnpj") String cnpj) {
+        try {
+            return companyLookupService.lookupCnpj(cnpj)
+                    .map(company -> Response.ok(company).build())
+                    .orElseGet(() -> Response.status(Response.Status.NOT_FOUND)
+                            .entity(new RestError("cnpj_not_found"))
+                            .build());
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @GET
+    @Path("/accountant/clients")
+    @Operation(summary = "Listar clientes do contador", description = "Retorna todos os tenants com acesso ativo para o contador autenticado, habilitando painel BPO multi-cliente.")
+    @SecurityRequirement(name = "bearerAuth")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Clientes do contador retornados.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = AccountantClientView.class))),
+            @APIResponse(responseCode = "401", description = "Token ausente, invalido ou expirado.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
+            @APIResponse(responseCode = "403", description = "Papel CONTADOR exigido.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
+    })
+    public List<AccountantClientView> listAccountantClients(
+            @Parameter(description = "Bearer JWT emitido pelo auth-service.", required = true)
+            @HeaderParam("Authorization") String authorizationHeader) {
+        TenantContext context = tenantAuthorizationService.requireAuthenticated(authorizationHeader);
+        return userIdentityService.listAccountantClients(context);
     }
 
     @POST
@@ -235,7 +293,23 @@ public class UserResource {
     }
 
     @Schema(name = "RegisterTenantRequest", description = "Dados para criar tenant e usuario administrador inicial.")
-    public record RegisterTenantRequest(String legalName, String tradeName, String adminName, String email, String password) {
+    public record RegisterTenantRequest(
+            String legalName,
+            String tradeName,
+            String adminName,
+            String email,
+            String password,
+            String cnpj,
+            String cnaeCode,
+            String cnaeDescription,
+            String addressStreet,
+            String addressNumber,
+            String addressComplement,
+            String addressNeighborhood,
+            String addressCity,
+            String addressState,
+            String addressZipCode
+    ) {
     }
 
     @Schema(name = "GrantAccountantAccessRequest", description = "Dados para conceder acesso secundario ao contador. firstName e lastName sao obrigatorios pelo Keycloak (realm brasaller).")

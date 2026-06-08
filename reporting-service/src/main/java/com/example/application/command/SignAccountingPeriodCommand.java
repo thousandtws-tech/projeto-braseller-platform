@@ -1,5 +1,6 @@
 package com.example.application.command;
 
+import java.math.BigDecimal;
 import java.time.YearMonth;
 
 public record SignAccountingPeriodCommand(
@@ -7,5 +8,6 @@ public record SignAccountingPeriodCommand(
         YearMonth periodMonth,
         String signedByUserId,
         String signedByEmail,
-        String signatureHash) {
+        String signatureHash,
+        BigDecimal distributableProfit) {
 }

@@ -38,7 +38,8 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
                 return new AuthIdentity(identityId, identity.tenantId(), identity.userId(), identity.email(),
                         identity.fullName(), identity.roles(), identity.status(), identity.provider(),
                         identity.providerSubject(), identity.preferredUsername(), identity.firstName(),
-                        identity.lastName(), identity.pictureUrl(), identity.emailVerified());
+                        identity.lastName(), identity.pictureUrl(), identity.emailVerified(),
+                        identity.accountantTenantIds());
             } catch (SQLException exception) {
                 connection.rollback();
                 throw exception;

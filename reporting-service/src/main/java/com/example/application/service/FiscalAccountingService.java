@@ -1,6 +1,7 @@
 package com.example.application.service;
 
 import com.example.application.command.CreateExpenseCommand;
+import com.example.application.command.CreateProfitDistributionCommand;
 import com.example.application.command.SignAccountingPeriodCommand;
 import com.example.application.command.UpdateExpenseCommand;
 import com.example.application.command.UpsertFiscalProfileCommand;
@@ -8,9 +9,11 @@ import com.example.application.exception.AccountingPeriodClosedException;
 import com.example.application.exception.NotFoundException;
 import com.example.application.exception.ValidationException;
 import com.example.application.event.DreCalculationRequestedEvent;
+import com.example.application.port.out.BankTransactionRepository;
 import com.example.application.port.out.DreCalculationEventPublisher;
 import com.example.application.port.out.DreCalculationJobRepository;
 import com.example.application.port.out.FiscalAccountingRepository;
+import com.example.application.port.out.StockRepository;
 import com.example.domain.model.AccountingPeriodClosing;
 import com.example.domain.model.DreCalculationJob;
 import com.example.domain.model.DreStatement;
@@ -22,6 +25,8 @@ import com.example.domain.model.ExpenseFilter;
 import com.example.domain.model.ExpensePage;
 import com.example.domain.model.FinancialSummary;
 import com.example.domain.model.FiscalProfile;
+import com.example.domain.model.ProfitAvailability;
+import com.example.domain.model.ProfitDistribution;
 import com.example.domain.model.ReportFilter;
 import com.example.domain.model.TaxRegime;
 import com.example.domain.model.TenantContext;
@@ -38,22 +43,45 @@ import java.util.List;
 public class FiscalAccountingService {
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     private static final BigDecimal ONE = BigDecimal.ONE;
+    private static final BigDecimal SIMPLES_MAX_REVENUE = new BigDecimal("4800000.00");
+    private static final BigDecimal PRESUMED_IRPJ_COMMERCE_RATE = new BigDecimal("0.08");
+    private static final BigDecimal PRESUMED_CSLL_COMMERCE_RATE = new BigDecimal("0.12");
+    private static final BigDecimal PRESUMED_PIS_COFINS_RATE = new BigDecimal("0.0365");
+    private static final BigDecimal REAL_PIS_COFINS_RATE = new BigDecimal("0.0925");
+    private static final BigDecimal IRPJ_RATE = new BigDecimal("0.15");
+    private static final BigDecimal IRPJ_ADDITIONAL_RATE = new BigDecimal("0.10");
+    private static final BigDecimal IRPJ_ADDITIONAL_MONTHLY_THRESHOLD = new BigDecimal("20000.00");
+    private static final BigDecimal CSLL_RATE = new BigDecimal("0.09");
+    private static final List<SimplesBracket> SIMPLES_COMMERCE_BRACKETS = List.of(
+            new SimplesBracket(new BigDecimal("180000.00"), new BigDecimal("0.0400"), ZERO),
+            new SimplesBracket(new BigDecimal("360000.00"), new BigDecimal("0.0730"), new BigDecimal("5940.00")),
+            new SimplesBracket(new BigDecimal("720000.00"), new BigDecimal("0.0950"), new BigDecimal("13860.00")),
+            new SimplesBracket(new BigDecimal("1800000.00"), new BigDecimal("0.1070"), new BigDecimal("22500.00")),
+            new SimplesBracket(new BigDecimal("3600000.00"), new BigDecimal("0.1430"), new BigDecimal("87300.00")),
+            new SimplesBracket(SIMPLES_MAX_REVENUE, new BigDecimal("0.1900"), new BigDecimal("378000.00"))
+    );
 
     private final FiscalAccountingRepository fiscalRepository;
     private final ReportingService reportingService;
     private final DreCalculationJobRepository dreCalculationJobRepository;
     private final DreCalculationEventPublisher dreCalculationEventPublisher;
+    private final StockRepository stockRepository;
+    private final BankTransactionRepository bankTransactionRepository;
 
     @Inject
     public FiscalAccountingService(
             FiscalAccountingRepository fiscalRepository,
             ReportingService reportingService,
             DreCalculationJobRepository dreCalculationJobRepository,
-            DreCalculationEventPublisher dreCalculationEventPublisher) {
+            DreCalculationEventPublisher dreCalculationEventPublisher,
+            StockRepository stockRepository,
+            BankTransactionRepository bankTransactionRepository) {
         this.fiscalRepository = fiscalRepository;
         this.reportingService = reportingService;
         this.dreCalculationJobRepository = dreCalculationJobRepository;
         this.dreCalculationEventPublisher = dreCalculationEventPublisher;
+        this.stockRepository = stockRepository;
+        this.bankTransactionRepository = bankTransactionRepository;
     }
 
     public FiscalProfile upsertProfile(UpsertFiscalProfileCommand command) {
@@ -136,12 +164,19 @@ public class FiscalAccountingService {
         if (periodMonth == null) {
             throw new ValidationException("periodMonth is required");
         }
+        BigDecimal distributableProfit = command.distributableProfit();
+        if (distributableProfit == null) {
+            // Calculate from DRE if not provided
+            DreStatement dreStatement = dre(tenantId, periodMonth.atDay(1), periodMonth.atEndOfMonth());
+            distributableProfit = dreStatement.distributableProfit();
+        }
         return fiscalRepository.signClosing(new SignAccountingPeriodCommand(
                 tenantId,
                 periodMonth,
                 requireText(command.signedByUserId(), "signedByUserId"),
                 requireText(command.signedByEmail(), "signedByEmail"),
-                requireText(command.signatureHash(), "signatureHash")
+                requireText(command.signatureHash(), "signatureHash"),
+                distributableProfit
         ));
     }
 
@@ -149,18 +184,45 @@ public class FiscalAccountingService {
         if (signer == null) {
             throw new ValidationException("signer is required");
         }
-        return signClosing(new SignAccountingPeriodCommand(
+        DreStatement dreStatement = dre(tenantId, periodMonth.atDay(1), periodMonth.atEndOfMonth());
+        return fiscalRepository.signClosing(new SignAccountingPeriodCommand(
                 tenantId,
                 periodMonth,
                 signer.userId(),
                 signer.email(),
-                signatureHash
+                signatureHash,
+                dreStatement.distributableProfit()
         ));
     }
 
     public AccountingPeriodClosing closing(String tenantId, YearMonth periodMonth) {
         return fiscalRepository.findClosing(requireText(tenantId, "tenantId"), requirePeriodMonth(periodMonth))
                 .orElseThrow(() -> new NotFoundException("accounting_period_closing_not_found"));
+    }
+
+    public ProfitAvailability profitAvailability(String tenantId) {
+        return fiscalRepository.profitAvailability(requireText(tenantId, "tenantId"));
+    }
+
+    public List<ProfitDistribution> profitDistributions(String tenantId, YearMonth periodMonth) {
+        return fiscalRepository.listProfitDistributions(requireText(tenantId, "tenantId"), periodMonth);
+    }
+
+    public ProfitDistribution createProfitDistribution(CreateProfitDistributionCommand command) {
+        if (command == null) {
+            throw new ValidationException("profit_distribution is required");
+        }
+        YearMonth periodMonth = requirePeriodMonth(command.periodMonth());
+        return fiscalRepository.createProfitDistribution(new CreateProfitDistributionCommand(
+                requireText(command.tenantId(), "tenantId"),
+                periodMonth,
+                moneyPositive(command.amount()),
+                command.distributedAt() == null ? LocalDate.now() : command.distributedAt(),
+                trimToNull(command.recipientName()),
+                trimToNull(command.notes()),
+                requireText(command.createdByUserId(), "createdByUserId"),
+                requireText(command.createdByEmail(), "createdByEmail")
+        ));
     }
 
     public DreStatement dre(String tenantId, LocalDate from, LocalDate to) {
@@ -171,18 +233,26 @@ public class FiscalAccountingService {
         ExpenseFilter expenseFilter = new ExpenseFilter(period.from(), period.to(), null, null, null);
         FinancialSummary summary = reportingService.summary(resolvedTenantId, reportFilter);
         FiscalProfile profile = fiscalRepository.findProfile(resolvedTenantId).orElse(null);
-        BigDecimal estimatedTaxRate = profile == null ? BigDecimal.ZERO : profile.estimatedTaxRate();
         BigDecimal grossRevenue = money(summary.grossValue());
         BigDecimal marketplaceFees = money(summary.feeValue());
-        BigDecimal estimatedTaxes = grossRevenue.multiply(estimatedTaxRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal cmv = money(stockRepository.sumCmv(resolvedTenantId, period.from(), period.to()));
         BigDecimal operatingExpenses = money(fiscalRepository.sumExpenses(resolvedTenantId, expenseFilter));
+        BigDecimal bankingExpenses = money(bankTransactionRepository.sumExpenses(resolvedTenantId, period.from(), period.to()));
         long expenseCount = fiscalRepository.countExpenses(resolvedTenantId, expenseFilter);
         List<ExpenseCategoryTotal> expensesByCategory = fiscalRepository.sumExpensesByCategory(resolvedTenantId, expenseFilter);
-        BigDecimal netResult = grossRevenue
+        BigDecimal resultBeforeTaxes = grossRevenue
                 .subtract(marketplaceFees)
-                .subtract(estimatedTaxes)
+                .subtract(cmv)
                 .subtract(operatingExpenses)
+                .subtract(bankingExpenses)
                 .setScale(2, RoundingMode.HALF_UP);
+        TaxEstimate taxEstimate = taxEstimate(resolvedTenantId, period, profile, grossRevenue, resultBeforeTaxes);
+        BigDecimal estimatedTaxRate = taxEstimate.effectiveRate();
+        BigDecimal estimatedTaxes = taxEstimate.amount();
+        BigDecimal netResult = resultBeforeTaxes
+                .subtract(estimatedTaxes)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal distributableProfit = netResult.compareTo(ZERO) > 0 ? netResult : ZERO;
 
         return new DreStatement(
                 resolvedTenantId,
@@ -193,8 +263,11 @@ public class FiscalAccountingService {
                 grossRevenue,
                 marketplaceFees,
                 estimatedTaxes,
+                cmv,
                 operatingExpenses,
+                bankingExpenses,
                 netResult,
+                distributableProfit,
                 summary.entryCount(),
                 expenseCount,
                 expensesByCategory
@@ -317,6 +390,9 @@ public class FiscalAccountingService {
 
     private BigDecimal rate(BigDecimal value) {
         BigDecimal rate = value == null ? BigDecimal.ZERO : value;
+        if (rate.compareTo(ONE) > 0 && rate.compareTo(new BigDecimal("100.00")) <= 0) {
+            rate = rate.divide(new BigDecimal("100.00"), 6, RoundingMode.HALF_UP);
+        }
         if (rate.compareTo(BigDecimal.ZERO) < 0 || rate.compareTo(ONE) > 0) {
             throw new ValidationException("estimated_tax_rate_must_be_between_0_and_1");
         }
@@ -348,6 +424,111 @@ public class FiscalAccountingService {
         return value == null ? ZERO : value.setScale(2, RoundingMode.HALF_UP);
     }
 
+    private TaxEstimate taxEstimate(String tenantId, DrePeriod period, FiscalProfile profile, BigDecimal grossRevenue, BigDecimal resultBeforeTaxes) {
+        if (grossRevenue.compareTo(ZERO) <= 0) {
+            return new TaxEstimate(ZERO, fallbackRate(profile));
+        }
+        if (profile == null || profile.taxRegime() == null) {
+            BigDecimal rate = fallbackRate(profile);
+            return new TaxEstimate(money(grossRevenue.multiply(rate)), rate);
+        }
+        return switch (profile.taxRegime()) {
+            case SIMPLES_NACIONAL -> simplesTaxEstimate(tenantId, period, profile, grossRevenue);
+            case LUCRO_PRESUMIDO -> lucroPresumidoTaxEstimate(period, profile, grossRevenue);
+            case LUCRO_REAL -> lucroRealTaxEstimate(period, profile, grossRevenue, resultBeforeTaxes);
+        };
+    }
+
+    private TaxEstimate simplesTaxEstimate(String tenantId, DrePeriod period, FiscalProfile profile, BigDecimal grossRevenue) {
+        BigDecimal rbt12 = rollingGrossRevenue(tenantId, period);
+        BigDecimal referenceRevenue = rbt12.compareTo(ZERO) > 0 ? rbt12 : grossRevenue;
+        if (referenceRevenue.compareTo(ZERO) <= 0) {
+            BigDecimal rate = fallbackRate(profile);
+            return new TaxEstimate(money(grossRevenue.multiply(rate)), rate);
+        }
+        SimplesBracket bracket = simplesBracket(referenceRevenue);
+        BigDecimal effectiveRate = referenceRevenue.multiply(bracket.nominalRate())
+                .subtract(bracket.deduction())
+                .divide(referenceRevenue, 6, RoundingMode.HALF_UP)
+                .max(BigDecimal.ZERO)
+                .min(ONE)
+                .setScale(4, RoundingMode.HALF_UP);
+        return new TaxEstimate(money(grossRevenue.multiply(effectiveRate)), effectiveRate);
+    }
+
+    private TaxEstimate lucroPresumidoTaxEstimate(DrePeriod period, FiscalProfile profile, BigDecimal grossRevenue) {
+        int months = monthsInPeriod(period);
+        BigDecimal irpjBase = grossRevenue.multiply(PRESUMED_IRPJ_COMMERCE_RATE);
+        BigDecimal csllBase = grossRevenue.multiply(PRESUMED_CSLL_COMMERCE_RATE);
+        BigDecimal taxes = grossRevenue.multiply(PRESUMED_PIS_COFINS_RATE)
+                .add(irpjBase.multiply(IRPJ_RATE))
+                .add(irpjAdditional(irpjBase, months))
+                .add(csllBase.multiply(CSLL_RATE));
+        BigDecimal amount = money(taxes);
+        return new TaxEstimate(amount, effectiveRate(grossRevenue, amount, fallbackRate(profile)));
+    }
+
+    private TaxEstimate lucroRealTaxEstimate(DrePeriod period, FiscalProfile profile, BigDecimal grossRevenue, BigDecimal resultBeforeTaxes) {
+        int months = monthsInPeriod(period);
+        BigDecimal taxableProfit = resultBeforeTaxes.max(BigDecimal.ZERO);
+        BigDecimal taxes = grossRevenue.multiply(REAL_PIS_COFINS_RATE)
+                .add(taxableProfit.multiply(IRPJ_RATE))
+                .add(irpjAdditional(taxableProfit, months))
+                .add(taxableProfit.multiply(CSLL_RATE));
+        BigDecimal amount = money(taxes);
+        return new TaxEstimate(amount, effectiveRate(grossRevenue, amount, fallbackRate(profile)));
+    }
+
+    private BigDecimal rollingGrossRevenue(String tenantId, DrePeriod period) {
+        LocalDate to = period.from().minusDays(1);
+        LocalDate from = period.from().minusMonths(12);
+        if (to.isBefore(from)) {
+            return ZERO;
+        }
+        ReportFilter filter = new ReportFilter(from, to, null, null, null, null, null, null, null, null);
+        return money(reportingService.summary(tenantId, filter).grossValue());
+    }
+
+    private SimplesBracket simplesBracket(BigDecimal referenceRevenue) {
+        for (SimplesBracket bracket : SIMPLES_COMMERCE_BRACKETS) {
+            if (referenceRevenue.compareTo(bracket.limit()) <= 0) {
+                return bracket;
+            }
+        }
+        return SIMPLES_COMMERCE_BRACKETS.get(SIMPLES_COMMERCE_BRACKETS.size() - 1);
+    }
+
+    private BigDecimal irpjAdditional(BigDecimal base, int months) {
+        BigDecimal threshold = IRPJ_ADDITIONAL_MONTHLY_THRESHOLD.multiply(BigDecimal.valueOf(Math.max(1, months)));
+        BigDecimal excess = base.subtract(threshold);
+        if (excess.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return excess.multiply(IRPJ_ADDITIONAL_RATE);
+    }
+
+    private int monthsInPeriod(DrePeriod period) {
+        YearMonth from = YearMonth.from(period.from());
+        YearMonth to = YearMonth.from(period.to());
+        return Math.max(1, (to.getYear() - from.getYear()) * 12 + to.getMonthValue() - from.getMonthValue() + 1);
+    }
+
+    private BigDecimal fallbackRate(FiscalProfile profile) {
+        return profile == null || profile.estimatedTaxRate() == null
+                ? BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP)
+                : profile.estimatedTaxRate().setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal effectiveRate(BigDecimal grossRevenue, BigDecimal taxes, BigDecimal fallbackRate) {
+        if (grossRevenue == null || grossRevenue.compareTo(ZERO) <= 0) {
+            return fallbackRate;
+        }
+        return taxes.divide(grossRevenue, 6, RoundingMode.HALF_UP)
+                .max(BigDecimal.ZERO)
+                .min(ONE)
+                .setScale(4, RoundingMode.HALF_UP);
+    }
+
     private String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new ValidationException(fieldName + " is required");
@@ -360,5 +541,11 @@ public class FiscalAccountingService {
     }
 
     private record DrePeriod(LocalDate from, LocalDate to) {
+    }
+
+    private record TaxEstimate(BigDecimal amount, BigDecimal effectiveRate) {
+    }
+
+    private record SimplesBracket(BigDecimal limit, BigDecimal nominalRate, BigDecimal deduction) {
     }
 }

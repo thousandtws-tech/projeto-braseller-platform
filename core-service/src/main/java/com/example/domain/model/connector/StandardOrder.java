@@ -1,5 +1,6 @@
 package com.example.domain.model.connector;
 
+import com.example.domain.enums.PaymentMethod;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;

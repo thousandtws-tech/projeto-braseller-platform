@@ -109,8 +109,11 @@ public class JdbcDreCalculationJobRepository implements DreCalculationJobReposit
                         gross_revenue = ?,
                         marketplace_fees = ?,
                         estimated_taxes = ?,
+                        cmv = ?,
                         operating_expenses = ?,
+                        banking_expenses = ?,
                         net_result = ?,
+                        distributable_profit = ?,
                         sales_count = ?,
                         expense_count = ?,
                         expenses_by_category_json = ?
@@ -123,12 +126,15 @@ public class JdbcDreCalculationJobRepository implements DreCalculationJobReposit
                 preparedStatement.setBigDecimal(5, statement.grossRevenue());
                 preparedStatement.setBigDecimal(6, statement.marketplaceFees());
                 preparedStatement.setBigDecimal(7, statement.estimatedTaxes());
-                preparedStatement.setBigDecimal(8, statement.operatingExpenses());
-                preparedStatement.setBigDecimal(9, statement.netResult());
-                preparedStatement.setLong(10, statement.salesCount());
-                preparedStatement.setLong(11, statement.expenseCount());
-                preparedStatement.setString(12, expensesJson(statement.expensesByCategory()));
-                preparedStatement.setString(13, jobId);
+                preparedStatement.setBigDecimal(8, statement.cmv());
+                preparedStatement.setBigDecimal(9, statement.operatingExpenses());
+                preparedStatement.setBigDecimal(10, statement.bankingExpenses());
+                preparedStatement.setBigDecimal(11, statement.netResult());
+                preparedStatement.setBigDecimal(12, statement.distributableProfit());
+                preparedStatement.setLong(13, statement.salesCount());
+                preparedStatement.setLong(14, statement.expenseCount());
+                preparedStatement.setString(15, expensesJson(statement.expensesByCategory()));
+                preparedStatement.setString(16, jobId);
                 preparedStatement.executeUpdate();
             }
             return find(connection, statement.tenantId(), jobId)
@@ -246,8 +252,11 @@ public class JdbcDreCalculationJobRepository implements DreCalculationJobReposit
                 money(resultSet, "gross_revenue"),
                 money(resultSet, "marketplace_fees"),
                 money(resultSet, "estimated_taxes"),
+                money(resultSet, "cmv"),
                 money(resultSet, "operating_expenses"),
+                money(resultSet, "banking_expenses"),
                 money(resultSet, "net_result"),
+                money(resultSet, "net_result").max(BigDecimal.ZERO),
                 resultSet.getLong("sales_count"),
                 resultSet.getLong("expense_count"),
                 expenses(resultSet.getString("expenses_by_category_json"))

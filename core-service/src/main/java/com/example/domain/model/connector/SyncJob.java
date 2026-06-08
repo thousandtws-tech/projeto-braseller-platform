@@ -1,5 +1,6 @@
 package com.example.domain.model.connector;
 
+import com.example.domain.enums.SyncJobStatus;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;

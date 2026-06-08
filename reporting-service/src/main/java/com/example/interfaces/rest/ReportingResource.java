@@ -1,13 +1,18 @@
 package com.example.interfaces.rest;
 
 import com.example.application.command.CreateExpenseCommand;
+import com.example.application.command.CreateProfitDistributionCommand;
 import com.example.application.command.UpdateExpenseCommand;
 import com.example.application.command.UpsertReportEntryCommand;
 import com.example.application.command.UpsertFiscalProfileCommand;
+import com.example.application.exception.NotFoundException;
 import com.example.application.exception.ValidationException;
 import com.example.application.service.ClicksignWebhookService;
 import com.example.application.service.CloudinaryUploadSignatureService;
 import com.example.application.service.FiscalAccountingService;
+import com.example.application.service.BankTransactionService;
+import com.example.application.service.InvoiceTrackingService;
+import com.example.application.service.StockService;
 import com.example.application.service.ReportExportService;
 import com.example.application.service.ReportingService;
 import com.example.application.service.TenantAuthorizationService;
@@ -23,12 +28,18 @@ import com.example.domain.model.ExpenseCategory;
 import com.example.domain.model.ExpenseEntry;
 import com.example.domain.model.ExpenseFilter;
 import com.example.domain.model.ExpensePage;
+import com.example.domain.model.BankTransaction;
+import com.example.domain.model.InvoiceEntry;
+import com.example.domain.model.PurchaseEntry;
+import com.example.domain.model.StockItem;
 import com.example.domain.model.FinancialSummary;
 import com.example.domain.model.FiscalProfile;
 import com.example.domain.model.MonthlyEvolutionPoint;
 import com.example.domain.model.PaymentMethod;
 import com.example.domain.model.PaymentReleaseAlert;
 import com.example.domain.model.PlatformComparisonPoint;
+import com.example.domain.model.ProfitAvailability;
+import com.example.domain.model.ProfitDistribution;
 import com.example.domain.model.ReportEntry;
 import com.example.domain.model.ReportEntryPage;
 import com.example.domain.model.ReportEntryStatus;
@@ -61,10 +72,16 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 @Path("/reports")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -91,6 +108,15 @@ public class ReportingResource {
 
     @Inject
     ConfiguredInternalServiceAuthorizer internalServiceAuthorizer;
+
+    @Inject
+    InvoiceTrackingService invoiceTrackingService;
+
+    @Inject
+    StockService stockService;
+
+    @Inject
+    BankTransactionService bankTransactionService;
 
     @GET
     @Produces(MediaType.TEXT_PLAIN)
@@ -442,6 +468,127 @@ public class ReportingResource {
         return fiscalAccountingService.signClosing(tenantId, parseMonth(month), signer, request.signatureHash());
     }
 
+    @POST
+    @Path("/bpo/closings/{month}/batch-sign")
+    @Operation(summary = "Assinar fechamentos em lote", description = "Permite ao contador assinar fechamentos de varios clientes vinculados em uma unica operacao BPO.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = BatchAccountingPeriodSignatureRequest.class)))
+    public BatchAccountingPeriodSignatureResponse batchSignAccountingClosings(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("month") String month,
+            BatchAccountingPeriodSignatureRequest request) {
+        YearMonth periodMonth = parseMonth(month);
+        List<String> tenantIds = normalizeTenantIds(request == null ? null : request.tenantIds());
+        String signatureHash = request == null ? null : request.signatureHash();
+        if (signatureHash == null || signatureHash.isBlank()) {
+            throw new ValidationException("signature_hash is required");
+        }
+        TenantContext signer = tenantAuthorizationService.requireBatchClosingSigner(authorizationHeader, tenantIds);
+
+        List<BatchAccountingPeriodSignatureResult> results = new ArrayList<>();
+        int signed = 0;
+        int skipped = 0;
+        int failed = 0;
+
+        for (String tenantId : tenantIds) {
+            try {
+                try {
+                    AccountingPeriodClosing existing = fiscalAccountingService.closing(tenantId, periodMonth);
+                    results.add(new BatchAccountingPeriodSignatureResult(
+                            tenantId,
+                            "SKIPPED",
+                            "already_signed",
+                            existing
+                    ));
+                    skipped++;
+                    continue;
+                } catch (NotFoundException ignored) {
+                    // Open period: continue and sign below.
+                }
+
+                AccountingPeriodClosing closing = fiscalAccountingService.signClosing(
+                        tenantId,
+                        periodMonth,
+                        signer,
+                        signatureHash + ":" + tenantId
+                );
+                results.add(new BatchAccountingPeriodSignatureResult(
+                        tenantId,
+                        "SIGNED",
+                        "signed",
+                        closing
+                ));
+                signed++;
+            } catch (RuntimeException exception) {
+                results.add(new BatchAccountingPeriodSignatureResult(
+                        tenantId,
+                        "ERROR",
+                        exception.getMessage() == null ? "batch_sign_failed" : exception.getMessage(),
+                        null
+                ));
+                failed++;
+            }
+        }
+
+        return new BatchAccountingPeriodSignatureResponse(
+                periodMonth.toString(),
+                tenantIds.size(),
+                signed,
+                skipped,
+                failed,
+                results
+        );
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/profit/available")
+    @Operation(summary = "Consultar lucro disponivel", description = "Consolida lucro liberado por fechamentos assinados, retiradas registradas e saldo disponivel para distribuicao.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ProfitAvailability profitAvailability(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.profitAvailability(tenantId);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/profit/distributions")
+    @Operation(summary = "Listar distribuicoes de lucro", description = "Lista retiradas/distribuicoes registradas para o tenant, opcionalmente filtradas por mes fechado.")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<ProfitDistribution> profitDistributions(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("month") String month) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.profitDistributions(tenantId, month == null || month.isBlank() ? null : parseMonth(month));
+    }
+
+    @POST
+    @Path("/tenants/{tenantId}/profit/distributions")
+    @Operation(summary = "Registrar distribuicao de lucro", description = "Registra uma retirada contra um periodo contabil assinado e abate o saldo disponivel.")
+    @SecurityRequirement(name = "bearerAuth")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ProfitDistributionRequest.class)))
+    public Response createProfitDistribution(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            ProfitDistributionRequest request) {
+        TenantContext actor = tenantAuthorizationService.requireWritable(authorizationHeader, tenantId);
+        if (request == null) {
+            throw new ValidationException("profit_distribution is required");
+        }
+        ProfitDistribution distribution = fiscalAccountingService.createProfitDistribution(new CreateProfitDistributionCommand(
+                tenantId,
+                parseRequiredMonth(request.periodMonth()),
+                request.amount(),
+                request.distributedAt(),
+                request.recipientName(),
+                request.notes(),
+                actor.userId(),
+                actor.email()
+        ));
+        return Response.status(Response.Status.CREATED).entity(distribution).build();
+    }
+
     @GET
     @Path("/tenants/{tenantId}/exports/monthly")
     @Produces({"application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv"})
@@ -489,6 +636,7 @@ public class ReportingResource {
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ReportEntryIngestRequest.class)))
     public Response ingest(@HeaderParam("X-Internal-Token") String internalToken, ReportEntryIngestRequest request) {
         internalServiceAuthorizer.requireInternal(internalToken);
+        ReportEntryStatus status = parseStatus(request.status());
         ReportEntry entry = reportingService.upsert(new UpsertReportEntryCommand(
                 request.tenantId(),
                 request.platform(),
@@ -499,11 +647,12 @@ public class ReportingResource {
                 request.feeValue(),
                 request.receivableValue(),
                 parsePaymentMethod(request.paymentMethod()),
-                parseStatus(request.status()),
+                status,
                 request.releaseDate(),
                 request.buyerName(),
                 request.invoiceNumber()
         ));
+        reconcileStockMovements(request, entry);
         return Response.status(Response.Status.CREATED).entity(entry).build();
     }
 
@@ -588,6 +737,60 @@ public class ReportingResource {
         return Response.status(Response.Status.CREATED).entity(entry).build();
     }
 
+    private void reconcileStockMovements(ReportEntryIngestRequest request, ReportEntry entry) {
+        if (entry == null) {
+            return;
+        }
+        if (isSaleStatus(entry.status())) {
+            recordStockExits(request, entry);
+            return;
+        }
+        if (isReversalStatus(entry.status())) {
+            stockService.reverseSaleMovements(entry.tenantId(), entry.orderId(), entry.saleDate());
+        }
+    }
+
+    private void recordStockExits(ReportEntryIngestRequest request, ReportEntry entry) {
+        if (!isSaleStatus(entry.status())) {
+            return;
+        }
+
+        Map<String, BigDecimal> quantitiesBySku = new LinkedHashMap<>();
+        for (ReportEntryItemRequest item : request.items()) {
+            if (item == null) {
+                continue;
+            }
+            String sku = normalizeSku(item.sku());
+            BigDecimal quantity = positiveQuantity(item.quantity());
+            if (sku == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            quantitiesBySku.merge(sku, quantity, BigDecimal::add);
+        }
+
+        quantitiesBySku.forEach((sku, quantity) ->
+                stockService.recordSaleMovement(entry.tenantId(), sku, quantity, entry.orderId(), entry.saleDate()));
+    }
+
+    private boolean isSaleStatus(ReportEntryStatus status) {
+        return status == ReportEntryStatus.PAID
+                || status == ReportEntryStatus.PENDING_RELEASE
+                || status == ReportEntryStatus.RECEIVED;
+    }
+
+    private boolean isReversalStatus(ReportEntryStatus status) {
+        return status == ReportEntryStatus.CANCELLED
+                || status == ReportEntryStatus.REFUNDED;
+    }
+
+    private String normalizeSku(String sku) {
+        return sku == null || sku.isBlank() ? null : sku.trim();
+    }
+
+    private BigDecimal positiveQuantity(BigDecimal quantity) {
+        return quantity == null ? BigDecimal.ZERO : quantity;
+    }
+
     private YearMonth parseMonth(String value) {
         if (value == null || value.isBlank()) {
             return YearMonth.now();
@@ -597,6 +800,32 @@ public class ReportingResource {
         } catch (DateTimeParseException exception) {
             throw new ValidationException("invalid_month");
         }
+    }
+
+    private YearMonth parseRequiredMonth(String value) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException("period_month is required");
+        }
+        return parseMonth(value);
+    }
+
+    private List<String> normalizeTenantIds(List<String> tenantIds) {
+        if (tenantIds == null || tenantIds.isEmpty()) {
+            throw new ValidationException("tenant_ids is required");
+        }
+        Set<String> unique = new LinkedHashSet<>();
+        for (String tenantId : tenantIds) {
+            if (tenantId != null && !tenantId.isBlank()) {
+                unique.add(tenantId.trim());
+            }
+        }
+        if (unique.isEmpty()) {
+            throw new ValidationException("tenant_ids is required");
+        }
+        if (unique.size() > 100) {
+            throw new ValidationException("tenant_ids_limit_exceeded");
+        }
+        return List.copyOf(unique);
     }
 
     private ReportExportFormat parseExportFormat(String value) {
@@ -688,7 +917,20 @@ public class ReportingResource {
             @JsonProperty("status") String status,
             @JsonProperty("release_date") LocalDate releaseDate,
             @JsonProperty("buyer_name") String buyerName,
+            @JsonProperty("items") List<ReportEntryItemRequest> items,
             @JsonProperty("invoice_number") String invoiceNumber) {
+        public ReportEntryIngestRequest {
+            items = items == null ? List.of() : List.copyOf(items);
+        }
+    }
+
+    @Schema(name = "ReportEntryItemRequest")
+    public record ReportEntryItemRequest(
+            @JsonProperty("sku") String sku,
+            @JsonProperty("title") String title,
+            @JsonProperty("quantity") BigDecimal quantity,
+            @JsonProperty("unit_value") BigDecimal unitValue,
+            @JsonProperty("gross_value") BigDecimal grossValue) {
     }
 
     @Schema(name = "FiscalProfileRequest")
@@ -722,10 +964,188 @@ public class ReportingResource {
             @JsonProperty("signature_hash") String signatureHash) {
     }
 
+    @Schema(name = "BatchAccountingPeriodSignatureRequest")
+    public record BatchAccountingPeriodSignatureRequest(
+            @JsonProperty("tenant_ids") List<String> tenantIds,
+            @JsonProperty("signature_hash") String signatureHash) {
+    }
+
+    @Schema(name = "BatchAccountingPeriodSignatureResponse")
+    public record BatchAccountingPeriodSignatureResponse(
+            @JsonProperty("period_month") String periodMonth,
+            @JsonProperty("requested_count") int requestedCount,
+            @JsonProperty("signed_count") int signedCount,
+            @JsonProperty("skipped_count") int skippedCount,
+            @JsonProperty("failed_count") int failedCount,
+            @JsonProperty("results") List<BatchAccountingPeriodSignatureResult> results) {
+    }
+
+    @Schema(name = "BatchAccountingPeriodSignatureResult")
+    public record BatchAccountingPeriodSignatureResult(
+            @JsonProperty("tenant_id") String tenantId,
+            @JsonProperty("status") String status,
+            @JsonProperty("message") String message,
+            @JsonProperty("closing") AccountingPeriodClosing closing) {
+    }
+
+    @Schema(name = "ProfitDistributionRequest")
+    public record ProfitDistributionRequest(
+            @JsonProperty("period_month") String periodMonth,
+            @JsonProperty("amount") BigDecimal amount,
+            @JsonProperty("distributed_at") LocalDate distributedAt,
+            @JsonProperty("recipient_name") String recipientName,
+            @JsonProperty("notes") String notes) {
+    }
+
     @Schema(name = "DreCalculationRequest")
     public record DreCalculationRequest(
             @JsonProperty("from") LocalDate from,
             @JsonProperty("to") LocalDate to) {
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/invoices")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Listar NF-es rastreadas", description = "Retorna NF-es registradas para o tenant no periodo.")
+    public List<InvoiceEntry> getInvoices(
+            @HeaderParam("Authorization") String authHeader,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("from") LocalDate from,
+            @QueryParam("to") LocalDate to) {
+        tenantAuthorizationService.requireReadable(authHeader, tenantId);
+        LocalDate fromDate = from != null ? from : LocalDate.now().withDayOfMonth(1);
+        LocalDate toDate = to != null ? to : LocalDate.now();
+        return invoiceTrackingService.listByPeriod(tenantId, fromDate, toDate);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/invoices/unmatched")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "NF-es sem lancamento", description = "Retorna NF-es que nao possuem lancamento correspondente no periodo (nao reconciliadas).")
+    public List<InvoiceEntry> getUnmatchedInvoices(
+            @HeaderParam("Authorization") String authHeader,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("from") LocalDate from,
+            @QueryParam("to") LocalDate to) {
+        tenantAuthorizationService.requireReadable(authHeader, tenantId);
+        LocalDate fromDate = from != null ? from : LocalDate.now().withDayOfMonth(1);
+        LocalDate toDate = to != null ? to : LocalDate.now();
+        return invoiceTrackingService.listUnmatched(tenantId, fromDate, toDate);
+    }
+
+    // ─── Estoque / CMV ────────────────────────────────────────────────────────
+
+    @GET
+    @Path("/tenants/{tenantId}/stock/items")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Listar itens do estoque")
+    public List<StockItemResponse> listStockItems(
+            @HeaderParam("Authorization") String auth,
+            @PathParam("tenantId") String tenantId) {
+        tenantAuthorizationService.requireReadable(auth, tenantId);
+        return stockService.listItems(tenantId).stream()
+                .map(StockItemResponse::from)
+                .toList();
+    }
+
+    @POST
+    @Path("/tenants/{tenantId}/stock/items")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Cadastrar ou atualizar item do estoque")
+    public StockItemResponse upsertStockItem(
+            @HeaderParam("Authorization") String auth,
+            @PathParam("tenantId") String tenantId,
+            StockItemRequest request) {
+        tenantAuthorizationService.requireWritable(auth, tenantId);
+        return StockItemResponse.from(stockService.upsertStockItem(tenantId, request.sku(), request.description(), request.unitCost()));
+    }
+
+    @POST
+    @Path("/tenants/{tenantId}/stock/nfe-import")
+    @Consumes("text/xml")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Importar NF-e de fornecedor (XML)", description = "Faz upload do XML da NF-e do fornecedor para alimentar o estoque com custo de aquisicao.")
+    public PurchaseEntry importNfeXml(
+            @HeaderParam("Authorization") String auth,
+            @PathParam("tenantId") String tenantId,
+            String xmlContent) {
+        tenantAuthorizationService.requireWritable(auth, tenantId);
+        return stockService.importNfeXml(tenantId, xmlContent);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/stock/purchases")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Listar entradas de NF-e de fornecedores")
+    public List<PurchaseEntry> listPurchaseEntries(
+            @HeaderParam("Authorization") String auth,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("from") LocalDate from,
+            @QueryParam("to") LocalDate to) {
+        tenantAuthorizationService.requireReadable(auth, tenantId);
+        LocalDate fromDate = from != null ? from : LocalDate.now().withDayOfMonth(1);
+        LocalDate toDate = to != null ? to : LocalDate.now();
+        return stockService.listPurchaseEntries(tenantId, fromDate, toDate);
+    }
+
+    // ─── Extrato Bancário / OFX ───────────────────────────────────────────────
+
+    @POST
+    @Path("/tenants/{tenantId}/bank/ofx-import")
+    @Consumes(MediaType.TEXT_PLAIN)
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Importar extrato bancário OFX", description = "Importa extrato da conta PJ no formato OFX para categorizar despesas financeiras automaticamente.")
+    public List<BankTransaction> importOfx(
+            @HeaderParam("Authorization") String auth,
+            @PathParam("tenantId") String tenantId,
+            String ofxContent) {
+        tenantAuthorizationService.requireWritable(auth, tenantId);
+        return bankTransactionService.importOfx(tenantId, ofxContent);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/bank/transactions")
+    @SecurityRequirement(name = "bearer")
+    @Operation(summary = "Listar transações bancárias importadas")
+    public List<BankTransaction> listBankTransactions(
+            @HeaderParam("Authorization") String auth,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("from") LocalDate from,
+            @QueryParam("to") LocalDate to) {
+        tenantAuthorizationService.requireReadable(auth, tenantId);
+        LocalDate fromDate = from != null ? from : LocalDate.now().withDayOfMonth(1);
+        LocalDate toDate = to != null ? to : LocalDate.now();
+        return bankTransactionService.listByPeriod(tenantId, fromDate, toDate);
+    }
+
+    @Schema(name = "StockItemResponse")
+    public record StockItemResponse(
+            @JsonProperty("id") String id,
+            @JsonProperty("tenant_id") String tenantId,
+            @JsonProperty("sku") String sku,
+            @JsonProperty("description") String description,
+            @JsonProperty("unit_cost") BigDecimal unitCost,
+            @JsonProperty("quantity") BigDecimal quantity,
+            @JsonProperty("created_at") LocalDateTime createdAt,
+            @JsonProperty("updated_at") LocalDateTime updatedAt) {
+        static StockItemResponse from(StockItem item) {
+            return new StockItemResponse(
+                    item.id(),
+                    item.tenantId(),
+                    item.sku(),
+                    item.description(),
+                    item.unitCost(),
+                    item.quantity(),
+                    item.createdAt(),
+                    item.updatedAt());
+        }
+    }
+
+    @Schema(name = "StockItemRequest")
+    public record StockItemRequest(
+            @JsonProperty("sku") String sku,
+            @JsonProperty("description") String description,
+            @JsonProperty("unit_cost") BigDecimal unitCost) {
     }
 
     @Schema(name = "PublicReportEntryImportRequest")

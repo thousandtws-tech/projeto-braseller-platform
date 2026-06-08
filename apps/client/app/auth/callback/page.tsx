@@ -22,7 +22,17 @@ export default function AuthCallbackPage({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
     })
-      .then(() => router.replace('/dashboard'))
+      .then(async (res) => {
+        if (res.ok) {
+          router.replace('/dashboard')
+          return
+        }
+        const body = await res.json().catch(() => ({})) as { message?: string }
+        const errorCode = body.message === 'google_account_not_registered'
+          ? 'google_account_not_registered'
+          : 'oauth_failed'
+        router.replace(`/login?error=${errorCode}`)
+      })
       .catch(() => router.replace('/login?error=oauth_failed'))
   }, [code, error, router])
 

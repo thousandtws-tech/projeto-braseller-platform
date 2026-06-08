@@ -36,6 +36,15 @@ class ExampleResourceTest {
                         {
                           "legalName": "Brasaller Test LTDA",
                           "tradeName": "Brasaller Test",
+                          "cnpj": "19.131.243/0001-97",
+                          "cnaeCode": "4781400",
+                          "cnaeDescription": "Comercio varejista de artigos do vestuario e acessorios",
+                          "addressStreet": "Avenida Brasil",
+                          "addressNumber": "1000",
+                          "addressNeighborhood": "Centro",
+                          "addressCity": "Sao Paulo",
+                          "addressState": "SP",
+                          "addressZipCode": "01001000",
                           "adminName": "Owner Test",
                           "email": "%s",
                           "password": "ChangeMe123!"
@@ -45,6 +54,10 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(201)
                 .body("tenant.status", is("ACTIVE"))
+                .body("tenant.cnpj", is("19131243000197"))
+                .body("tenant.cnaeCode", is("4781400"))
+                .body("tenant.addressCity", is("Sao Paulo"))
+                .body("tenant.addressState", is("SP"))
                 .body("adminUser.email", is(email))
                 .body("adminUser.fullName", is("Owner Test"))
                 .body("adminUser.preferredUsername", is(email))
@@ -203,7 +216,8 @@ class ExampleResourceTest {
                 .body("""
                         {
                           "email": "%s",
-                          "fullName": "Contador Teste",
+                          "firstName": "Contador",
+                          "lastName": "Teste",
                           "temporaryPassword": "ChangeMe123!"
                         }
                         """.formatted(accountantEmail))
@@ -221,6 +235,151 @@ class ExampleResourceTest {
                 .statusCode(200)
                 .body("email", hasItem(ownerEmail))
                 .body("email", hasItem(accountantEmail));
+    }
+
+    @Test
+    void accountantCanListAllGrantedClientsForBpoPanel() {
+        String accountantEmail = "bpo-contador-" + System.nanoTime() + "@brasaller.test";
+
+        var firstRegistration = given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "legalName": "Cliente BPO Um LTDA",
+                          "tradeName": "Cliente BPO Um",
+                          "adminName": "Owner BPO Um",
+                          "email": "owner-bpo-um-%d@brasaller.test",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(System.nanoTime()))
+                .when().post("/users/tenants/register")
+                .then()
+                .statusCode(201)
+                .extract();
+
+        String firstTenantId = firstRegistration.path("tenant.id");
+        String firstAdminUserId = firstRegistration.path("adminUser.id");
+        String firstOwnerEmail = firstRegistration.path("adminUser.email");
+        String firstAdminToken = token(firstTenantId, firstAdminUserId, firstOwnerEmail, "ADMIN", "VENDEDOR");
+
+        String accountantUserId = given()
+                .header("Authorization", "Bearer " + firstAdminToken)
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "firstName": "BPO",
+                          "lastName": "Contador",
+                          "temporaryPassword": "ChangeMe123!"
+                        }
+                        """.formatted(accountantEmail))
+                .when().post("/users/tenants/%s/accountants".formatted(firstTenantId))
+                .then()
+                .statusCode(201)
+                .body("tenantId", is(firstTenantId))
+                .extract().path("accountantUserId");
+
+        var secondRegistration = given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "legalName": "Cliente BPO Dois LTDA",
+                          "tradeName": "Cliente BPO Dois",
+                          "adminName": "Owner BPO Dois",
+                          "email": "owner-bpo-dois-%d@brasaller.test",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(System.nanoTime()))
+                .when().post("/users/tenants/register")
+                .then()
+                .statusCode(201)
+                .extract();
+
+        String secondTenantId = secondRegistration.path("tenant.id");
+        String secondAdminUserId = secondRegistration.path("adminUser.id");
+        String secondOwnerEmail = secondRegistration.path("adminUser.email");
+        String secondAdminToken = token(secondTenantId, secondAdminUserId, secondOwnerEmail, "ADMIN", "VENDEDOR");
+
+        given()
+                .header("Authorization", "Bearer " + secondAdminToken)
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "firstName": "BPO",
+                          "lastName": "Contador",
+                          "temporaryPassword": "ChangeMe123!"
+                        }
+                        """.formatted(accountantEmail))
+                .when().post("/users/tenants/%s/accountants".formatted(secondTenantId))
+                .then()
+                .statusCode(201)
+                .body("tenantId", is(secondTenantId))
+                .body("accountantUserId", is(accountantUserId));
+
+        String accountantToken = token(firstTenantId, accountantUserId, accountantEmail, "CONTADOR");
+
+        given()
+                .header("Authorization", "Bearer " + accountantToken)
+                .when().get("/users/accountant/clients")
+                .then()
+                .statusCode(200)
+                .body("tenantId", hasItem(firstTenantId))
+                .body("tenantId", hasItem(secondTenantId))
+                .body("tradeName", hasItem("Cliente BPO Um"))
+                .body("tradeName", hasItem("Cliente BPO Dois"));
+    }
+
+    @Test
+    void globalBpoOperatorCanListAllTenantsWithoutIndividualGrant() {
+        var firstRegistration = given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "legalName": "Global BPO Um LTDA",
+                          "tradeName": "Global BPO Um",
+                          "adminName": "Owner Global Um",
+                          "email": "owner-global-bpo-um-%d@brasaller.test",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(System.nanoTime()))
+                .when().post("/users/tenants/register")
+                .then()
+                .statusCode(201)
+                .extract();
+
+        var secondRegistration = given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "legalName": "Global BPO Dois LTDA",
+                          "tradeName": "Global BPO Dois",
+                          "adminName": "Owner Global Dois",
+                          "email": "owner-global-bpo-dois-%d@brasaller.test",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(System.nanoTime()))
+                .when().post("/users/tenants/register")
+                .then()
+                .statusCode(201)
+                .extract();
+
+        String firstTenantId = firstRegistration.path("tenant.id");
+        String adminUserId = firstRegistration.path("adminUser.id");
+        String adminEmail = firstRegistration.path("adminUser.email");
+        String secondTenantId = secondRegistration.path("tenant.id");
+        String globalBpoToken = token(firstTenantId, adminUserId, adminEmail, "ADMIN", "CONTADOR");
+
+        given()
+                .header("Authorization", "Bearer " + globalBpoToken)
+                .when().get("/users/accountant/clients")
+                .then()
+                .statusCode(200)
+                .body("tenantId", hasItem(firstTenantId))
+                .body("tenantId", hasItem(secondTenantId))
+                .body("tradeName", hasItem("Global BPO Um"))
+                .body("tradeName", hasItem("Global BPO Dois"))
+                .body("accessStatus", hasItem("GLOBAL"));
     }
 
     @Test
@@ -270,7 +429,8 @@ class ExampleResourceTest {
                 .body("""
                         {
                           "email": "blocked-contador@brasaller.test",
-                          "fullName": "Blocked Contador",
+                          "firstName": "Blocked",
+                          "lastName": "Contador",
                           "temporaryPassword": "ChangeMe123!"
                         }
                         """)

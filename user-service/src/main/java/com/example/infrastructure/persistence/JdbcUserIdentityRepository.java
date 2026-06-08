@@ -2,8 +2,10 @@ package com.example.infrastructure.persistence;
 
 import com.example.application.port.out.UserIdentityRepository;
 import com.example.domain.model.AccountantAccessView;
+import com.example.domain.model.AccountantClientView;
 import com.example.domain.model.RegisteredTenant;
 import com.example.domain.model.StoredUserCredentials;
+import com.example.domain.model.TenantCompanyProfile;
 import com.example.domain.model.TenantView;
 import com.example.domain.model.UserRole;
 import com.example.domain.model.UserView;
@@ -29,7 +31,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     DataSource dataSource;
 
     @Override
-    public RegisteredTenant registerTenant(String legalName, String tradeName, String adminName, String email, String passwordHash) {
+    public RegisteredTenant registerTenant(String legalName, String tradeName, String adminName, String email,
+                                           String passwordHash, TenantCompanyProfile companyProfile) {
         String tenantId = UUID.randomUUID().toString();
         String userId = UUID.randomUUID().toString();
         String normalizedEmail = normalizeEmail(email);
@@ -37,15 +40,15 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                insertTenant(connection, tenantId, legalName, tradeName);
+                insertTenant(connection, tenantId, legalName, tradeName, companyProfile);
                 insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, null, null, passwordHash, "PASSWORD", null, "ACTIVE");
                 insertRole(connection, tenantId, userId, UserRole.ADMIN);
                 insertRole(connection, tenantId, userId, UserRole.VENDEDOR);
                 connection.commit();
                 return new RegisteredTenant(
-                        new TenantView(tenantId, legalName, tradeName, "ACTIVE"),
+                        toTenantView(tenantId, legalName, tradeName, companyProfile),
                         new UserView(userId, tenantId, email, adminName, email, null, null, null, true,
-                                "PASSWORD", null, "ACTIVE", List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()))
+                                "PASSWORD", null, "ACTIVE", List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()), List.of())
                 );
             } catch (SQLException exception) {
                 connection.rollback();
@@ -80,9 +83,18 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             try {
                 requireTenant(connection, tenantId);
                 requireUser(connection, tenantId, grantedByUserId);
-                insertUser(connection, accountantUserId, tenantId, accountantEmail, normalizedEmail,
-                        accountantFullName, firstName, lastName, passwordHash, provider, providerSubject, status);
-                insertRole(connection, tenantId, accountantUserId, UserRole.CONTADOR);
+                if (!userExists(connection, accountantUserId)) {
+                    insertUser(connection, accountantUserId, tenantId, accountantEmail, normalizedEmail,
+                            accountantFullName, firstName, lastName, passwordHash, provider, providerSubject, status);
+                }
+                ensureRole(connection, tenantId, accountantUserId, UserRole.CONTADOR);
+
+                Optional<AccountantAccessView> existingAccess = findActiveAccountantAccess(
+                        connection, tenantId, accountantUserId, accountantEmail);
+                if (existingAccess.isPresent()) {
+                    connection.commit();
+                    return existingAccess.get();
+                }
 
                 try (PreparedStatement statement = connection.prepareStatement("""
                         INSERT INTO accountant_access
@@ -132,6 +144,95 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             return users;
         } catch (SQLException exception) {
             throw new RepositoryException("Could not list tenant users", exception);
+        }
+    }
+
+    @Override
+    public List<AccountantClientView> listAccountantClients(String userId, String email) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT DISTINCT t.id AS tenant_id,
+                            t.legal_name,
+                            t.trade_name,
+                            t.status AS tenant_status,
+                            aa.read_only,
+                            aa.status AS access_status,
+                            aa.created_at
+                     FROM accountant_access aa
+                     JOIN tenants t ON t.id = aa.tenant_id
+                     JOIN user_accounts ua ON ua.id = aa.accountant_user_id
+                     WHERE aa.status = 'ACTIVE'
+                       AND (aa.accountant_user_id = ? OR ua.email_normalized = ?)
+                     ORDER BY t.trade_name NULLS LAST, t.legal_name
+                     """)) {
+            statement.setString(1, userId);
+            statement.setString(2, normalizeEmail(email));
+            List<AccountantClientView> clients = new ArrayList<>();
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    clients.add(new AccountantClientView(
+                            resultSet.getString("tenant_id"),
+                            resultSet.getString("legal_name"),
+                            resultSet.getString("trade_name"),
+                            resultSet.getString("tenant_status"),
+                            resultSet.getBoolean("read_only"),
+                            resultSet.getString("access_status"),
+                            resultSet.getTimestamp("created_at").toInstant()
+                    ));
+                }
+            }
+            return clients;
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not list accountant clients", exception);
+        }
+    }
+
+    @Override
+    public List<AccountantClientView> listAllBpoClients() {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT id AS tenant_id,
+                            legal_name,
+                            trade_name,
+                            status AS tenant_status,
+                            created_at
+                     FROM tenants
+                     ORDER BY trade_name NULLS LAST, legal_name
+                     """)) {
+            List<AccountantClientView> clients = new ArrayList<>();
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    clients.add(new AccountantClientView(
+                            resultSet.getString("tenant_id"),
+                            resultSet.getString("legal_name"),
+                            resultSet.getString("trade_name"),
+                            resultSet.getString("tenant_status"),
+                            true,
+                            "GLOBAL",
+                            resultSet.getTimestamp("created_at").toInstant()
+                    ));
+                }
+            }
+            return clients;
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not list BPO clients", exception);
+        }
+    }
+
+    @Override
+    public List<String> listAccountantTenantIds(String userId, String email) {
+        return listAccountantClients(userId, email).stream()
+                .map(AccountantClientView::tenantId)
+                .distinct()
+                .toList();
+    }
+
+    @Override
+    public Optional<UserView> findUserByEmail(String email) {
+        try (Connection connection = dataSource.getConnection()) {
+            return findUserByEmail(connection, normalizeEmail(email));
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not find user by email", exception);
         }
     }
 
@@ -222,17 +323,53 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
         }
     }
 
-    private void insertTenant(Connection connection, String tenantId, String legalName, String tradeName) throws SQLException {
+    private void insertTenant(Connection connection, String tenantId, String legalName, String tradeName,
+                              TenantCompanyProfile companyProfile) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO tenants (id, legal_name, trade_name, status)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO tenants (
+                    id, legal_name, trade_name, status,
+                    cnpj, cnae_code, cnae_description,
+                    address_street, address_number, address_complement, address_neighborhood,
+                    address_city, address_state, address_zip_code
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, tenantId);
             statement.setString(2, legalName);
             statement.setString(3, tradeName);
             statement.setString(4, "ACTIVE");
+            statement.setString(5, companyProfile.cnpj());
+            statement.setString(6, companyProfile.cnaeCode());
+            statement.setString(7, companyProfile.cnaeDescription());
+            statement.setString(8, companyProfile.addressStreet());
+            statement.setString(9, companyProfile.addressNumber());
+            statement.setString(10, companyProfile.addressComplement());
+            statement.setString(11, companyProfile.addressNeighborhood());
+            statement.setString(12, companyProfile.addressCity());
+            statement.setString(13, companyProfile.addressState());
+            statement.setString(14, companyProfile.addressZipCode());
             statement.executeUpdate();
         }
+    }
+
+    private TenantView toTenantView(String tenantId, String legalName, String tradeName,
+                                    TenantCompanyProfile companyProfile) {
+        return new TenantView(
+                tenantId,
+                legalName,
+                tradeName,
+                "ACTIVE",
+                companyProfile.cnpj(),
+                companyProfile.cnaeCode(),
+                companyProfile.cnaeDescription(),
+                companyProfile.addressStreet(),
+                companyProfile.addressNumber(),
+                companyProfile.addressComplement(),
+                companyProfile.addressNeighborhood(),
+                companyProfile.addressCity(),
+                companyProfile.addressState(),
+                companyProfile.addressZipCode()
+        );
     }
 
     private void insertUser(
@@ -282,6 +419,62 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             statement.setString(2, userId);
             statement.setString(3, role.name());
             statement.executeUpdate();
+        }
+    }
+
+    private void ensureRole(Connection connection, String tenantId, String userId, UserRole role) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT 1 FROM user_roles WHERE tenant_id = ? AND user_id = ? AND role = ?
+                """)) {
+            statement.setString(1, tenantId);
+            statement.setString(2, userId);
+            statement.setString(3, role.name());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return;
+                }
+            }
+        }
+        insertRole(connection, tenantId, userId, role);
+    }
+
+    private boolean userExists(Connection connection, String userId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_accounts WHERE id = ?")) {
+            statement.setString(1, userId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        }
+    }
+
+    private Optional<AccountantAccessView> findActiveAccountantAccess(
+            Connection connection,
+            String tenantId,
+            String accountantUserId,
+            String accountantEmail
+    ) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT id, tenant_id, accountant_user_id, read_only, status
+                FROM accountant_access
+                WHERE tenant_id = ?
+                  AND accountant_user_id = ?
+                  AND status = 'ACTIVE'
+                """)) {
+            statement.setString(1, tenantId);
+            statement.setString(2, accountantUserId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new AccountantAccessView(
+                        resultSet.getString("id"),
+                        resultSet.getString("tenant_id"),
+                        resultSet.getString("accountant_user_id"),
+                        accountantEmail,
+                        resultSet.getBoolean("read_only"),
+                        resultSet.getString("status")
+                ));
+            }
         }
     }
 
@@ -346,6 +539,25 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
         }
     }
 
+    private Optional<UserView> findUserByEmail(Connection connection, String normalizedEmail) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT id, tenant_id, email, full_name, preferred_username, first_name, last_name, picture_url,
+                       email_verified, provider, provider_subject, status
+                FROM user_accounts
+                WHERE email_normalized = ?
+                """)) {
+            statement.setString(1, normalizedEmail);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                String tenantId = resultSet.getString("tenant_id");
+                String userId = resultSet.getString("id");
+                return Optional.of(toUserView(connection, resultSet, tenantId, userId));
+            }
+        }
+    }
+
     private UserView toUserView(Connection connection, ResultSet resultSet, String tenantId, String userId) throws SQLException {
         return new UserView(
                 userId,
@@ -360,7 +572,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                 resultSet.getString("provider"),
                 resultSet.getString("provider_subject"),
                 resultSet.getString("status"),
-                listRoles(connection, tenantId, userId)
+                listRoles(connection, tenantId, userId),
+                listAccountantTenantIds(userId, resultSet.getString("email"))
         );
     }
 

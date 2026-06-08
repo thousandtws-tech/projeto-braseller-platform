@@ -2,8 +2,8 @@ package com.example.infrastructure.persistence;
 
 import com.example.application.event.SyncAllRequestedEvent;
 import com.example.application.port.out.ConnectorSyncJobRepository;
+import com.example.domain.enums.SyncJobStatus;
 import com.example.domain.model.connector.SyncJob;
-import com.example.domain.model.connector.SyncJobStatus;
 import com.example.domain.model.connector.SyncResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
