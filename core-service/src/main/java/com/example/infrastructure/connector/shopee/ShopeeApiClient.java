@@ -2,6 +2,8 @@ package com.example.infrastructure.connector.shopee;
 
 import com.example.application.exception.ConnectorRateLimitException;
 import com.example.application.exception.ConnectorValidationException;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import java.time.temporal.ChronoUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -59,6 +61,12 @@ public class ShopeeApiClient {
                 .build();
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode getPublic(String path, long partnerId, String partnerKey) {
         long timestamp = Instant.now().getEpochSecond();
         String sign = sign(partnerId + path + timestamp, partnerKey);
@@ -66,6 +74,12 @@ public class ShopeeApiClient {
         return send(get(path + "?" + query));
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode get(String path, long partnerId, String partnerKey, long shopId, String accessToken) {
         long timestamp = Instant.now().getEpochSecond();
         String sign = sign(partnerId + path + timestamp + accessToken + shopId, partnerKey);
@@ -74,6 +88,12 @@ public class ShopeeApiClient {
         return send(get(path + "?" + query));
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode postPublic(String path, long partnerId, String partnerKey, JsonNode body) {
         long timestamp = Instant.now().getEpochSecond();
         String sign = sign(partnerId + path + timestamp, partnerKey);

@@ -2,6 +2,11 @@ package com.example.infrastructure.oauth;
 
 import com.example.application.exception.AuthenticationException;
 import com.example.application.exception.FeatureNotConfiguredException;
+import com.example.application.exception.TransientAuthenticationException;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Retry;
+import java.time.temporal.ChronoUnit;
 import com.example.application.port.out.KeycloakOAuthClient;
 import com.example.domain.model.AuthIdentity;
 import com.example.domain.model.KeycloakIdentity;
@@ -74,6 +79,17 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
     }
 
     @Override
+    @Retry(
+            maxRetries = 1, delay = 500, delayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientAuthenticationException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "exchangeCodeFallback")
     public KeycloakTokenResponse exchangeCode(String code) {
         requireConfigured();
         if (isBlank(code)) {
@@ -93,6 +109,18 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
     }
 
     @Override
+    @Retry(
+            maxRetries = 2, delay = 500, delayUnit = ChronoUnit.MILLIS,
+            jitter = 250, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientAuthenticationException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "passwordGrantFallback")
     public KeycloakTokenResponse passwordGrant(String email, String password) {
         requireConfigured();
         if (isBlank(email) || isBlank(password)) {
@@ -115,6 +143,18 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
     }
 
     @Override
+    @Retry(
+            maxRetries = 2, delay = 500, delayUnit = ChronoUnit.MILLIS,
+            jitter = 250, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientAuthenticationException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "refreshFallback")
     public KeycloakTokenResponse refresh(String refreshToken) {
         requireConfigured();
         if (isBlank(refreshToken)) {
@@ -136,6 +176,11 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
     }
 
     @Override
+    @Retry(
+            maxRetries = 2, delay = 300, delayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "logoutFallback")
     public boolean logout(String refreshToken) {
         requireConfigured();
         if (isBlank(refreshToken)) {
@@ -155,6 +200,17 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
     }
 
     @Override
+    @Retry(
+            maxRetries = 1, delay = 300, delayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientAuthenticationException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "userInfoFallback")
     public KeycloakIdentity userInfo(String accessToken) {
         requireConfigured();
         if (isBlank(accessToken)) {
@@ -197,13 +253,19 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
             throw exception;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new AuthenticationException("keycloak_userinfo_unavailable");
+            throw new TransientAuthenticationException("keycloak_userinfo_unavailable", exception);
         } catch (IOException | IllegalArgumentException exception) {
-            throw new AuthenticationException("keycloak_userinfo_unavailable");
+            throw new TransientAuthenticationException("keycloak_userinfo_unavailable", exception);
         }
     }
 
     @Override
+    @CircuitBreaker(
+            requestVolumeThreshold = 5, failureRatio = 0.6,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            failOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "createPasswordUserFallback")
     public void createPasswordUser(AuthIdentity identity, String password) {
         requireConfigured();
         requireAdminConfigured();
@@ -233,6 +295,12 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
     }
 
     @Override
+    @CircuitBreaker(
+            requestVolumeThreshold = 5, failureRatio = 0.6,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            failOn = {TransientAuthenticationException.class}
+    )
+    @Fallback(fallbackMethod = "synchronizeUserFallback")
     public void synchronizeUser(AuthIdentity identity, String keycloakSubject) {
         requireConfigured();
         requireAdminConfigured();
@@ -251,6 +319,34 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
         if (response.statusCode() != 201 && response.statusCode() != 204 && response.statusCode() != 409) {
             throw new AuthenticationException("keycloak_user_sync_failed");
         }
+    }
+
+    private KeycloakTokenResponse exchangeCodeFallback(String code) {
+        throw new AuthenticationException("keycloak_unavailable");
+    }
+
+    private KeycloakTokenResponse passwordGrantFallback(String email, String password) {
+        throw new AuthenticationException("keycloak_unavailable");
+    }
+
+    private KeycloakTokenResponse refreshFallback(String refreshToken) {
+        throw new AuthenticationException("keycloak_unavailable");
+    }
+
+    private boolean logoutFallback(String refreshToken) {
+        return false;
+    }
+
+    private KeycloakIdentity userInfoFallback(String accessToken) {
+        throw new AuthenticationException("keycloak_unavailable");
+    }
+
+    private void createPasswordUserFallback(AuthIdentity identity, String password) {
+        throw new AuthenticationException("keycloak_admin_unavailable");
+    }
+
+    private void synchronizeUserFallback(AuthIdentity identity, String keycloakSubject) {
+        throw new AuthenticationException("keycloak_admin_unavailable");
     }
 
     private KeycloakTokenResponse readTokenResponse(String body, String failureMessage) {
@@ -280,9 +376,9 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
             return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new AuthenticationException("keycloak_unavailable");
+            throw new TransientAuthenticationException("keycloak_unavailable", exception);
         } catch (IOException | IllegalArgumentException exception) {
-            throw new AuthenticationException("keycloak_unavailable");
+            throw new TransientAuthenticationException("keycloak_unavailable", exception);
         }
     }
 
@@ -299,9 +395,9 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
             return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new AuthenticationException("keycloak_admin_unavailable");
+            throw new TransientAuthenticationException("keycloak_admin_unavailable", exception);
         } catch (IOException | IllegalArgumentException exception) {
-            throw new AuthenticationException("keycloak_admin_unavailable");
+            throw new TransientAuthenticationException("keycloak_admin_unavailable", exception);
         }
     }
 
@@ -318,9 +414,9 @@ public class HttpKeycloakOAuthClient implements KeycloakOAuthClient {
             return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new AuthenticationException("keycloak_admin_unavailable");
+            throw new TransientAuthenticationException("keycloak_admin_unavailable", exception);
         } catch (IOException | IllegalArgumentException exception) {
-            throw new AuthenticationException("keycloak_admin_unavailable");
+            throw new TransientAuthenticationException("keycloak_admin_unavailable", exception);
         }
     }
 

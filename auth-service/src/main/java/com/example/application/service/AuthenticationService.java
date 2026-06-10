@@ -42,8 +42,10 @@ public class AuthenticationService {
     boolean requireKeycloakEmailVerified;
 
     public AuthTokenSet register(RegisterCommand command) {
-        if (isBlank(command.tenantName()) || isBlank(command.fullName()) || isBlank(command.email()) || isWeakPassword(command.password())) {
-            throw new ValidationException("tenantName, fullName, email and a password with at least 8 characters are required");
+        if (isBlank(command.tenantName()) || isBlank(command.fullName()) || isBlank(command.email())
+                || isWeakPassword(command.password())) {
+            throw new ValidationException(
+                    "tenantName, fullName, email and a password with at least 8 characters are required");
         }
 
         AuthIdentity identity = authIdentityRepository.synchronize(userIdentityGateway.registerTenant(command));
@@ -69,22 +71,21 @@ public class AuthenticationService {
 
     private AuthIdentity provisionIdentityFromUserService(KeycloakIdentity keycloakIdentity) {
         return userIdentityGateway.syncExternalProfile(new SyncExternalProfileCommand(
-                        keycloakIdentity.email(),
-                        "KEYCLOAK",
-                        keycloakIdentity.subject(),
-                        keycloakIdentity.fullName(),
-                        keycloakIdentity.preferredUsername(),
-                        keycloakIdentity.firstName(),
-                        keycloakIdentity.lastName(),
-                        keycloakIdentity.pictureUrl(),
-                        keycloakIdentity.emailVerified()
-                ))
+                keycloakIdentity.email(),
+                "KEYCLOAK",
+                keycloakIdentity.subject(),
+                keycloakIdentity.fullName(),
+                keycloakIdentity.preferredUsername(),
+                keycloakIdentity.firstName(),
+                keycloakIdentity.lastName(),
+                keycloakIdentity.pictureUrl(),
+                keycloakIdentity.emailVerified()))
                 .map(authIdentityRepository::synchronize)
                 .orElseThrow(() -> new AuthenticationException("invalid_credentials"));
     }
 
     public AuthTokenSet loginOrRegisterWithKeycloak(KeycloakIdentity keycloakIdentity, String tenantName,
-                                                    KeycloakTokenResponse tokenResponse) {
+            KeycloakTokenResponse tokenResponse) {
         if (keycloakIdentity == null || isBlank(keycloakIdentity.email()) || isBlank(keycloakIdentity.subject())) {
             throw new AuthenticationException("invalid_keycloak_identity");
         }
@@ -117,8 +118,7 @@ public class AuthenticationService {
                 null,
                 null,
                 null,
-                null
-        ));
+                null));
         return authIdentityRepository.synchronize(identity);
     }
 
@@ -131,13 +131,13 @@ public class AuthenticationService {
         KeycloakIdentity keycloakIdentity = keycloakOAuthClient.userInfo(tokenResponse.accessToken());
         AuthIdentity identity = authIdentityRepository.findIdentityByEmail(keycloakIdentity.email())
                 .orElseThrow(() -> new AuthenticationException("invalid_refresh_token"));
-        String refreshToken = isBlank(tokenResponse.refreshToken()) ? command.refreshToken() : tokenResponse.refreshToken();
+        String refreshToken = isBlank(tokenResponse.refreshToken()) ? command.refreshToken()
+                : tokenResponse.refreshToken();
         AuthIdentity synchronizedIdentity = synchronizeKeycloakProfile(identity, keycloakIdentity);
         return issueKeycloakSession(
                 synchronizedIdentity,
                 keycloakProfile(synchronizedIdentity, keycloakIdentity),
-                refreshToken
-        );
+                refreshToken);
     }
 
     public boolean logout(RefreshTokenCommand command) {
@@ -149,15 +149,15 @@ public class AuthenticationService {
     }
 
     private AuthTokenSet finishKeycloakSession(AuthIdentity identity, KeycloakIdentity keycloakIdentity,
-                                               KeycloakTokenResponse tokenResponse) {
+            KeycloakTokenResponse tokenResponse) {
         AuthIdentity synchronizedIdentity = synchronizeKeycloakProfile(identity, keycloakIdentity);
-        authIdentityRepository.linkProviderSubject(synchronizedIdentity.email(), "KEYCLOAK", keycloakIdentity.subject());
+        authIdentityRepository.linkProviderSubject(synchronizedIdentity.email(), "KEYCLOAK",
+                keycloakIdentity.subject());
         keycloakOAuthClient.synchronizeUser(synchronizedIdentity, keycloakIdentity.subject());
         return issueKeycloakSession(
                 synchronizedIdentity,
                 keycloakProfile(synchronizedIdentity, keycloakIdentity),
-                tokenResponse.refreshToken()
-        );
+                tokenResponse.refreshToken());
     }
 
     private AuthTokenSet issueKeycloakSession(AuthIdentity identity, AuthProfile profile, String keycloakRefreshToken) {
@@ -171,8 +171,7 @@ public class AuthenticationService {
                 identity.userId(),
                 identity.email(),
                 identity.roles(),
-                profile
-        );
+                profile);
     }
 
     private AuthProfile keycloakProfile(AuthIdentity identity, KeycloakIdentity keycloakIdentity) {
@@ -188,22 +187,20 @@ public class AuthenticationService {
                 keycloakIdentity.lastName(),
                 keycloakIdentity.pictureUrl(),
                 keycloakIdentity.emailVerified(),
-                identity.roles()
-        );
+                identity.roles());
     }
 
     private AuthIdentity synchronizeKeycloakProfile(AuthIdentity fallback, KeycloakIdentity keycloakIdentity) {
         return userIdentityGateway.syncExternalProfile(new SyncExternalProfileCommand(
-                        keycloakIdentity.email(),
-                        "KEYCLOAK",
-                        keycloakIdentity.subject(),
-                        keycloakIdentity.fullName(),
-                        keycloakIdentity.preferredUsername(),
-                        keycloakIdentity.firstName(),
-                        keycloakIdentity.lastName(),
-                        keycloakIdentity.pictureUrl(),
-                        keycloakIdentity.emailVerified()
-                ))
+                keycloakIdentity.email(),
+                "KEYCLOAK",
+                keycloakIdentity.subject(),
+                keycloakIdentity.fullName(),
+                keycloakIdentity.preferredUsername(),
+                keycloakIdentity.firstName(),
+                keycloakIdentity.lastName(),
+                keycloakIdentity.pictureUrl(),
+                keycloakIdentity.emailVerified()))
                 .map(authIdentityRepository::synchronize)
                 .orElse(fallback);
     }

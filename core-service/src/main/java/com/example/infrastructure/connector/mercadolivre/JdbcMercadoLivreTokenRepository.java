@@ -51,6 +51,28 @@ public class JdbcMercadoLivreTokenRepository {
         }
     }
 
+    public Optional<String> findTenantIdBySellerId(String sellerId) {
+        String sql = """
+                SELECT tenant_id
+                FROM marketplace_connector_tokens
+                WHERE seller_id = ? AND connector_name = ?
+                LIMIT 1
+                """;
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, sellerId);
+            statement.setString(2, CONNECTOR_NAME);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(resultSet.getString("tenant_id"));
+            }
+        } catch (SQLException exception) {
+            throw new ConnectorValidationException("mercado_livre_token_repository_unavailable");
+        }
+    }
+
     public void save(MercadoLivreConnectorToken token) {
         try (Connection connection = dataSource.getConnection()) {
             update(connection, token);

@@ -35,13 +35,3 @@ output "container_app_fqdns" {
     name => app.ingress[0].fqdn
   }
 }
-
-output "client_webapp_name" {
-  description = "Azure Web App name for the Next.js client."
-  value       = var.deploy_client ? azurerm_linux_web_app.client[0].name : null
-}
-
-output "client_webapp_url" {
-  description = "Default HTTPS URL for the Next.js client."
-  value       = var.deploy_client ? "https://${azurerm_linux_web_app.client[0].default_hostname}" : null
-}

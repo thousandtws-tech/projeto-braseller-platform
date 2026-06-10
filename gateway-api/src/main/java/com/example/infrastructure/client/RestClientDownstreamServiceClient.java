@@ -9,7 +9,10 @@ import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriBuilder;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
+import java.time.temporal.ChronoUnit;
 
 import java.net.URI;
 import java.util.List;
@@ -36,6 +39,13 @@ public class RestClientDownstreamServiceClient implements DownstreamServiceClien
     DownstreamRestClient restClient;
 
     @Override
+    @CircuitBreaker(
+            requestVolumeThreshold = 20, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {DownstreamServiceUnavailableException.class, ProcessingException.class}
+    )
+    @Fallback(fallbackMethod = "exchangeFallback")
     public GatewayResponse exchange(DownstreamRequest request) {
         URI targetUri = buildTargetUri(request);
         try (Response response = send(request, targetUri)) {
@@ -50,6 +60,12 @@ public class RestClientDownstreamServiceClient implements DownstreamServiceClien
                     exception
             );
         }
+    }
+
+    private GatewayResponse exchangeFallback(DownstreamRequest request) {
+        throw new DownstreamServiceUnavailableException(
+                request.route().serviceName(), new RuntimeException("circuit_breaker_open")
+        );
     }
 
     private Response send(DownstreamRequest request, URI targetUri) {

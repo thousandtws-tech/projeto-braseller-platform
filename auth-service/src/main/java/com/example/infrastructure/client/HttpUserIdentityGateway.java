@@ -4,7 +4,12 @@ import com.example.application.command.LoginCommand;
 import com.example.application.command.RegisterCommand;
 import com.example.application.command.SyncExternalProfileCommand;
 import com.example.application.exception.IdentityGatewayException;
+import com.example.application.exception.TransientIdentityGatewayException;
 import com.example.application.port.out.UserIdentityGateway;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Retry;
+import java.time.temporal.ChronoUnit;
 import com.example.domain.model.AuthIdentity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -48,6 +53,13 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     }
 
     @Override
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "registerTenantFallback")
     public AuthIdentity registerTenant(RegisterCommand command) {
         UserTenantRegistrationRequest userRequest = new UserTenantRegistrationRequest(
                 firstNonBlank(command.legalName(), command.tenantName()).trim(),
@@ -77,6 +89,18 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     }
 
     @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "verifyPasswordFallback")
     public Optional<AuthIdentity> verifyPassword(LoginCommand command) {
         VerifyPasswordRequest userRequest = new VerifyPasswordRequest(command.email().trim(), command.password());
         HttpResponse<String> response = send("/users/internal/identity/verify-password", userRequest, true);
@@ -92,6 +116,18 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     }
 
     @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "syncExternalProfileFallback")
     public Optional<AuthIdentity> syncExternalProfile(SyncExternalProfileCommand command) {
         UserProfileSyncRequest userRequest = new UserProfileSyncRequest(
                 command.email(),
@@ -116,6 +152,18 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
         return Optional.of(toAuthIdentity(user));
     }
 
+    private AuthIdentity registerTenantFallback(RegisterCommand command) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private Optional<AuthIdentity> verifyPasswordFallback(LoginCommand command) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private Optional<AuthIdentity> syncExternalProfileFallback(SyncExternalProfileCommand command) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
     private HttpResponse<String> send(String path, Object body, boolean internal) {
         try {
             HttpRequest.Builder request = HttpRequest.newBuilder()
@@ -130,9 +178,9 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
             return httpClient.send(request.build(), HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IdentityGatewayException(503, "user_service_unavailable", exception);
+            throw new TransientIdentityGatewayException(503, "user_service_unavailable", exception);
         } catch (IOException | IllegalArgumentException exception) {
-            throw new IdentityGatewayException(503, "user_service_unavailable", exception);
+            throw new TransientIdentityGatewayException(503, "user_service_unavailable", exception);
         }
     }
 

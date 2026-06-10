@@ -2,6 +2,8 @@ package com.example.infrastructure.connector.amazon;
 
 import com.example.application.exception.ConnectorRateLimitException;
 import com.example.application.exception.ConnectorValidationException;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import java.time.temporal.ChronoUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -71,6 +73,12 @@ public class AmazonApiClient {
                 .build();
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode exchangeCode(String clientId, String clientSecret, String code) {
         String body = "grant_type=authorization_code&code=" + encode(code)
                 + "&client_id=" + encode(clientId)
@@ -78,6 +86,12 @@ public class AmazonApiClient {
         return postLwa(body);
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode refreshToken(String clientId, String clientSecret, String refreshToken) {
         String body = "grant_type=refresh_token&refresh_token=" + encode(refreshToken)
                 + "&client_id=" + encode(clientId)
@@ -85,6 +99,12 @@ public class AmazonApiClient {
         return postLwa(body);
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode get(String path, String accessToken, String awsAccessKey, String awsSecretKey,
                         Map<String, String> queryParams) {
         ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);

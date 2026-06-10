@@ -2,6 +2,8 @@ package com.example.infrastructure.connector.mercadolivre;
 
 import com.example.application.exception.ConnectorRateLimitException;
 import com.example.application.exception.ConnectorValidationException;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import java.time.temporal.ChronoUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -57,6 +59,12 @@ public class MercadoLivreApiClient {
                 .build();
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode exchangeCode(String clientId, String clientSecret, String redirectUri, String code) {
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", "authorization_code");
@@ -67,6 +75,12 @@ public class MercadoLivreApiClient {
         return postForm("/oauth/token", form);
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode refreshToken(String clientId, String clientSecret, String refreshToken) {
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", "refresh_token");
@@ -76,10 +90,22 @@ public class MercadoLivreApiClient {
         return postForm("/oauth/token", form);
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode get(String path, String accessToken) {
         return get(path, accessToken, Map.of());
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 60, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            skipOn = {ConnectorValidationException.class}
+    )
     public JsonNode get(String path, String accessToken, Map<String, String> queryParameters) {
         HttpRequest request = HttpRequest.newBuilder(uri(path, queryParameters))
                 .timeout(requestTimeout())
