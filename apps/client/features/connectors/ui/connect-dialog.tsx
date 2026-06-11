@@ -15,6 +15,11 @@ import { Button, buttonVariants } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { authenticateAction } from '@/features/connectors/server/actions'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
+
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 
 const ML_OAUTH_URL =
   'https://auth.mercadolivre.com.br/authorization?response_type=code' +
@@ -25,35 +30,46 @@ const ML_OAUTH_URL =
 // para /conectores/callback?code=... no nosso frontend
 
 // Conectores que usam OAuth redirect em vez de formulário de credenciais
-const OAUTH_CONNECTORS: Record<string, { url: string; label: string }> = {
-  'mercado-livre': { url: ML_OAUTH_URL, label: 'Autorizar com Mercado Livre' },
-  mercadolivre:   { url: ML_OAUTH_URL, label: 'Autorizar com Mercado Livre' },
+const OAUTH_CONNECTORS: Record<string, { url: string }> = {
+  'mercado-livre': { url: ML_OAUTH_URL },
+  mercadolivre:   { url: ML_OAUTH_URL },
 }
 
-// Campos de credencial para conectores não-OAuth
-const CREDENTIAL_FIELDS: Record<string, { name: string; label: string; placeholder: string; type?: string; hint?: string }[]> = {
-  shopee: [
-    { name: 'shop_id', label: 'Shop ID', placeholder: 'ID da sua loja no Seller Center', hint: 'Encontrado em Minha conta > Loja no Shopee Seller Center.' },
-    { name: 'code',    label: 'Código de autorização', placeholder: 'Código gerado pelo Shopee OAuth', hint: 'Gere em Shopee Partner Center > Autorizar aplicativo, copie o código retornado.' },
-  ],
-  amazon: [
-    { name: 'seller_id',     label: 'Seller ID',     placeholder: 'ID do vendedor (Seller Central)', hint: 'Encontrado em Seller Central > Configurações de conta.' },
-    { name: 'refresh_token', label: 'Refresh Token', placeholder: 'Token gerado no Seller Central', type: 'password', hint: 'Gere em Seller Central > Aplicativos e serviços > Meus aplicativos.' },
-  ],
+interface CredentialField {
+  name: string
+  label: string
+  placeholder: string
+  type?: string
+  hint?: string
 }
 
-const DEFAULT_FIELDS = [
-  { name: 'api_key', label: 'API Key', placeholder: 'Chave de acesso', type: 'password' },
-]
+function getCredentialFields(dict: Dictionary): Record<string, CredentialField[]> {
+  return {
+    shopee: [
+      { name: 'shop_id', ...dict.connectors.fields.shopId },
+      { name: 'code', ...dict.connectors.fields.shopeeCode },
+    ],
+    amazon: [
+      { name: 'seller_id', ...dict.connectors.fields.sellerId },
+      { name: 'refresh_token', ...dict.connectors.fields.refreshToken, type: 'password' },
+    ],
+  }
+}
+
+function getDefaultFields(dict: Dictionary): CredentialField[] {
+  return [{ name: 'api_key', ...dict.connectors.fields.apiKey, type: 'password' }]
+}
 
 interface Props {
   connectorName: string
   displayName: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  dict: Dictionary
+  lang: Locale
 }
 
-export function ConnectDialog({ connectorName, displayName, open, onOpenChange }: Props) {
+export function ConnectDialog({ connectorName, displayName, open, onOpenChange, dict, lang }: Props) {
   const router = useRouter()
   const [state, formAction, isPending] = useActionState(authenticateAction, null)
   const [oauthOpened, setOauthOpened] = useState(false)
@@ -70,17 +86,17 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
       return () => clearTimeout(t)
     }
   }, [state?.success, onOpenChange, router])
-  const fields = CREDENTIAL_FIELDS[connectorName] ?? DEFAULT_FIELDS
+  const fields = getCredentialFields(dict)[connectorName] ?? getDefaultFields(dict)
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) setOauthOpened(false); onOpenChange(o) }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Conectar {displayName}</DialogTitle>
+          <DialogTitle>{formatMessage(dict.connectors.dialog.connectTitle, { displayName })}</DialogTitle>
           <DialogDescription>
             {oauth
-              ? 'Autorize o acesso e cole o código gerado para finalizar a conexão.'
-              : 'Informe as credenciais da sua conta para autorizar a integração.'}
+              ? dict.connectors.dialog.oauthDescription
+              : dict.connectors.dialog.credentialDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -94,9 +110,9 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
               <div className="flex items-start gap-2.5">
                 <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground mt-0.5">1</span>
                 <div className="space-y-2 flex-1">
-                  <p className="text-sm font-medium">Autorizar no {displayName}</p>
+                  <p className="text-sm font-medium">{formatMessage(dict.connectors.dialog.step1Title, { displayName })}</p>
                   <p className="text-xs text-muted-foreground">
-                    Clique para abrir a página de autorização em uma nova aba. Após aprovar, copie o código exibido na URL.
+                    {dict.connectors.dialog.step1Hint}
                   </p>
                   <a
                     href={oauth.url}
@@ -106,7 +122,7 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
                     onClick={() => setOauthOpened(true)}
                   >
                     <ExternalLink className="size-3.5" />
-                    Abrir autorização {displayName}
+                    {formatMessage(dict.connectors.dialog.openAuth, { displayName })}
                   </a>
                 </div>
               </div>
@@ -117,14 +133,14 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
               <div className="flex items-start gap-2.5">
                 <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground mt-0.5">2</span>
                 <div className="space-y-2 flex-1">
-                  <p className="text-sm font-medium">Cole o código de autorização</p>
+                  <p className="text-sm font-medium">{dict.connectors.dialog.step2Title}</p>
                   <p className="text-xs text-muted-foreground">
-                    Após autorizar, o código estará na URL de retorno. Cole-o abaixo.
+                    {dict.connectors.dialog.step2Hint}
                   </p>
                   <input
                     name="code"
                     type="text"
-                    placeholder="TG-xxxxxxxxxxxxxxxxxxxxxxxx"
+                    placeholder={dict.connectors.dialog.codePlaceholder}
                     required={oauthOpened}
                     disabled={isPending || !oauthOpened}
                     autoComplete="off"
@@ -148,18 +164,18 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
             {state?.success === true && (
               <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-                <span>{displayName} conectado com sucesso!</span>
+                <span>{formatMessage(dict.connectors.dialog.success, { displayName })}</span>
               </div>
             )}
 
             <DialogFooter className="border-0 bg-transparent p-0 mt-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-                Cancelar
+                {dict.connectors.dialog.cancel}
               </Button>
               <Button type="submit" disabled={isPending || !oauthOpened || state?.success === true}>
                 {isPending
-                  ? <><Loader2 className="size-4 animate-spin" />Conectando...</>
-                  : <><Plug className="size-4" />Finalizar conexão</>
+                  ? <><Loader2 className="size-4 animate-spin" />{dict.connectors.dialog.connecting}</>
+                  : <><Plug className="size-4" />{dict.connectors.dialog.finishConnection}</>
                 }
               </Button>
             </DialogFooter>
@@ -179,10 +195,10 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
               <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
                 <span>
-                  {displayName} conectado com sucesso!
+                  {formatMessage(dict.connectors.dialog.success, { displayName })}
                   {state.expires_at && (
                     <span className="text-muted-foreground ml-1">
-                      Expira em {new Date(state.expires_at).toLocaleDateString('pt-BR')}
+                      {formatMessage(dict.connectors.dialog.expiresAt, { date: new Date(state.expires_at).toLocaleDateString(LOCALE_MAP[lang]) })}
                     </span>
                   )}
                 </span>
@@ -209,12 +225,12 @@ export function ConnectDialog({ connectorName, displayName, open, onOpenChange }
 
             <DialogFooter className="border-0 bg-transparent p-0 mt-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-                Cancelar
+                {dict.connectors.dialog.cancel}
               </Button>
               <Button type="submit" disabled={isPending || state?.success === true}>
                 {isPending
-                  ? <><Loader2 className="size-4 animate-spin" />Conectando...</>
-                  : <><Plug className="size-4" />Conectar</>
+                  ? <><Loader2 className="size-4 animate-spin" />{dict.connectors.dialog.connecting}</>
+                  : <><Plug className="size-4" />{dict.connectors.dialog.connect}</>
                 }
               </Button>
             </DialogFooter>

@@ -1,1 +1,1 @@
-export { notificationsMetadata as metadata, NotificationsPage as default } from '@/features/notifications'
+export { generateNotificationsMetadata as generateMetadata, NotificationsPage as default } from '@/features/notifications'

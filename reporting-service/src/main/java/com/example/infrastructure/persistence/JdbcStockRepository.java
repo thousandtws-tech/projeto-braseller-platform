@@ -213,6 +213,19 @@ public class JdbcStockRepository implements StockRepository {
     }
 
     @Override
+    public BigDecimal totalInventoryValue(String tenantId) {
+        String sql = "SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM stock_items WHERE tenant_id = ?";
+        try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tenantId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO;
+            }
+        } catch (SQLException e) {
+            throw new RepositoryException("stock_inventory_value_failed", e);
+        }
+    }
+
+    @Override
     public List<StockRepository.SaleStockMovement> listSaleExitMovements(String tenantId, String orderId) {
         String sql = """
                 SELECT stock_item_id, quantity, unit_cost

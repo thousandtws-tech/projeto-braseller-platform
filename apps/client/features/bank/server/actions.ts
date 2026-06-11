@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { getToken, getSession, COOKIE_NAME } from '@/entities/session/server/session'
+import { localePath } from '@/shared/i18n/server-locale'
 
 function resolveGatewayUrl() {
   const raw =
@@ -18,7 +19,7 @@ const GATEWAY_URL = resolveGatewayUrl()
 async function handleExpired(): Promise<never> {
   const store = await cookies()
   store.delete(COOKIE_NAME)
-  redirect('/login?expired=1')
+  redirect(await localePath('/login?expired=1'))
 }
 
 type OfxImportState =

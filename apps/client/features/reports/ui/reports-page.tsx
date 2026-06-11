@@ -1,4 +1,3 @@
-import type { Metadata } from 'next'
 import { ArrowDownToLine, Download, FileSignature, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -14,27 +13,17 @@ import {
   getReportsEntries,
   formatCurrency,
 } from '@/shared/api/gateway'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import type { FiscalProfile, ProfitAvailability, ProfitDistribution, ReportsDre, ReportsEntry } from '@/shared/types'
 import { ProfitDistributionForm } from './profit-distribution-form'
 
-export const metadata: Metadata = { title: 'DRE' }
-
-const CATEGORY_LABELS: Record<string, string> = {
-  OPERATIONAL: 'Operacional',
-  PACKAGING: 'Embalagens',
-  SUPPLIES: 'Suprimentos',
-  LABOR: 'Mão de obra',
-  BANK_FEE: 'Tarifas bancárias',
-  SHIPPING: 'Frete',
-  TAX: 'Impostos',
-  OTHER: 'Outros',
-}
-
-const TAX_REGIME_LABELS: Record<string, string> = {
-  SIMPLES_NACIONAL: 'Simples Nacional',
-  LUCRO_PRESUMIDO: 'Lucro Presumido',
-  LUCRO_REAL: 'Lucro Real',
-  MEI: 'MEI',
+const LOCALE_MAP: Record<Locale, string> = {
+  'pt-BR': 'pt-BR',
+  en: 'en-US',
+  es: 'es-ES',
 }
 
 const CURRENT_PERIOD = (() => {
@@ -42,17 +31,30 @@ const CURRENT_PERIOD = (() => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 })()
 
-const PERIOD_LABEL = (() => {
+function getPeriodLabel(lang: Locale) {
   const [year, month] = CURRENT_PERIOD.split('-')
   const date = new Date(parseInt(year), parseInt(month) - 1, 1)
-  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-})()
+  return date.toLocaleDateString(LOCALE_MAP[lang], { month: 'long', year: 'numeric' })
+}
 
-export default async function DrePage() {
+interface PageProps {
+  params: Promise<{ lang: Locale }>
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.dre.title }
+}
+
+export default async function DrePage({ params }: PageProps) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
   const token = (await getToken()) ?? ''
   const session = await getSession()
   const tenantId = session?.tenantId ?? ''
   const readOnly = isReadOnlyAccountant(session?.roles)
+  const periodLabel = getPeriodLabel(lang)
 
   const now = new Date()
   const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -93,30 +95,30 @@ export default async function DrePage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-semibold">DRE</h2>
+          <h2 className="text-xl font-semibold">{dict.dre.title}</h2>
           <p className="text-sm text-muted-foreground capitalize">
-            Demonstracao do Resultado - {PERIOD_LABEL}
+            {dict.dre.subtitle} - {periodLabel}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {dreData.tax_regime && (
             <Badge variant="secondary" className="h-8 px-3">
-              {TAX_REGIME_LABELS[dreData.tax_regime] ?? dreData.tax_regime}
+              {dict.dre.taxRegimes[dreData.tax_regime as keyof Dictionary['dre']['taxRegimes']] ?? dreData.tax_regime}
             </Badge>
           )}
           <Badge variant="secondary" className="h-8 px-3">
-            Aliquota efetiva {formatTaxRate(dreData.estimated_tax_rate)}
+            {dict.dre.effectiveRate} {formatTaxRate(dreData.estimated_tax_rate, lang)}
           </Badge>
           {closing ? (
             <Badge variant="success" className="h-8 px-3">
-              <FileSignature className="size-3 mr-1" /> Assinado
+              <FileSignature className="size-3 mr-1" /> {dict.dre.signed}
             </Badge>
           ) : (
-            <Badge variant="outline" className="h-8 px-3">Aberto</Badge>
+            <Badge variant="outline" className="h-8 px-3">{dict.dre.open}</Badge>
           )}
           <Button variant="outline" size="sm">
             <Download className="size-3.5" />
-            Exportar PDF
+            {dict.common.exportPdf}
           </Button>
         </div>
       </div>
@@ -124,26 +126,26 @@ export default async function DrePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between pb-3">
-            <CardTitle>Demonstracao do Resultado</CardTitle>
-            <span className="text-xs text-muted-foreground">{dreData.sales_count} vendas</span>
+            <CardTitle>{dict.dre.statementTitle}</CardTitle>
+            <span className="text-xs text-muted-foreground">{dreData.sales_count} {dict.dre.salesCount}</span>
           </CardHeader>
           <CardContent>
             <div className="space-y-0 divide-y divide-border">
-              <DreRow label="Receita Bruta de Vendas" value={dreData.gross_revenue} type="income" />
-              <DreRow label="(-) Taxas e Fretes de Marketplace" value={dreData.marketplace_fees} type="deduction" />
-              <DreRow label="(-) Impostos Estimados" value={dreData.estimated_taxes} type="deduction" />
+              <DreRow label={dict.dre.rows.grossRevenue} value={dreData.gross_revenue} type="income" />
+              <DreRow label={dict.dre.rows.marketplaceFees} value={dreData.marketplace_fees} type="deduction" />
+              <DreRow label={dict.dre.rows.estimatedTaxes} value={dreData.estimated_taxes} type="deduction" />
               {(dreData.cmv ?? 0) > 0 && (
-                <DreRow label="(-) Custo da Mercadoria Vendida (CMV)" value={dreData.cmv ?? 0} type="deduction" />
+                <DreRow label={dict.dre.rows.cmv} value={dreData.cmv ?? 0} type="deduction" />
               )}
-              <DreRow label="(-) Despesas Operacionais" value={dreData.operating_expenses} type="deduction" />
+              <DreRow label={dict.dre.rows.operatingExpenses} value={dreData.operating_expenses} type="deduction" />
               {(dreData.banking_expenses ?? 0) > 0 && (
-                <DreRow label="(-) Despesas Bancárias" value={dreData.banking_expenses ?? 0} type="deduction" />
+                <DreRow label={dict.dre.rows.bankingExpenses} value={dreData.banking_expenses ?? 0} type="deduction" />
               )}
-              <DreRow label="Resultado Liquido" value={dreData.net_result} type="total" />
+              <DreRow label={dict.dre.rows.netResult} value={dreData.net_result} type="total" />
             </div>
             <div className="mt-6 pt-4 border-t-2 border-foreground flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Margem Liquida</p>
+                <p className="text-xs text-muted-foreground">{dict.dre.netMargin}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={`text-3xl font-bold ${profitMargin >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                     {profitMargin.toFixed(1)}%
@@ -155,7 +157,7 @@ export default async function DrePage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Resultado Liquido</p>
+                <p className="text-xs text-muted-foreground">{dict.dre.netResultLabel}</p>
                 <p className={`text-2xl font-bold mt-0.5 ${dreData.net_result >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                   {formatCurrency(dreData.net_result)}
                 </p>
@@ -166,13 +168,13 @@ export default async function DrePage() {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Resumo Financeiro</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{dict.dre.summary.title}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {[
-                { label: 'Receita Bruta', value: dreData.gross_revenue, color: 'text-primary', icon: TrendingUp },
-                { label: 'Total Deducoes', value: totalDeductions, color: 'text-destructive', icon: TrendingDown },
+                { label: dict.dre.summary.grossRevenue, value: dreData.gross_revenue, color: 'text-primary', icon: TrendingUp },
+                { label: dict.dre.summary.totalDeductions, value: totalDeductions, color: 'text-destructive', icon: TrendingDown },
                 {
-                  label: 'Resultado',
+                  label: dict.dre.summary.result,
                   value: dreData.net_result,
                   color: dreData.net_result >= 0 ? 'text-emerald-600' : 'text-destructive',
                   icon: dreData.net_result >= 0 ? TrendingUp : TrendingDown,
@@ -193,13 +195,13 @@ export default async function DrePage() {
 
           {dreData.expenses_by_category.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Despesas por Categoria</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{dict.dre.expensesByCategory}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {dreData.expenses_by_category.map((cat) => (
                   <div key={cat.category} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {CATEGORY_LABELS[cat.category] ?? cat.category}
+                        {dict.dre.categories[cat.category as keyof Dictionary['dre']['categories']] ?? cat.category}
                       </span>
                       <span className="font-medium">{formatCurrency(cat.amount)}</span>
                     </div>
@@ -220,23 +222,23 @@ export default async function DrePage() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <ArrowDownToLine className="size-4 text-emerald-600" />
-                  Lucro disponivel
+                  {dict.dre.profitAvailable.title}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Saldo liberado para retirada</p>
+                  <p className="text-xs text-muted-foreground">{dict.dre.profitAvailable.availableBalance}</p>
                   <p className="text-3xl font-bold text-emerald-600">
                     {formatCurrency(availableProfit)}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-lg border border-border bg-background/70 p-2">
-                    <p className="text-muted-foreground">Liberado</p>
+                    <p className="text-muted-foreground">{dict.dre.profitAvailable.released}</p>
                     <p className="font-semibold">{formatCurrency(profitBalance.distributable_profit)}</p>
                   </div>
                   <div className="rounded-lg border border-border bg-background/70 p-2">
-                    <p className="text-muted-foreground">Distribuido</p>
+                    <p className="text-muted-foreground">{dict.dre.profitAvailable.distributed}</p>
                     <p className="font-semibold">{formatCurrency(profitBalance.distributed_profit)}</p>
                   </div>
                 </div>
@@ -248,16 +250,16 @@ export default async function DrePage() {
                 />
                 {profitDistributions.length > 0 && (
                   <div className="space-y-2 pt-2 border-t border-emerald-500/20">
-                    <p className="text-xs font-medium text-muted-foreground">Historico do periodo</p>
+                    <p className="text-xs font-medium text-muted-foreground">{dict.dre.profitAvailable.historyTitle}</p>
                     <div className="space-y-2">
                       {profitDistributions.slice(0, 4).map((distribution) => (
                         <div key={distribution.id} className="flex items-center justify-between gap-3 rounded-lg bg-background/70 px-3 py-2 text-xs">
                           <div className="min-w-0">
                             <p className="font-medium truncate">
-                              {distribution.recipient_name || 'Retirada de lucro'}
+                              {distribution.recipient_name || dict.dre.profitAvailable.defaultRecipient}
                             </p>
                             <p className="text-muted-foreground">
-                              {new Date(distribution.distributed_at).toLocaleDateString('pt-BR')}
+                              {new Date(distribution.distributed_at).toLocaleDateString(LOCALE_MAP[lang])}
                             </p>
                           </div>
                           <span className="font-semibold text-emerald-700 dark:text-emerald-400">
@@ -278,40 +280,40 @@ export default async function DrePage() {
                 <div className="size-10 rounded-full bg-muted flex items-center justify-center">
                   <Wallet className="size-5 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-medium">Lucro ainda nao liberado</p>
+                <p className="text-sm font-medium">{dict.dre.profitNotAvailable.title}</p>
                 <p className="text-xs text-muted-foreground max-w-[220px]">
-                  Feche e assine o periodo para liberar {formatCurrency(dreData.distributable_profit)} para distribuicao.
+                  {formatMessage(dict.dre.profitNotAvailable.description, { amount: formatCurrency(dreData.distributable_profit) })}
                 </p>
               </CardContent>
             </Card>
           )}
 
           <Card>
-            <CardHeader><CardTitle>Assinatura Digital</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{dict.dre.signature.title}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {closing ? (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-1">
                   <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                    Periodo fechado
+                    {dict.dre.signature.closedPeriod}
                   </p>
-                  <p className="text-xs text-muted-foreground">Por {closing.signed_by_email}</p>
+                  <p className="text-xs text-muted-foreground">{formatMessage(dict.dre.signature.signedBy, { email: closing.signed_by_email })}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(closing.signed_at).toLocaleString('pt-BR')}
+                    {new Date(closing.signed_at).toLocaleString(LOCALE_MAP[lang])}
                   </p>
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-border p-4 text-center">
                   <FileSignature className="size-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Periodo ainda nao fechado</p>
+                  <p className="text-sm text-muted-foreground">{dict.dre.signature.openPeriod}</p>
                   <p className="text-xs text-muted-foreground/60 mt-1">
-                    Assine para travar os dados do mes
+                    {dict.dre.signature.openPeriodHint}
                   </p>
                 </div>
               )}
               {!closing && (
                 <Button className="w-full" size="sm" disabled>
                   <FileSignature className="size-3.5" />
-                  Assinar via Clicksign
+                  {dict.dre.signature.signButton}
                 </Button>
               )}
             </CardContent>
@@ -372,9 +374,9 @@ function resolveProfitBalance(
   }
 }
 
-function formatTaxRate(rate: number): string {
+function formatTaxRate(rate: number, lang: Locale): string {
   const normalized = Number.isFinite(rate) ? rate : 0
-  return new Intl.NumberFormat('pt-BR', {
+  return new Intl.NumberFormat(LOCALE_MAP[lang], {
     style: 'percent',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

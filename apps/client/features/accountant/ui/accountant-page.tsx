@@ -1,4 +1,3 @@
-import type { Metadata } from 'next'
 import { Calculator, Info, UserRound } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -14,14 +13,18 @@ import {
 import { getToken, getSession } from '@/entities/session/server/session'
 import { getAccountants } from '@/shared/api/gateway'
 import { isReadOnlyAccountant } from '@/entities/session/model/permissions'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import { AccountantForm } from './accountant-form'
 
-export const metadata: Metadata = { title: 'Contador' }
+interface Props {
+  params: Promise<{ lang: Locale }>
+}
 
-const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: 'Ativo',
-  INACTIVE: 'Inativo',
-  PENDING: 'Pendente',
+export async function generateMetadata({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.accountant.title }
 }
 
 const STATUS_VARIANT: Record<string, 'success' | 'secondary' | 'warning' | 'destructive'> = {
@@ -30,7 +33,9 @@ const STATUS_VARIANT: Record<string, 'success' | 'secondary' | 'warning' | 'dest
   PENDING: 'warning',
 }
 
-export default async function ContadorPage() {
+export default async function ContadorPage({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
   const token = (await getToken()) ?? ''
   const session = await getSession()
   if (!session) return null
@@ -38,12 +43,14 @@ export default async function ContadorPage() {
 
   const accountants = await getAccountants(token, session.tenantId)
 
+  const statusLabels = dict.accountant.status as Record<string, string>
+
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="space-y-1">
-        <h2 className="text-xl font-semibold">Contador</h2>
+        <h2 className="text-xl font-semibold">{dict.accountant.title}</h2>
         <p className="text-sm text-muted-foreground">
-          Gerencie o acesso do contador às informações financeiras do tenant.
+          {dict.accountant.subtitle}
         </p>
       </div>
 
@@ -53,10 +60,10 @@ export default async function ContadorPage() {
           <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
             <Calculator className="size-4 text-primary" />
           </div>
-          <CardTitle>Conceder acesso ao contador</CardTitle>
+          <CardTitle>{dict.accountant.grantForm.title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <AccountantForm readOnly={readOnly} />
+          <AccountantForm readOnly={readOnly} dict={dict} />
         </CardContent>
       </Card>
       {/* Tabela de contadores ativos */}
@@ -65,7 +72,7 @@ export default async function ContadorPage() {
           <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
             <Calculator className="size-4 text-primary" />
           </div>
-          <CardTitle>Contadores com acesso</CardTitle>
+          <CardTitle>{dict.accountant.table.title}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {accountants.length === 0 ? (
@@ -73,18 +80,18 @@ export default async function ContadorPage() {
               <div className="size-12 rounded-full bg-muted flex items-center justify-center mb-3">
                 <UserRound className="size-6 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium">Nenhum contador com acesso</p>
+              <p className="text-sm font-medium">{dict.accountant.table.empty.title}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Conceda acesso abaixo para que um contador visualize suas informações financeiras.
+                {dict.accountant.table.empty.hint}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="pl-6">Contador</TableHead>
-                  <TableHead>E-mail</TableHead>
-<TableHead>Status</TableHead>
+                  <TableHead className="pl-6">{dict.accountant.table.columns.name}</TableHead>
+                  <TableHead>{dict.accountant.table.columns.email}</TableHead>
+<TableHead>{dict.accountant.table.columns.status}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -129,7 +136,7 @@ export default async function ContadorPage() {
                           variant={STATUS_VARIANT[accountant.status] ?? 'secondary'}
                           className="text-xs"
                         >
-                          {STATUS_LABEL[accountant.status] ?? accountant.status}
+                          {statusLabels[accountant.status] ?? accountant.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -141,14 +148,14 @@ export default async function ContadorPage() {
         </CardContent>
       </Card>
 
-    
+
 
       <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
         <Info className="size-4 mt-0.5 shrink-0" />
         <p>
-          O contador terá acesso com papel <strong className="text-foreground">CONTADOR</strong> e
-          perfil somente leitura. Ele poderá visualizar lançamentos, despesas, DRE e relatórios,
-          mas não poderá alterar dados nem configurações da conta.
+          {dict.accountant.accessNote.prefix}
+          <strong className="text-foreground">{dict.accountant.accessNote.highlight}</strong>
+          {dict.accountant.accessNote.suffix}
         </p>
       </div>
     </div>

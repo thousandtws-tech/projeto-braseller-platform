@@ -1,16 +1,26 @@
-import type { Metadata } from 'next'
+import Link from 'next/link'
 import { AlertCircle } from 'lucide-react'
 import { LoginForm } from '@/features/auth'
-
-export const metadata: Metadata = { title: 'Entrar' }
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
 interface Props {
+  params: Promise<{ lang: Locale }>
   searchParams: Promise<{ expired?: string; error?: string }>
 }
 
-export default async function LoginPage({ searchParams }: Props) {
+export async function generateMetadata({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.auth.login.title }
+}
+
+export default async function LoginPage({ params, searchParams }: Props) {
+  const { lang } = await params
   const { expired, error } = await searchParams
-  const oauthError = googleAuthErrorMessage(error)
+  const dict = await getDictionary(lang)
+  const oauthError = googleAuthErrorMessage(error, dict.auth.login.errors)
 
   return (
     <div className="space-y-8">
@@ -22,16 +32,16 @@ export default async function LoginPage({ searchParams }: Props) {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Bem-vindo de volta</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{dict.auth.login.title}</h1>
         <p className="text-sm text-muted-foreground">
-          Acesse sua conta para gerenciar suas vendas
+          {dict.auth.login.subtitle}
         </p>
       </div>
 
       {expired === '1' && (
         <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3.5 py-3 text-sm text-amber-700 dark:text-amber-400">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>Sua sessao expirou. Faca login novamente para continuar.</span>
+          <span>{dict.auth.login.sessionExpired}</span>
         </div>
       )}
 
@@ -45,24 +55,24 @@ export default async function LoginPage({ searchParams }: Props) {
       <LoginForm />
 
       <p className="text-center text-sm text-muted-foreground">
-        Nao tem uma conta?{' '}
-        <a href="/register" className="font-medium text-primary hover:underline">
-          Criar conta
-        </a>
+        {dict.auth.login.noAccount}{' '}
+        <Link href={`/${lang}/register`} className="font-medium text-primary hover:underline">
+          {dict.auth.login.createAccount}
+        </Link>
       </p>
     </div>
   )
 }
 
-function googleAuthErrorMessage(error?: string) {
+function googleAuthErrorMessage(error: string | undefined, errors: Dictionary['auth']['login']['errors']) {
   if (error === 'google_unavailable') {
-    return 'Login com Google indisponivel no momento.'
+    return errors.googleUnavailable
   }
   if (error === 'google_account_not_registered') {
-    return 'Essa conta Google ainda nao esta cadastrada. Crie a conta primeiro ou entre com e-mail e senha.'
+    return errors.googleAccountNotRegistered
   }
   if (error === 'oauth_failed') {
-    return 'Nao foi possivel concluir o login com Google.'
+    return errors.oauthFailed
   }
   return null
 }

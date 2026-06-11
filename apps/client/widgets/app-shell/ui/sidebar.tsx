@@ -19,39 +19,46 @@ import {
   Package,
   Landmark,
   BriefcaseBusiness,
+  Scale,
 } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { isBpoOperator } from '@/entities/session/model/permissions'
 import { logoutAction } from '@/features/auth/server/actions'
 import { Avatar, AvatarImage, AvatarFallback } from '@/shared/ui/avatar'
 import type { UserSession } from '@/shared/types'
-
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/lancamentos', label: 'Lançamentos', icon: ShoppingCart },
-  { href: '/despesas', label: 'Despesas', icon: Receipt },
-  { href: '/estoque', label: 'Estoque', icon: Package },
-  { href: '/extrato', label: 'Extrato', icon: Landmark },
-  { href: '/dre', label: 'DRE', icon: BarChart3 },
-  { href: '/conectores', label: 'Conectores', icon: Store },
-]
-
-const BOTTOM_NAV = [
-  { href: '/notificacoes', label: 'Notificações', icon: Bell },
-  { href: '/contador', label: 'Contador', icon: Calculator },
-  { href: '/configuracoes', label: 'Configurações', icon: Settings },
-]
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
 interface SidebarProps {
   user: UserSession
+  dict: Dictionary
+  lang: Locale
 }
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, dict, lang }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
-  const navItems = isBpoOperator(user.roles)
-    ? [{ href: '/bpo', label: 'BPO', icon: BriefcaseBusiness }, ...NAV_ITEMS]
-    : NAV_ITEMS
+
+  const navItems = [
+    { href: 'dashboard', label: dict.nav.dashboard, icon: LayoutDashboard },
+    { href: 'lancamentos', label: dict.nav.lancamentos, icon: ShoppingCart },
+    { href: 'despesas', label: dict.nav.despesas, icon: Receipt },
+    { href: 'estoque', label: dict.nav.estoque, icon: Package },
+    { href: 'extrato', label: dict.nav.extrato, icon: Landmark },
+    { href: 'dre', label: dict.nav.dre, icon: BarChart3 },
+    { href: 'balanco', label: dict.nav.balanco, icon: Scale },
+    { href: 'conectores', label: dict.nav.conectores, icon: Store },
+  ]
+
+  const items = isBpoOperator(user.roles)
+    ? [{ href: 'bpo', label: dict.nav.bpo, icon: BriefcaseBusiness }, ...navItems]
+    : navItems
+
+  const bottomNav = [
+    { href: 'notificacoes', label: dict.nav.notificacoes, icon: Bell },
+    { href: 'contador', label: dict.nav.contador, icon: Calculator },
+    { href: 'configuracoes', label: dict.nav.configuracoes, icon: Settings },
+  ]
 
   return (
     <aside
@@ -66,18 +73,19 @@ export function Sidebar({ user }: SidebarProps) {
           <span className="text-sidebar-primary-foreground font-bold text-sm">B</span>
         </div>
         {!collapsed && (
-          <span className="font-semibold text-base truncate">Brasaller</span>
+          <span className="font-semibold text-base truncate">LogoOficial</span>
         )}
       </div>
 
       {/* Nav */}
       <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
+        {items.map(({ href, label, icon: Icon }) => {
+          const fullHref = `/${lang}/${href}`
+          const active = pathname === fullHref || pathname.startsWith(fullHref + '/')
           return (
             <Link
               key={href}
-              href={href}
+              href={fullHref}
               title={collapsed ? label : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
@@ -96,12 +104,13 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* Bottom nav */}
       <div className="border-t border-sidebar-border py-4 space-y-0.5 px-2">
-        {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href
+        {bottomNav.map(({ href, label, icon: Icon }) => {
+          const fullHref = `/${lang}/${href}`
+          const active = pathname === fullHref
           return (
             <Link
               key={href}
-              href={href}
+              href={fullHref}
               title={collapsed ? label : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
@@ -118,15 +127,15 @@ export function Sidebar({ user }: SidebarProps) {
         })}
 
         <Link
-          href="/plano"
-          title={collapsed ? 'Plano' : undefined}
+          href={`/${lang}/plano`}
+          title={collapsed ? dict.nav.plano : undefined}
           className={cn(
             'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
             collapsed && 'justify-center px-2'
           )}
         >
           <CreditCard className="size-4 shrink-0" />
-          {!collapsed && <span className="truncate">Plano</span>}
+          {!collapsed && <span className="truncate">{dict.nav.plano}</span>}
         </Link>
       </div>
 
@@ -155,7 +164,7 @@ export function Sidebar({ user }: SidebarProps) {
               <button
                 type="submit"
                 className="p-1 rounded hover:bg-sidebar-accent/50 transition-colors"
-                title="Sair"
+                title={dict.nav.signOut}
               >
                 <LogOut className="size-3.5 text-sidebar-foreground/50" />
               </button>
@@ -168,7 +177,7 @@ export function Sidebar({ user }: SidebarProps) {
       <button
         onClick={() => setCollapsed(!collapsed)}
         className="absolute -right-3 top-[52px] size-6 rounded-full bg-sidebar border border-sidebar-border flex items-center justify-center hover:bg-sidebar-accent transition-colors z-10"
-        aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+        aria-label={collapsed ? dict.nav.expandMenu : dict.nav.collapseMenu}
       >
         <ChevronLeft className={cn('size-3 text-sidebar-foreground/70 transition-transform', collapsed && 'rotate-180')} />
       </button>

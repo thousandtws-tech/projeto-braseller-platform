@@ -1,22 +1,15 @@
-import type { Metadata } from 'next'
 import { TrendingDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { getToken, getSession } from '@/entities/session/server/session'
 import { getBankTransactions, formatCurrency } from '@/shared/api/gateway'
 import { isReadOnlyAccountant } from '@/entities/session/model/permissions'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Locale } from '@/shared/i18n/config'
 import { UploadOfxForm } from './upload-ofx-form'
 import type { BankTransaction } from '@/shared/types'
 
-export const metadata: Metadata = { title: 'Extrato Bancário' }
-
-const CATEGORY_LABELS: Record<string, string> = {
-  TARIFA_BANCARIA: 'Tarifa bancária',
-  JUROS: 'Juros',
-  PIX: 'PIX',
-  TED_DOC: 'TED/DOC',
-  IOF: 'IOF',
-  OUTROS: 'Outros',
-}
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 
 const CATEGORY_COLORS: Record<string, string> = {
   TARIFA_BANCARIA: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -44,7 +37,20 @@ function summarizeByCategory(transactions: BankTransaction[]) {
   return Object.entries(byCategory).sort((a, b) => b[1] - a[1])
 }
 
-export default async function ExtratoPage() {
+interface Props {
+  params: Promise<{ lang: Locale }>
+}
+
+export async function generateMetadata({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.bank.title }
+}
+
+export default async function ExtratoPage({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  const categoryLabels = dict.bank.categories as Record<string, string>
   const token = (await getToken()) ?? ''
   const session = await getSession()
   const tenantId = session?.tenantId ?? ''
@@ -62,9 +68,9 @@ export default async function ExtratoPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h2 className="text-xl font-semibold">Extrato Bancário</h2>
+        <h2 className="text-xl font-semibold">{dict.bank.header.title}</h2>
         <p className="text-sm text-muted-foreground">
-          Importe o extrato OFX da conta PJ para registrar despesas financeiras automaticamente na DRE.
+          {dict.bank.header.subtitle}
         </p>
       </div>
 
@@ -72,12 +78,11 @@ export default async function ExtratoPage() {
         {/* Upload + KPIs */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
-            <CardHeader><CardTitle>Importar Extrato OFX</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{dict.bank.importOfx.title}</CardTitle></CardHeader>
             <CardContent>
-              <UploadOfxForm readOnly={readOnly} />
+              <UploadOfxForm readOnly={readOnly} dict={dict} />
               <p className="mt-3 text-xs text-muted-foreground">
-                Exporte o extrato da conta PJ no seu banco (formato OFX/QFX) e importe aqui.
-                As despesas são categorizadas automaticamente e entram na DRE.
+                {dict.bank.importOfx.hint}
               </p>
             </CardContent>
           </Card>
@@ -85,37 +90,37 @@ export default async function ExtratoPage() {
           {/* Transactions table */}
           <Card>
             <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle>Transações do Mês</CardTitle>
-              <span className="text-xs text-muted-foreground">{transactions.length} registros</span>
+              <CardTitle>{dict.bank.transactions.title}</CardTitle>
+              <span className="text-xs text-muted-foreground">{formatMessage(dict.bank.transactions.count, { count: transactions.length })}</span>
             </CardHeader>
             <CardContent>
               {transactions.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhuma transação importada este mês.
+                  {dict.bank.transactions.empty}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border text-muted-foreground">
-                        <th className="text-left py-2 pr-4 font-medium">Data</th>
-                        <th className="text-left py-2 pr-4 font-medium">Descrição</th>
-                        <th className="text-left py-2 pr-4 font-medium">Categoria</th>
-                        <th className="text-right py-2 font-medium">Valor</th>
+                        <th className="text-left py-2 pr-4 font-medium">{dict.bank.transactions.columns.date}</th>
+                        <th className="text-left py-2 pr-4 font-medium">{dict.bank.transactions.columns.description}</th>
+                        <th className="text-left py-2 pr-4 font-medium">{dict.bank.transactions.columns.category}</th>
+                        <th className="text-right py-2 font-medium">{dict.bank.transactions.columns.value}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {transactions.map((t) => (
                         <tr key={t.id} className="hover:bg-muted/30 transition-colors">
                           <td className="py-2.5 pr-4 text-muted-foreground tabular-nums whitespace-nowrap">
-                            {new Date(t.posted_date).toLocaleDateString('pt-BR')}
+                            {new Date(t.posted_date).toLocaleDateString(LOCALE_MAP[lang])}
                           </td>
                           <td className="py-2.5 pr-4 text-muted-foreground max-w-[200px] truncate">
                             {t.description ?? '—'}
                           </td>
                           <td className="py-2.5 pr-4">
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[t.category] ?? CATEGORY_COLORS.OUTROS}`}>
-                              {CATEGORY_LABELS[t.category] ?? t.category}
+                              {categoryLabels[t.category] ?? t.category}
                             </span>
                           </td>
                           <td className={`py-2.5 text-right font-medium tabular-nums ${t.tran_type === 'DEBIT' ? 'text-destructive' : 'text-emerald-600'}`}>
@@ -140,24 +145,24 @@ export default async function ExtratoPage() {
                   <TrendingDown className="size-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total despesas bancárias</p>
+                  <p className="text-xs text-muted-foreground">{dict.bank.sidebar.totalExpenses}</p>
                   <p className="text-xl font-bold text-destructive">{formatCurrency(totalExpenses)}</p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground border-t border-border pt-2">
-                Valor deduzido automaticamente na linha <strong>Despesas Bancárias</strong> da DRE.
+                {dict.bank.sidebar.notePrefix} <strong>{dict.bank.sidebar.noteHighlight}</strong> {dict.bank.sidebar.noteSuffix}
               </p>
             </CardContent>
           </Card>
 
           {categorySummary.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Por Categoria</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{dict.bank.sidebar.byCategory}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {categorySummary.map(([category, amount]) => (
                   <div key={category} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{CATEGORY_LABELS[category] ?? category}</span>
+                      <span className="text-muted-foreground">{categoryLabels[category] ?? category}</span>
                       <span className="font-medium tabular-nums">{formatCurrency(amount)}</span>
                     </div>
                     <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -173,13 +178,13 @@ export default async function ExtratoPage() {
           )}
 
           <Card>
-            <CardHeader><CardTitle>Como exportar o OFX</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{dict.bank.howToExport.title}</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-xs text-muted-foreground">
-              <p><strong className="text-foreground">Itaú:</strong> Internet Banking → Extrato → Exportar → OFX</p>
-              <p><strong className="text-foreground">Bradesco:</strong> Net Empresa → Extrato → Download OFX</p>
-              <p><strong className="text-foreground">Santander:</strong> Internet Banking → Conta Corrente → Extrato → OFX</p>
-              <p><strong className="text-foreground">Nubank PJ:</strong> App → Extrato → Exportar → OFX</p>
-              <p><strong className="text-foreground">Sicoob/Sicredi:</strong> Internet Banking → Conta → Extrato → Exportar OFX</p>
+              <p><strong className="text-foreground">Itaú:</strong> {dict.bank.howToExport.itau}</p>
+              <p><strong className="text-foreground">Bradesco:</strong> {dict.bank.howToExport.bradesco}</p>
+              <p><strong className="text-foreground">Santander:</strong> {dict.bank.howToExport.santander}</p>
+              <p><strong className="text-foreground">Nubank PJ:</strong> {dict.bank.howToExport.nubank}</p>
+              <p><strong className="text-foreground">Sicoob/Sicredi:</strong> {dict.bank.howToExport.sicoob}</p>
             </CardContent>
           </Card>
         </div>

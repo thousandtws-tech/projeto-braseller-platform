@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import type { Metadata } from 'next'
 import { TrendingUp, ShoppingCart, DollarSign, ArrowDownLeft } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
@@ -7,103 +6,133 @@ import { Skeleton } from '@/shared/ui/skeleton'
 import { DatePicker } from '@/shared/ui/date-picker'
 import { getToken, getSession } from '@/entities/session/server/session'
 import { getDashboard, getReportEntries, getReportsSummary, formatCurrency, formatDate } from '@/shared/api/gateway'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import type { DashboardView, PlatformBreakdown, ReportEntry, ReportsSummary } from '@/shared/types'
 
-export const metadata: Metadata = { title: 'Dashboard' }
+const LOCALE_MAP: Record<Locale, string> = {
+  'pt-BR': 'pt-BR',
+  en: 'en-US',
+  es: 'es-ES',
+}
 
-const CURRENT_PERIOD = (() => {
+function getCurrentPeriod(lang: Locale) {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
   const from = `${year}-${String(month + 1).padStart(2, '0')}-01`
   const lastDay = new Date(year, month + 1, 0).getDate()
   const to = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  const label = new Date(year, month, 1).toLocaleDateString('pt-BR', {
+  const label = new Date(year, month, 1).toLocaleDateString(LOCALE_MAP[lang], {
     month: 'long',
     year: 'numeric',
   })
 
   return { from, to, label }
-})()
+}
 
-export default async function DashboardPage() {
+interface PageProps {
+  params: Promise<{ lang: Locale }>
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.dashboard.title }
+}
+
+export default async function DashboardPage({ params }: PageProps) {
+  const { lang } = await params
   const token = (await getToken()) ?? ''
   const session = await getSession()
   const tenantId = session?.tenantId
+  const dict = await getDictionary(lang)
+  const period = getCurrentPeriod(lang)
 
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Visão Geral</h2>
-          <p className="text-sm text-muted-foreground capitalize">{CURRENT_PERIOD.label}</p>
+          <h2 className="text-xl font-semibold">{dict.dashboard.title}</h2>
+          <p className="text-sm text-muted-foreground capitalize">{period.label}</p>
         </div>
-        <PeriodSelector />
+        <PeriodSelector dict={dict} period={period} />
       </div>
 
       <Suspense fallback={<KpiSkeleton />}>
-        <KpiSection token={token} tenantId={tenantId} />
+        <KpiSection token={token} tenantId={tenantId} period={period} dict={dict} />
       </Suspense>
 
       <Suspense fallback={<ChartSkeleton />}>
-        <ChartsSection token={token} tenantId={tenantId} />
+        <ChartsSection token={token} tenantId={tenantId} dict={dict} />
       </Suspense>
 
       <Suspense fallback={<OrdersSkeleton />}>
-        <RecentOrdersSection token={token} tenantId={tenantId} />
+        <RecentOrdersSection token={token} tenantId={tenantId} dict={dict} lang={lang} />
       </Suspense>
     </div>
   )
 }
 
-function PeriodSelector() {
+function PeriodSelector({ dict, period }: { dict: Dictionary; period: { from: string } }) {
   return (
     <DatePicker
       name="period"
-      defaultValue={CURRENT_PERIOD.from}
+      defaultValue={period.from}
       displayFormat="LLLL yyyy"
-      placeholder="Selecionar período"
+      placeholder={dict.dashboard.selectPeriod}
       buttonClassName="h-8 w-40 capitalize"
     />
   )
 }
 
-async function KpiSection({ token, tenantId }: { token: string; tenantId?: string }) {
+async function KpiSection({
+  token,
+  tenantId,
+  period,
+  dict,
+}: {
+  token: string
+  tenantId?: string
+  period: { from: string; to: string }
+  dict: Dictionary
+}) {
   const summary = tenantId
     ? await getReportsSummary(token, tenantId, {
-        from: CURRENT_PERIOD.from,
-        to: CURRENT_PERIOD.to,
+        from: period.from,
+        to: period.to,
       })
     : null
 
-  return <KpiCards summary={summary} />
+  return <KpiCards summary={summary} dict={dict} />
 }
 
-function KpiCards({ summary }: { summary: ReportsSummary | null }) {
+function KpiCards({ summary, dict }: { summary: ReportsSummary | null; dict: Dictionary }) {
   const cards = [
     {
-      title: 'Receita Bruta',
+      title: dict.dashboard.kpis.grossRevenue,
       value: formatCurrency(summary?.gross_value ?? 0),
       icon: DollarSign,
       color: 'text-primary',
       bg: 'bg-primary/10',
     },
     {
-      title: 'Recebido',
+      title: dict.dashboard.kpis.received,
       value: formatCurrency(summary?.received_value ?? 0),
       icon: TrendingUp,
       color: 'text-[--success]',
       bg: 'bg-[--success]/10',
     },
     {
-      title: 'Taxas e frete',
+      title: dict.dashboard.kpis.feesAndShipping,
       value: formatCurrency(summary?.fee_value ?? 0),
       icon: ArrowDownLeft,
       color: 'text-destructive',
       bg: 'bg-destructive/10',
     },
     {
-      title: 'Total de Pedidos',
+      title: dict.dashboard.kpis.totalOrders,
       value: String(summary?.entry_count ?? 0),
       icon: ShoppingCart,
       color: 'text-[--warning]',
@@ -134,7 +163,7 @@ function KpiCards({ summary }: { summary: ReportsSummary | null }) {
   )
 }
 
-async function ChartsSection({ token, tenantId }: { token: string; tenantId?: string }) {
+async function ChartsSection({ token, tenantId, dict }: { token: string; tenantId?: string; dict: Dictionary }) {
   const [data, entries] = await Promise.all([
     getDashboard(token, tenantId),
     getReportEntries(token, tenantId),
@@ -161,18 +190,18 @@ async function ChartsSection({ token, tenantId }: { token: string; tenantId?: st
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <RevenueChart data={data} />
-      <PlatformBreakdown breakdown={breakdown} />
+      <RevenueChart data={data} dict={dict} />
+      <PlatformBreakdown breakdown={breakdown} dict={dict} />
     </div>
   )
 }
 
-function RevenueChart({ data }: { data: DashboardView }) {
+function RevenueChart({ data, dict }: { data: DashboardView; dict: Dictionary }) {
   const max = Math.max(...data.monthlyEvolution.map((m) => m.grossRevenue))
   return (
     <Card className="lg:col-span-2">
       <CardHeader>
-        <CardTitle>Evolução Mensal</CardTitle>
+        <CardTitle>{dict.dashboard.monthlyEvolution}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-end gap-2 h-44">
@@ -182,12 +211,12 @@ function RevenueChart({ data }: { data: DashboardView }) {
                 <div
                   className="w-full rounded-t-sm bg-primary/20"
                   style={{ height: `${(m.grossRevenue / max) * 100}%` }}
-                  title={`Receita: ${formatCurrency(m.grossRevenue)}`}
+                  title={`${dict.dashboard.grossRevenueTooltip}: ${formatCurrency(m.grossRevenue)}`}
                 />
                 <div
                   className="w-full rounded-t-sm bg-primary"
                   style={{ height: `${(m.received / max) * 100}%` }}
-                  title={`Recebido: ${formatCurrency(m.received)}`}
+                  title={`${dict.dashboard.receivedTooltip}: ${formatCurrency(m.received)}`}
                 />
               </div>
               <span className="text-xs text-muted-foreground">{m.month}</span>
@@ -196,10 +225,10 @@ function RevenueChart({ data }: { data: DashboardView }) {
         </div>
         <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="size-2.5 rounded-sm bg-primary/20" />Receita Bruta
+            <div className="size-2.5 rounded-sm bg-primary/20" />{dict.dashboard.grossRevenueLegend}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="size-2.5 rounded-sm bg-primary" />Recebido
+            <div className="size-2.5 rounded-sm bg-primary" />{dict.dashboard.receivedLegend}
           </div>
         </div>
       </CardContent>
@@ -207,15 +236,15 @@ function RevenueChart({ data }: { data: DashboardView }) {
   )
 }
 
-function PlatformBreakdown({ breakdown }: { breakdown: PlatformBreakdown[] }) {
+function PlatformBreakdown({ breakdown, dict }: { breakdown: PlatformBreakdown[]; dict: Dictionary }) {
   const colors = ['bg-primary', 'bg-chart-2', 'bg-chart-3', 'bg-chart-4', 'bg-chart-5']
 
   if (breakdown.length === 0) {
     return (
       <Card>
-        <CardHeader><CardTitle>Marketplaces</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{dict.dashboard.marketplaces}</CardTitle></CardHeader>
         <CardContent className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-          Nenhum pedido encontrado
+          {dict.dashboard.noOrdersFound}
         </CardContent>
       </Card>
     )
@@ -224,7 +253,7 @@ function PlatformBreakdown({ breakdown }: { breakdown: PlatformBreakdown[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Marketplaces</CardTitle>
+        <CardTitle>{dict.dashboard.marketplaces}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {breakdown.map((p, i) => (
@@ -247,18 +276,28 @@ function PlatformBreakdown({ breakdown }: { breakdown: PlatformBreakdown[] }) {
   )
 }
 
-async function RecentOrdersSection({ token, tenantId }: { token: string; tenantId?: string }) {
+async function RecentOrdersSection({
+  token,
+  tenantId,
+  dict,
+  lang,
+}: {
+  token: string
+  tenantId?: string
+  dict: Dictionary
+  lang: Locale
+}) {
   const data = await getDashboard(token, tenantId)
-  return <RecentOrdersTable orders={data.recentOrders} />
+  return <RecentOrdersTable orders={data.recentOrders} dict={dict} lang={lang} />
 }
 
-function RecentOrdersTable({ orders }: { orders: ReportEntry[] }) {
+function RecentOrdersTable({ orders, dict, lang }: { orders: ReportEntry[]; dict: Dictionary; lang: Locale }) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Pedidos Recentes</CardTitle>
-        <a href="/lancamentos" className="text-xs text-primary hover:underline">
-          Ver todos →
+        <CardTitle>{dict.dashboard.recentOrders}</CardTitle>
+        <a href={`/${lang}/lancamentos`} className="text-xs text-primary hover:underline">
+          {dict.common.viewAll} →
         </a>
       </CardHeader>
       <CardContent className="p-0">
@@ -266,12 +305,12 @@ function RecentOrdersTable({ orders }: { orders: ReportEntry[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Pedido</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Comprador</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Plataforma</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground hidden lg:table-cell">Data</th>
-                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Valor</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Status</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">{dict.dashboard.table.order}</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">{dict.dashboard.table.buyer}</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground hidden md:table-cell">{dict.dashboard.table.platform}</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground hidden lg:table-cell">{dict.dashboard.table.date}</th>
+                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">{dict.dashboard.table.value}</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">{dict.dashboard.table.status}</th>
               </tr>
             </thead>
             <tbody>
@@ -286,7 +325,7 @@ function RecentOrdersTable({ orders }: { orders: ReportEntry[] }) {
                     {formatDate(order.saleDate)}
                   </td>
                   <td className="px-5 py-3 text-right font-medium">{formatCurrency(order.grossValue)}</td>
-                  <td className="px-5 py-3"><OrderStatusBadge status={order.status} /></td>
+                  <td className="px-5 py-3"><OrderStatusBadge status={order.status} dict={dict} /></td>
                 </tr>
               ))}
             </tbody>
@@ -310,14 +349,15 @@ function PlatformBadge({ platform }: { platform: string }) {
   )
 }
 
-function OrderStatusBadge({ status }: { status: ReportEntry['status'] }) {
-  const map: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
-    PAID: { label: 'Pago', variant: 'success' },
-    PENDING: { label: 'Pendente', variant: 'warning' },
-    CANCELLED: { label: 'Cancelado', variant: 'destructive' },
-    REFUNDED: { label: 'Reembolsado', variant: 'secondary' },
+function OrderStatusBadge({ status, dict }: { status: ReportEntry['status']; dict: Dictionary }) {
+  const variants: Record<string, 'success' | 'warning' | 'destructive' | 'secondary'> = {
+    PAID: 'success',
+    PENDING: 'warning',
+    CANCELLED: 'destructive',
+    REFUNDED: 'secondary',
   }
-  const { label, variant } = map[status] ?? { label: status, variant: 'secondary' as const }
+  const label = dict.dashboard.status[status] ?? status
+  const variant = variants[status] ?? 'secondary'
   return <Badge variant={variant}>{label}</Badge>
 }
 

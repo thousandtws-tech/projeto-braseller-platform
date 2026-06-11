@@ -1,9 +1,22 @@
-import type { Metadata } from 'next'
+import Link from 'next/link'
 import { RegisterForm } from '@/features/auth'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
-export const metadata: Metadata = { title: 'Criar conta' }
+interface Props {
+  params: Promise<{ lang: Locale }>
+}
 
-export default function RegisterPage() {
+export async function generateMetadata({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.auth.register.title }
+}
+
+export default async function RegisterPage({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+
   return (
     <div className="space-y-8">
       <div className="flex lg:hidden items-center gap-2 justify-center mb-2">
@@ -14,19 +27,19 @@ export default function RegisterPage() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Criar sua conta</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{dict.auth.register.title}</h1>
         <p className="text-sm text-muted-foreground">
-          Configure seu tenant e comece com 14 dias de trial
+          {dict.auth.register.subtitle}
         </p>
       </div>
 
       <RegisterForm />
 
       <p className="text-center text-sm text-muted-foreground">
-        Já tem uma conta?{' '}
-        <a href="/login" className="text-primary hover:underline font-medium">
-          Entrar
-        </a>
+        {dict.auth.register.hasAccount}{' '}
+        <Link href={`/${lang}/login`} className="text-primary hover:underline font-medium">
+          {dict.auth.register.signIn}
+        </Link>
       </p>
     </div>
   )

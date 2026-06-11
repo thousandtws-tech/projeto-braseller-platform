@@ -15,13 +15,15 @@ import { Button, buttonVariants } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { authenticateAction } from '@/features/connectors/server/actions'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
 const ML_OAUTH_URL =
   'https://auth.mercadolivre.com.br/authorization?response_type=code' +
   '&client_id=4587994283757685' +
   '&redirect_uri=https%3A%2F%2Fgateway-api.salmonrock-4d3f2812.brazilsouth.azurecontainerapps.io%2Fintegrations%2Fmercado-livre%2Fcallback'
 
-const MARKETPLACES: {
+interface Marketplace {
   name: string
   displayName: string
   bg: string
@@ -29,86 +31,91 @@ const MARKETPLACES: {
   iconSrc?: string
   iconAlt?: string
   oauthUrl?: string
-  fields: { name: string; label: string; placeholder: string; type?: string }[]
-}[] = [
-  {
-    name: 'shopee',
-    displayName: 'Shopee',
-    bg: 'bg-orange-500',
-    initials: 'SP',
-    iconSrc: '/favicons/favicon.ico',
-    iconAlt: 'Shopee',
-    fields: [
-      { name: 'shop_id', label: 'Shop ID', placeholder: 'ID da sua loja no Seller Center' },
-      { name: 'code',    label: 'Código de autorização', placeholder: 'Código gerado pelo Shopee OAuth' },
-    ],
-  },
-  {
-    name: 'magalu',
-    displayName: 'Magalu',
-    bg: 'bg-blue-500',
-    initials: 'MG',
-    iconSrc: '/favicons/magalu.ico',
-    iconAlt: 'Magalu',
-    fields: [
-      { name: 'client_id',     label: 'Client ID',     placeholder: 'Client ID Magalu' },
-      { name: 'client_secret', label: 'Client Secret', placeholder: 'Client Secret', type: 'password' },
-    ],
-  },
-  {
-    name: 'bling',
-    displayName: 'Bling',
-    bg: 'bg-indigo-500',
-    initials: 'BL',
-    iconSrc: '/favicons/bling.ico',
-    iconAlt: 'Bling',
-    fields: [
-      { name: 'api_key', label: 'API Key', placeholder: 'Chave de API do Bling', type: 'password' },
-    ],
-  },
-  {
-    name: 'amazon',
-    displayName: 'Amazon',
-    bg: 'bg-blue-700',
-    initials: 'AZ',
-    iconSrc: '/favicons/amazon.ico',
-    iconAlt: 'Amazon',
-    fields: [
-      { name: 'seller_id',     label: 'Seller ID',     placeholder: 'ID do vendedor (Seller Central)' },
-      { name: 'refresh_token', label: 'Refresh Token', placeholder: 'Token gerado no Seller Central', type: 'password' },
-    ],
-  },
-  {
-    name: 'mercado-livre',
-    displayName: 'Mercado Livre',
-    bg: 'bg-yellow-400',
-    initials: 'ML',
-    iconSrc: '/favicons/180x180.png',
-    iconAlt: 'Mercado Livre',
-    oauthUrl: ML_OAUTH_URL,
-    fields: [],
-  },
-  {
-    name: 'olist',
-    displayName: 'Olist',
-    bg: 'bg-yellow-600',
-    initials: 'OL',
-    iconSrc: '/favicons/olist.ico',
-    iconAlt: 'Olist',
-    fields: [
-      { name: 'api_key', label: 'API Key', placeholder: 'Chave de API Olist', type: 'password' },
-    ],
-  },
-]
+  fields: { name: string; label: string; placeholder: string; type?: string; hint?: string }[]
+}
+
+function getMarketplaces(dict: Dictionary): Marketplace[] {
+  return [
+    {
+      name: 'shopee',
+      displayName: 'Shopee',
+      bg: 'bg-orange-500',
+      initials: 'SP',
+      iconSrc: '/favicons/favicon.ico',
+      iconAlt: 'Shopee',
+      fields: [
+        { name: 'shop_id', ...dict.connectors.fields.shopId },
+        { name: 'code', ...dict.connectors.fields.shopeeCode },
+      ],
+    },
+    {
+      name: 'magalu',
+      displayName: 'Magalu',
+      bg: 'bg-blue-500',
+      initials: 'MG',
+      iconSrc: '/favicons/magalu.ico',
+      iconAlt: 'Magalu',
+      fields: [
+        { name: 'client_id', ...dict.connectors.fields.clientId },
+        { name: 'client_secret', ...dict.connectors.fields.clientSecret, type: 'password' },
+      ],
+    },
+    {
+      name: 'bling',
+      displayName: 'Bling',
+      bg: 'bg-indigo-500',
+      initials: 'BL',
+      iconSrc: '/favicons/bling.ico',
+      iconAlt: 'Bling',
+      fields: [
+        { name: 'api_key', ...dict.connectors.fields.blingApiKey, type: 'password' },
+      ],
+    },
+    {
+      name: 'amazon',
+      displayName: 'Amazon',
+      bg: 'bg-blue-700',
+      initials: 'AZ',
+      iconSrc: '/favicons/amazon.ico',
+      iconAlt: 'Amazon',
+      fields: [
+        { name: 'seller_id', ...dict.connectors.fields.sellerId },
+        { name: 'refresh_token', ...dict.connectors.fields.refreshToken, type: 'password' },
+      ],
+    },
+    {
+      name: 'mercado-livre',
+      displayName: 'Mercado Livre',
+      bg: 'bg-yellow-400',
+      initials: 'ML',
+      iconSrc: '/favicons/180x180.png',
+      iconAlt: 'Mercado Livre',
+      oauthUrl: ML_OAUTH_URL,
+      fields: [],
+    },
+    {
+      name: 'olist',
+      displayName: 'Olist',
+      bg: 'bg-yellow-600',
+      initials: 'OL',
+      iconSrc: '/favicons/olist.ico',
+      iconAlt: 'Olist',
+      fields: [
+        { name: 'api_key', ...dict.connectors.fields.olistApiKey, type: 'password' },
+      ],
+    },
+  ]
+}
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   existingConnectors?: string[]
+  dict: Dictionary
 }
 
-export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = [] }: Props) {
-  const [selected, setSelected] = useState<typeof MARKETPLACES[0] | null>(null)
+export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = [], dict }: Props) {
+  const [selected, setSelected] = useState<Marketplace | null>(null)
   const [state, formAction, isPending] = useActionState(authenticateAction, null)
 
   function handleClose(o: boolean) {
@@ -118,7 +125,8 @@ export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = 
     onOpenChange(o)
   }
 
-  const available = MARKETPLACES.filter(
+  const marketplaces = getMarketplaces(dict)
+  const available = marketplaces.filter(
     (m) => !existingConnectors.includes(m.name)
   )
 
@@ -136,17 +144,17 @@ export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = 
                 >
                   <ChevronLeft className="size-4" />
                 </button>
-                <DialogTitle>Conectar {selected.displayName}</DialogTitle>
+                <DialogTitle>{formatMessage(dict.connectors.addMarketplaceDialog.connectTitle, { displayName: selected.displayName })}</DialogTitle>
               </div>
               <DialogDescription>
-                Informe as credenciais da sua conta para autorizar a integração.
+                {dict.connectors.addMarketplaceDialog.credentialDescription}
               </DialogDescription>
             </>
           ) : (
             <>
-              <DialogTitle>Adicionar Marketplace</DialogTitle>
+              <DialogTitle>{dict.connectors.addMarketplaceDialog.chooseTitle}</DialogTitle>
               <DialogDescription>
-                Escolha a plataforma que deseja integrar.
+                {dict.connectors.addMarketplaceDialog.chooseDescription}
               </DialogDescription>
             </>
           )}
@@ -183,7 +191,7 @@ export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = 
             ))}
             {available.length === 0 && (
               <p className="col-span-3 text-center text-sm text-muted-foreground py-4">
-                Todos os marketplaces disponíveis já estão conectados.
+                {dict.connectors.addMarketplaceDialog.allConnected}
               </p>
             )}
           </div>
@@ -194,14 +202,18 @@ export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = 
           selected.oauthUrl ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
-                <p>Ao clicar em <strong className="text-foreground">Autorizar</strong>, você será redirecionado para o site do {selected.displayName}.</p>
-                <p>Após aprovar, o acesso será configurado automaticamente.</p>
+                <p>
+                  {dict.connectors.addMarketplaceDialog.oauthIntroPrefix}{' '}
+                  <strong className="text-foreground">{dict.connectors.addMarketplaceDialog.oauthIntroHighlight}</strong>
+                  {formatMessage(dict.connectors.addMarketplaceDialog.oauthIntroSuffix, { displayName: selected.displayName })}
+                </p>
+                <p>{dict.connectors.addMarketplaceDialog.oauthNote}</p>
               </div>
               <DialogFooter className="border-0 bg-transparent p-0 mt-2">
-                <Button variant="outline" onClick={() => handleClose(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => handleClose(false)}>{dict.connectors.dialog.cancel}</Button>
                 <a href={selected.oauthUrl} className={buttonVariants()}>
                   <Plug className="size-4" />
-                  Autorizar com {selected.displayName}
+                  {formatMessage(dict.connectors.addMarketplaceDialog.authorizeWith, { displayName: selected.displayName })}
                 </a>
               </DialogFooter>
             </div>
@@ -218,7 +230,7 @@ export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = 
               {state?.success === true && (
                 <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-                  <span>{selected.displayName} conectado com sucesso!</span>
+                  <span>{formatMessage(dict.connectors.dialog.success, { displayName: selected.displayName })}</span>
                 </div>
               )}
 
@@ -239,12 +251,12 @@ export function AddMarketplaceDialog({ open, onOpenChange, existingConnectors = 
 
               <DialogFooter className="border-0 bg-transparent p-0 mt-2">
                 <Button type="button" variant="outline" onClick={() => handleClose(false)} disabled={isPending}>
-                  Cancelar
+                  {dict.connectors.dialog.cancel}
                 </Button>
                 <Button type="submit" disabled={isPending || state?.success === true}>
                   {isPending
-                    ? <><Loader2 className="size-4 animate-spin" />Conectando...</>
-                    : <><Plug className="size-4" />Conectar</>
+                    ? <><Loader2 className="size-4 animate-spin" />{dict.connectors.dialog.connecting}</>
+                    : <><Plug className="size-4" />{dict.connectors.dialog.connect}</>
                   }
                 </Button>
               </DialogFooter>

@@ -4,13 +4,16 @@ import { useActionState } from 'react'
 import { AlertCircle, CheckCircle2, FileSignature, Loader2 } from 'lucide-react'
 import { batchSignAccountingClosingsAction } from '@/features/reports/server/actions'
 import { Button } from '@/shared/ui/button'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
 interface BatchClosingActionProps {
   periodMonth: string
   tenantIds: string[]
+  dict: Dictionary
 }
 
-export function BatchClosingAction({ periodMonth, tenantIds }: BatchClosingActionProps) {
+export function BatchClosingAction({ periodMonth, tenantIds, dict }: BatchClosingActionProps) {
   const [state, action, isPending] = useActionState(batchSignAccountingClosingsAction, null)
   const disabled = tenantIds.length === 0 || isPending
 
@@ -22,11 +25,11 @@ export function BatchClosingAction({ periodMonth, tenantIds }: BatchClosingActio
       ))}
 
       <div className="space-y-1">
-        <p className="text-sm font-medium">Fechamento BPO em lote</p>
+        <p className="text-sm font-medium">{dict.bpo.batchClosing.title}</p>
         <p className="text-xs text-muted-foreground">
           {tenantIds.length > 0
-            ? `${tenantIds.length} clientes pendentes prontos para assinatura.`
-            : 'Nenhum cliente pendente pronto para assinatura.'}
+            ? formatMessage(dict.bpo.batchClosing.pending, { count: tenantIds.length })
+            : dict.bpo.batchClosing.none}
         </p>
         {state?.success === false && (
           <p className="flex items-center gap-1.5 text-xs text-destructive">
@@ -37,14 +40,18 @@ export function BatchClosingAction({ periodMonth, tenantIds }: BatchClosingActio
         {state?.success === true && (
           <p className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="size-3.5" />
-            {state.data.signed_count} assinados, {state.data.skipped_count} ignorados, {state.data.failed_count} falhas.
+            {formatMessage(dict.bpo.batchClosing.result, {
+              signed: state.data.signed_count,
+              skipped: state.data.skipped_count,
+              failed: state.data.failed_count,
+            })}
           </p>
         )}
       </div>
 
       <Button type="submit" size="sm" disabled={disabled} className="shrink-0">
         {isPending ? <Loader2 className="size-4 animate-spin" /> : <FileSignature className="size-4" />}
-        Assinar pendentes
+        {dict.bpo.batchClosing.submit}
       </Button>
     </form>
   )

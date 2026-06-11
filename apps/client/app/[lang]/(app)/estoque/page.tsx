@@ -1,1 +1,1 @@
-export { stockMetadata as metadata, StockPage as default } from '@/features/stock'
+export { generateStockMetadata as generateMetadata, StockPage as default } from '@/features/stock'

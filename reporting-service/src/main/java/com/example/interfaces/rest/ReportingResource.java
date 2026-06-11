@@ -18,6 +18,7 @@ import com.example.application.service.ReportingService;
 import com.example.application.service.TenantAuthorizationService;
 import com.example.domain.model.AccountingPeriodClosing;
 import com.example.domain.model.AvailableFilters;
+import com.example.domain.model.BalanceSheetStatement;
 import com.example.domain.model.ClicksignWebhookEvent;
 import com.example.domain.model.CloudinaryUploadSignature;
 import com.example.domain.model.DashboardView;
@@ -406,6 +407,18 @@ public class ReportingResource {
             @QueryParam("to") LocalDate to) {
         tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
         return fiscalAccountingService.dre(tenantId, from, to);
+    }
+
+    @GET
+    @Path("/tenants/{tenantId}/balance-sheet")
+    @Operation(summary = "Gerar Balanco Patrimonial", description = "Gera o balanco patrimonial (ativo, passivo e patrimonio liquido) consolidado ate a data informada.")
+    @SecurityRequirement(name = "bearerAuth")
+    public BalanceSheetStatement balanceSheet(
+            @HeaderParam("Authorization") String authorizationHeader,
+            @PathParam("tenantId") String tenantId,
+            @QueryParam("asOf") LocalDate asOf) {
+        tenantAuthorizationService.requireReadable(authorizationHeader, tenantId);
+        return fiscalAccountingService.balanceSheet(tenantId, asOf);
     }
 
     @POST

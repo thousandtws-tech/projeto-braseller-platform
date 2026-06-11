@@ -7,42 +7,8 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { Separator } from '@/shared/ui/separator'
 import { updatePreferencesAction } from '@/features/notifications/server/actions'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { NotificationPreferences } from '@/shared/types'
-
-const PREFS_CONFIG = [
-  {
-    key: 'newSaleEnabled',
-    icon: ShoppingCart,
-    label: 'Nova venda',
-    desc: 'Notificado a cada nova venda confirmada nos marketplaces',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-500/10',
-  },
-  {
-    key: 'mlPaymentReleaseEnabled',
-    icon: DollarSign,
-    label: 'Liberação de pagamento ML',
-    desc: 'Alertas quando um pagamento do Mercado Livre está próximo de liberar',
-    color: 'text-amber-600',
-    bg: 'bg-amber-500/10',
-  },
-  {
-    key: 'monthlyClosingEnabled',
-    icon: FileText,
-    label: 'Fechamento mensal',
-    desc: 'Resumo automático com totais de vendas e receita do mês',
-    color: 'text-blue-600',
-    bg: 'bg-blue-500/10',
-  },
-  {
-    key: 'weeklyAccountantReportEnabled',
-    icon: BarChart3,
-    label: 'Relatório semanal ao contador',
-    desc: 'Envio semanal automático com resumo de vendas para o contador',
-    color: 'text-purple-600',
-    bg: 'bg-purple-500/10',
-  },
-] as const
 
 interface ToggleProps {
   checked: boolean
@@ -79,10 +45,46 @@ function Toggle({ checked, onChange, name, disabled }: ToggleProps) {
 
 interface Props {
   prefs: NotificationPreferences | null
+  dict: Dictionary
 }
 
-export function NotificationPrefsForm({ prefs }: Props) {
+export function NotificationPrefsForm({ prefs, dict }: Props) {
   const [state, formAction, isPending] = useActionState(updatePreferencesAction, null)
+
+  const PREFS_CONFIG = [
+    {
+      key: 'newSaleEnabled' as const,
+      icon: ShoppingCart,
+      label: dict.notifications.preferences.items.newSale.label,
+      desc: dict.notifications.preferences.items.newSale.desc,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-500/10',
+    },
+    {
+      key: 'mlPaymentReleaseEnabled' as const,
+      icon: DollarSign,
+      label: dict.notifications.preferences.items.mlPaymentRelease.label,
+      desc: dict.notifications.preferences.items.mlPaymentRelease.desc,
+      color: 'text-amber-600',
+      bg: 'bg-amber-500/10',
+    },
+    {
+      key: 'monthlyClosingEnabled' as const,
+      icon: FileText,
+      label: dict.notifications.preferences.items.monthlyClosing.label,
+      desc: dict.notifications.preferences.items.monthlyClosing.desc,
+      color: 'text-blue-600',
+      bg: 'bg-blue-500/10',
+    },
+    {
+      key: 'weeklyAccountantReportEnabled' as const,
+      icon: BarChart3,
+      label: dict.notifications.preferences.items.weeklyAccountantReport.label,
+      desc: dict.notifications.preferences.items.weeklyAccountantReport.desc,
+      color: 'text-purple-600',
+      bg: 'bg-purple-500/10',
+    },
+  ]
 
   const [values, setValues] = useState({
     emailEnabled:                  prefs?.emailEnabled ?? true,
@@ -109,7 +111,7 @@ export function NotificationPrefsForm({ prefs }: Props) {
       {state?.success === true && (
         <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3.5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-          <span>Preferências salvas com sucesso.</span>
+          <span>{dict.notifications.preferences.success}</span>
         </div>
       )}
 
@@ -120,8 +122,8 @@ export function NotificationPrefsForm({ prefs }: Props) {
             <Mail className="size-4 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium">Notificações por e-mail</p>
-            <p className="text-xs text-muted-foreground">Receber alertas no e-mail além do app</p>
+            <p className="text-sm font-medium">{dict.notifications.preferences.email.title}</p>
+            <p className="text-xs text-muted-foreground">{dict.notifications.preferences.email.subtitle}</p>
           </div>
         </div>
         <Toggle
@@ -136,7 +138,7 @@ export function NotificationPrefsForm({ prefs }: Props) {
 
       {/* Alert types */}
       <div className="space-y-5">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Tipos de alerta</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{dict.notifications.preferences.alertTypes}</p>
         {PREFS_CONFIG.map(({ key, icon: Icon, label, desc, color, bg }) => (
           <div key={key} className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-3">
@@ -162,29 +164,29 @@ export function NotificationPrefsForm({ prefs }: Props) {
 
       {/* E-mails */}
       <div className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Destinatários</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{dict.notifications.preferences.recipients}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="recipientEmail">E-mail do destinatário</Label>
+            <Label htmlFor="recipientEmail">{dict.notifications.preferences.recipientEmail}</Label>
             <Input
               id="recipientEmail"
               name="recipientEmail"
               type="email"
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
-              placeholder="seu@email.com.br"
+              placeholder={dict.notifications.preferences.recipientPlaceholder}
               disabled={isPending}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="accountantEmail">E-mail do contador</Label>
+            <Label htmlFor="accountantEmail">{dict.notifications.preferences.accountantEmail}</Label>
             <Input
               id="accountantEmail"
               name="accountantEmail"
               type="email"
               value={accountantEmail}
               onChange={(e) => setAccountantEmail(e.target.value)}
-              placeholder="contador@escritorio.com.br"
+              placeholder={dict.notifications.preferences.accountantPlaceholder}
               disabled={isPending}
             />
           </div>
@@ -194,8 +196,8 @@ export function NotificationPrefsForm({ prefs }: Props) {
       <div className="flex justify-end">
         <Button type="submit" disabled={isPending}>
           {isPending
-            ? <><Loader2 className="size-4 animate-spin" />Salvando...</>
-            : 'Salvar preferências'
+            ? <><Loader2 className="size-4 animate-spin" />{dict.notifications.preferences.saving}</>
+            : dict.notifications.preferences.submit
           }
         </Button>
       </div>

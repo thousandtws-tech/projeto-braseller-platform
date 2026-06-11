@@ -10,6 +10,7 @@ import com.example.domain.model.ReportEntry;
 import com.example.domain.model.ReportEntryPage;
 import com.example.domain.model.ReportFilter;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.time.LocalDate;
 
@@ -29,4 +30,6 @@ public interface ReportEntryRepository {
     List<PlatformComparisonPoint> platformComparison(String tenantId, ReportFilter filter);
 
     AvailableFilters availableFilters(String tenantId);
+
+    BigDecimal outstandingReceivables(String tenantId, LocalDate asOf);
 }

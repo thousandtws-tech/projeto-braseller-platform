@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { getToken, COOKIE_NAME } from '@/entities/session/server/session'
+import { localePath } from '@/shared/i18n/server-locale'
 import { syncConnector, getSyncJob } from '@/shared/api/gateway'
 import type { SyncJob } from '@/shared/types'
 
@@ -13,7 +14,7 @@ const GATEWAY_URL = process.env.GATEWAY_URL
 async function handleExpired(): Promise<never> {
   const store = await cookies()
   store.delete(COOKIE_NAME)
-  redirect('/login?expired=1')
+  redirect(await localePath('/login?expired=1'))
 }
 
 type AuthenticateState =

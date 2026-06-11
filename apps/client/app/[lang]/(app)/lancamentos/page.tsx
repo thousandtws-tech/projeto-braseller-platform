@@ -1,1 +1,1 @@
-export { salesMetadata as metadata, SalesPage as default } from '@/features/sales'
+export { generateSalesMetadata as generateMetadata, SalesPage as default } from '@/features/sales'

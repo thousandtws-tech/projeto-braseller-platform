@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { resolveGatewayUrl } from '@/shared/config/gateway-url'
 import { COOKIE_NAME } from '@/entities/session/server/session'
+import { localePath } from '@/shared/i18n/server-locale'
 import type { CompanyLookup } from '@/shared/types'
 
 const GATEWAY_URL = resolveGatewayUrl()
@@ -53,7 +54,7 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
     path: '/',
   })
 
-  redirect('/dashboard')
+  redirect(await localePath('/dashboard'))
 }
 
 export async function registerAction(prevState: AuthState, formData: FormData): Promise<AuthState> {
@@ -103,7 +104,7 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
     path: '/',
   })
 
-  redirect('/dashboard')
+  redirect(await localePath('/dashboard'))
 }
 
 export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLookupState> {
@@ -138,5 +139,5 @@ export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLo
 export async function logoutAction(): Promise<void> {
   const store = await cookies()
   store.delete(COOKIE_NAME)
-  redirect('/login')
+  redirect(await localePath('/login'))
 }

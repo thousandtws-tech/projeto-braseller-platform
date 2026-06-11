@@ -235,6 +235,21 @@ export interface ReportsDre {
   expenses_by_category: { category: string; amount: number; entry_count: number }[]
 }
 
+export interface ReportsBalanceSheet {
+  tenant_id: string
+  as_of: string
+  cash_and_bank: number
+  accounts_receivable: number
+  inventory: number
+  total_assets: number
+  accounts_payable: number
+  taxes_payable: number
+  total_liabilities: number
+  equity: number
+  accumulated_net_result: number
+  total_liabilities_and_equity: number
+}
+
 export interface DreJob {
   job_id: string
   tenant_id: string

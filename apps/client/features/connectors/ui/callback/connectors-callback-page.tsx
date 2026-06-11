@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getToken } from '@/entities/session/server/session'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
 const GATEWAY_URL =
   process.env.GATEWAY_URL ??
@@ -10,23 +12,26 @@ const ML_REDIRECT_URI =
   'https://gateway-api.salmonrock-4d3f2812.brazilsouth.azurecontainerapps.io/integrations/mercado-livre/callback'
 
 interface Props {
+  params: Promise<{ lang: Locale }>
   searchParams: Promise<{ code?: string; error?: string; connector?: string }>
 }
 
-export default async function ConnectorCallbackPage({ searchParams }: Props) {
+export default async function ConnectorCallbackPage({ params, searchParams }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
   const { code, error } = await searchParams
 
   if (error) {
-    redirect(`/conectores?auth_error=${encodeURIComponent(error)}`)
+    redirect(`/${lang}/conectores?auth_error=${encodeURIComponent(error)}`)
   }
 
   if (!code) {
-    redirect('/conectores')
+    redirect(`/${lang}/conectores`)
   }
 
   const token = await getToken()
   if (!token) {
-    redirect('/login?expired=1')
+    redirect(`/${lang}/login?expired=1`)
   }
 
   try {
@@ -46,17 +51,17 @@ export default async function ConnectorCallbackPage({ searchParams }: Props) {
     })
 
     if (res.status === 401) {
-      redirect('/login?expired=1')
+      redirect(`/${lang}/login?expired=1`)
     }
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      const msg = encodeURIComponent(body.message ?? 'Erro ao autenticar o Mercado Livre.')
-      redirect(`/conectores?auth_error=${msg}`)
+      const msg = encodeURIComponent(body.message ?? dict.connectors.callback.authError)
+      redirect(`/${lang}/conectores?auth_error=${msg}`)
     }
 
-    redirect('/conectores?connected=mercado-livre')
+    redirect(`/${lang}/conectores?connected=mercado-livre`)
   } catch {
-    redirect('/conectores?auth_error=Servi%C3%A7o+indispon%C3%ADvel')
+    redirect(`/${lang}/conectores?auth_error=${encodeURIComponent(dict.connectors.callback.serviceUnavailable)}`)
   }
 }

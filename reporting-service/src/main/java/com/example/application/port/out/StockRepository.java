@@ -17,6 +17,7 @@ public interface StockRepository {
     List<PurchaseEntry> listPurchaseEntries(String tenantId, LocalDate from, LocalDate to);
 
     BigDecimal sumCmv(String tenantId, LocalDate from, LocalDate to);
+    BigDecimal totalInventoryValue(String tenantId);
     List<SaleStockMovement> listSaleExitMovements(String tenantId, String orderId);
     void recordMovement(String tenantId, String stockItemId, String movementType,
                         BigDecimal quantity, BigDecimal unitCost,

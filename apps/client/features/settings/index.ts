@@ -1,1 +1,1 @@
-export { default as SettingsPage, metadata as settingsMetadata } from './ui/settings-page'
+export { default as SettingsPage, generateMetadata as generateSettingsMetadata } from './ui/settings-page'

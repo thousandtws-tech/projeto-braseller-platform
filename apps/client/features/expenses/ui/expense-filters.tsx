@@ -11,31 +11,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui/select'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
-const CATEGORIES = [
-  { value: 'OPERATIONAL', label: 'Operacional' },
-  { value: 'PACKAGING', label: 'Embalagens' },
-  { value: 'SUPPLIES', label: 'Suprimentos' },
-  { value: 'LABOR', label: 'Mão de obra' },
-  { value: 'BANK_FEE', label: 'Tarifas bancárias' },
-  { value: 'SHIPPING', label: 'Frete' },
-  { value: 'TAX', label: 'Impostos' },
-  { value: 'OTHER', label: 'Outros' },
-]
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
+
+const CATEGORY_VALUES = ['OPERATIONAL', 'PACKAGING', 'SUPPLIES', 'LABOR', 'BANK_FEE', 'SHIPPING', 'TAX', 'OTHER'] as const
 
 interface ExpenseFiltersProps {
   from: string
   to: string
   category: string
+  dict: Dictionary
+  lang: Locale
 }
 
-export function ExpenseFilters({ from, to, category }: ExpenseFiltersProps) {
+export function ExpenseFilters({ from, to, category, dict, lang }: ExpenseFiltersProps) {
   const router = useRouter()
 
   function navigate(newFrom: string, newTo: string, cat?: string) {
     const sp = new URLSearchParams({ from: newFrom, to: newTo })
     if (cat) sp.set('category', cat)
-    router.push(`/despesas?${sp}`)
+    router.push(`/${lang}/despesas?${sp}`)
   }
 
   function prevMonth() {
@@ -74,7 +71,7 @@ export function ExpenseFilters({ from, to, category }: ExpenseFiltersProps) {
     fromDate.getFullYear() > now.getFullYear() ||
     (fromDate.getFullYear() === now.getFullYear() && fromDate.getMonth() > now.getMonth())
 
-  const label = new Intl.DateTimeFormat('pt-BR', {
+  const label = new Intl.DateTimeFormat(LOCALE_MAP[lang], {
     month: 'long',
     year: 'numeric',
   }).format(fromDate)
@@ -83,7 +80,7 @@ export function ExpenseFilters({ from, to, category }: ExpenseFiltersProps) {
     <div className="flex flex-wrap items-center gap-2">
       {/* Month navigation */}
       <div className="flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5">
-        <Button variant="ghost" size="icon-sm" onClick={prevMonth} aria-label="Mês anterior">
+        <Button variant="ghost" size="icon-sm" onClick={prevMonth} aria-label={dict.expenses.filters.previousMonth}>
           <ChevronLeft className="size-3.5" />
         </Button>
         <span className="min-w-40 px-2 text-center text-sm font-medium capitalize">
@@ -94,7 +91,7 @@ export function ExpenseFilters({ from, to, category }: ExpenseFiltersProps) {
           size="icon-sm"
           onClick={nextMonth}
           disabled={isCurrentMonth || isAfterCurrentMonth}
-          aria-label="Próximo mês"
+          aria-label={dict.expenses.filters.nextMonth}
         >
           <ChevronRight className="size-3.5" />
         </Button>
@@ -103,7 +100,7 @@ export function ExpenseFilters({ from, to, category }: ExpenseFiltersProps) {
       {/* Jump to current month */}
       {!isCurrentMonth && (
         <Button variant="outline" size="sm" onClick={goToCurrentMonth} className="text-xs">
-          Mês atual
+          {dict.expenses.filters.currentMonth}
         </Button>
       )}
 
@@ -114,14 +111,14 @@ export function ExpenseFilters({ from, to, category }: ExpenseFiltersProps) {
       >
         <SelectTrigger className="h-8 min-w-44 gap-1.5 text-xs" size="sm">
           <SlidersHorizontal className="size-3 text-muted-foreground" />
-          <SelectValue placeholder="Todas as categorias" />
+          <SelectValue placeholder={dict.expenses.filters.allCategories} />
         </SelectTrigger>
         <SelectContent align="start">
           <SelectGroup>
-            <SelectItem value="">Todas as categorias</SelectItem>
-            {CATEGORIES.map((c) => (
-              <SelectItem key={c.value} value={c.value}>
-                {c.label}
+            <SelectItem value="">{dict.expenses.filters.allCategories}</SelectItem>
+            {CATEGORY_VALUES.map((c) => (
+              <SelectItem key={c} value={c}>
+                {dict.dre.categories[c]}
               </SelectItem>
             ))}
           </SelectGroup>

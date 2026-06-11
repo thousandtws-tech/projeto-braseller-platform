@@ -7,8 +7,14 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { upsertStockItemAction } from '@/features/stock/server/actions'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
-export function StockItemForm({ readOnly = false }: { readOnly?: boolean }) {
+interface Props {
+  readOnly?: boolean
+  dict: Dictionary
+}
+
+export function StockItemForm({ readOnly = false, dict }: Props) {
   const [state, action, isPending] = useActionState(upsertStockItemAction, null)
   const isSuccess = state?.success === true
   const disabled = readOnly || isPending
@@ -18,15 +24,15 @@ export function StockItemForm({ readOnly = false }: { readOnly?: boolean }) {
       {readOnly && <ReadOnlyLock />}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="sku">SKU</Label>
-          <Input id="sku" name="sku" placeholder="COD-001" required disabled={disabled} autoComplete="off" />
+          <Label htmlFor="sku">{dict.stock.manualForm.fields.sku}</Label>
+          <Input id="sku" name="sku" placeholder={dict.stock.manualForm.fields.skuPlaceholder} required disabled={disabled} autoComplete="off" />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="description">Descrição</Label>
-          <Input id="description" name="description" placeholder="Nome do produto" disabled={disabled} autoComplete="off" />
+          <Label htmlFor="description">{dict.stock.manualForm.fields.description}</Label>
+          <Input id="description" name="description" placeholder={dict.stock.manualForm.fields.descriptionPlaceholder} disabled={disabled} autoComplete="off" />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="unit_cost">Custo Unitário (R$)</Label>
+          <Label htmlFor="unit_cost">{dict.stock.manualForm.fields.unitCost}</Label>
           <Input id="unit_cost" name="unit_cost" type="number" step="0.01" min="0" placeholder="0,00" required disabled={disabled} />
         </div>
       </div>
@@ -40,13 +46,13 @@ export function StockItemForm({ readOnly = false }: { readOnly?: boolean }) {
       {isSuccess && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-          <span>Produto salvo com sucesso.</span>
+          <span>{dict.stock.manualForm.success}</span>
         </div>
       )}
 
       <Button type="submit" size="sm" disabled={disabled || isSuccess}>
         {isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-        Salvar produto
+        {dict.stock.manualForm.submit}
       </Button>
     </form>
   )

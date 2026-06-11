@@ -5,6 +5,7 @@ import { Trash2, Paperclip, Loader2 } from 'lucide-react'
 import { deleteExpenseAction } from '@/features/reports/server/actions'
 import { formatCurrency, formatDate } from '@/shared/api/gateway'
 import { ReadOnlyLockInline } from '@/shared/ui/read-only-lock'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { ExpenseEntry } from '@/shared/types'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -25,24 +26,19 @@ const CATEGORY_COLORS: Record<string, string> = {
   Outros:       'bg-muted text-muted-foreground',
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  OPERATIONAL: 'Operacional',
-  PACKAGING: 'Embalagens',
-  SUPPLIES: 'Suprimentos',
-  LABOR: 'Mão de obra',
-  BANK_FEE: 'Tarifas bancárias',
-  SHIPPING: 'Frete',
-  TAX: 'Impostos',
-  OTHER: 'Outros',
+interface Props {
+  expense: ExpenseEntry
+  readOnly?: boolean
+  dict: Dictionary
 }
 
-export function ExpenseRow({ expense, readOnly = false }: { expense: ExpenseEntry; readOnly?: boolean }) {
+export function ExpenseRow({ expense, readOnly = false, dict }: Props) {
   const [isPending, startTransition] = useTransition()
-  const label = CATEGORY_LABELS[expense.category] ?? expense.category
+  const label = dict.dre.categories[expense.category as keyof typeof dict.dre.categories] ?? expense.category
   const color = CATEGORY_COLORS[expense.category] ?? CATEGORY_COLORS.OTHER
 
   function handleDelete() {
-    if (!confirm('Excluir esta despesa?')) return
+    if (!confirm(dict.expenses.row.confirmDelete)) return
     startTransition(() => deleteExpenseAction(expense.id))
   }
 
@@ -68,7 +64,7 @@ export function ExpenseRow({ expense, readOnly = false }: { expense: ExpenseEntr
               target="_blank"
               rel="noopener noreferrer"
               className="p-1 rounded hover:text-primary transition-colors"
-              title="Ver comprovante"
+              title={dict.expenses.row.viewReceipt}
             >
               <Paperclip className="size-3.5" />
             </a>
@@ -80,7 +76,7 @@ export function ExpenseRow({ expense, readOnly = false }: { expense: ExpenseEntr
               onClick={handleDelete}
               disabled={isPending}
               className="p-1 rounded hover:text-destructive transition-colors disabled:opacity-50"
-              title="Excluir"
+              title={dict.expenses.row.delete}
             >
               {isPending
                 ? <Loader2 className="size-3.5 animate-spin" />

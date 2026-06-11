@@ -2,6 +2,13 @@
 
 import { useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { defaultLocale, isLocale, LOCALE_COOKIE } from '@/shared/i18n/config'
+
+function getLocalePrefix() {
+  const match = document.cookie.match(new RegExp(`${LOCALE_COOKIE}=([^;]+)`))
+  const value = match?.[1]
+  return isLocale(value) ? value : defaultLocale
+}
 
 export default function AuthCallbackPage({
   searchParams,
@@ -12,8 +19,10 @@ export default function AuthCallbackPage({
   const router = useRouter()
 
   useEffect(() => {
+    const lang = getLocalePrefix()
+
     if (error || !code) {
-      router.replace('/login?error=oauth_failed')
+      router.replace(`/${lang}/login?error=oauth_failed`)
       return
     }
 
@@ -24,16 +33,16 @@ export default function AuthCallbackPage({
     })
       .then(async (res) => {
         if (res.ok) {
-          router.replace('/dashboard')
+          router.replace(`/${lang}/dashboard`)
           return
         }
         const body = await res.json().catch(() => ({})) as { message?: string }
         const errorCode = body.message === 'google_account_not_registered'
           ? 'google_account_not_registered'
           : 'oauth_failed'
-        router.replace(`/login?error=${errorCode}`)
+        router.replace(`/${lang}/login?error=${errorCode}`)
       })
-      .catch(() => router.replace('/login?error=oauth_failed'))
+      .catch(() => router.replace(`/${lang}/login?error=oauth_failed`))
   }, [code, error, router])
 
   return (

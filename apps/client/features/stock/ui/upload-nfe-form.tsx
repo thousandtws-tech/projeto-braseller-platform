@@ -4,8 +4,14 @@ import { useActionState, useRef } from 'react'
 import { Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { importNfeXmlAction } from '@/features/stock/server/actions'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
-export function UploadNfeForm({ readOnly = false }: { readOnly?: boolean }) {
+interface Props {
+  readOnly?: boolean
+  dict: Dictionary
+}
+
+export function UploadNfeForm({ readOnly = false, dict }: Props) {
   const [state, action, isPending] = useActionState(importNfeXmlAction, null)
   const inputRef = useRef<HTMLInputElement>(null)
   const disabled = readOnly || isPending
@@ -22,8 +28,8 @@ export function UploadNfeForm({ readOnly = false }: { readOnly?: boolean }) {
         }}
       >
         <Upload className={`size-8 text-muted-foreground ${readOnly ? 'animate-pulse' : ''}`} />
-        <span className="text-sm font-medium">Arraste o XML da NF-e ou clique para selecionar</span>
-        <span className="text-xs text-muted-foreground">Formato: .xml — NF-e do fornecedor</span>
+        <span className="text-sm font-medium">{dict.stock.importNfe.dropzone}</span>
+        <span className="text-xs text-muted-foreground">{dict.stock.importNfe.format}</span>
       </label>
       <input
         ref={inputRef}
@@ -44,13 +50,13 @@ export function UploadNfeForm({ readOnly = false }: { readOnly?: boolean }) {
       {state?.success === true && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-          <span>NF-e importada com sucesso! Estoque e CMV atualizados.</span>
+          <span>{dict.stock.importNfe.success}</span>
         </div>
       )}
       {isPending && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Importando XML...
+          {dict.stock.importNfe.importing}
         </div>
       )}
     </form>

@@ -7,11 +7,18 @@ import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
-export function AccountantForm({ readOnly = false }: { readOnly?: boolean }) {
+interface Props {
+  readOnly?: boolean
+  dict: Dictionary
+}
+
+export function AccountantForm({ readOnly = false, dict }: Props) {
   const [state, formAction, isPending] = useActionState(grantAccountantAction, null)
   const [showPassword, setShowPassword] = useState(false)
   const disabled = readOnly || isPending
+  const fields = dict.accountant.grantForm.fields
 
   return (
     <form action={formAction} className="space-y-4">
@@ -30,30 +37,32 @@ export function AccountantForm({ readOnly = false }: { readOnly?: boolean }) {
       )}
 
       <p className="text-sm text-muted-foreground">
-        O contador terá acesso de leitura às informações financeiras do tenant com papel <strong>CONTADOR</strong>.
+        {dict.accountant.grantForm.descriptionPrefix}
+        <strong>{dict.accountant.grantForm.descriptionRole}</strong>
+        {dict.accountant.grantForm.descriptionSuffix}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="accountantFirstName">Nome</Label>
+          <Label htmlFor="accountantFirstName">{fields.firstName}</Label>
           <Input
             id="accountantFirstName"
             name="accountantFirstName"
             type="text"
             autoComplete="off"
-            placeholder="João"
+            placeholder={fields.firstNamePlaceholder}
             required
             disabled={disabled}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="accountantLastName">Sobrenome</Label>
+          <Label htmlFor="accountantLastName">{fields.lastName}</Label>
           <Input
             id="accountantLastName"
             name="accountantLastName"
             type="text"
             autoComplete="off"
-            placeholder="Silva"
+            placeholder={fields.lastNamePlaceholder}
             required
             disabled={disabled}
           />
@@ -61,27 +70,27 @@ export function AccountantForm({ readOnly = false }: { readOnly?: boolean }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="accountantEmail">E-mail</Label>
+        <Label htmlFor="accountantEmail">{fields.email}</Label>
         <Input
           id="accountantEmail"
           name="accountantEmail"
           type="email"
           autoComplete="off"
-          placeholder="contador@escritorio.com.br"
+          placeholder={fields.emailPlaceholder}
           required
           disabled={disabled}
         />
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="accountantPassword">Senha temporária</Label>
+        <Label htmlFor="accountantPassword">{fields.password}</Label>
         <div className="relative">
           <Input
             id="accountantPassword"
             name="accountantPassword"
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
-            placeholder="Mínimo 8 caracteres"
+            placeholder={fields.passwordPlaceholder}
             required
             minLength={8}
             disabled={disabled}
@@ -95,13 +104,13 @@ export function AccountantForm({ readOnly = false }: { readOnly?: boolean }) {
             }}
             disabled={readOnly}
             className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            aria-label={showPassword ? dict.accountant.grantForm.hidePassword : dict.accountant.grantForm.showPassword}
           >
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
         <p className="text-xs text-muted-foreground">
-          O contador deverá trocar a senha no primeiro acesso.
+          {dict.accountant.grantForm.passwordHint}
         </p>
       </div>
 
@@ -109,10 +118,10 @@ export function AccountantForm({ readOnly = false }: { readOnly?: boolean }) {
         {isPending ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            Concedendo acesso...
+            {dict.accountant.grantForm.submitting}
           </>
         ) : (
-          'Conceder acesso'
+          dict.accountant.grantForm.submit
         )}
       </Button>
     </form>

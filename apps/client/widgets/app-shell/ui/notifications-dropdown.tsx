@@ -22,10 +22,15 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
 import { cn } from "@/shared/lib/utils"
+import { formatMessage } from "@/shared/i18n/format"
 import type { NotificationMessage } from "@/shared/types"
+import type { Dictionary } from "@/shared/i18n/get-dictionary"
+import type { Locale } from "@/shared/i18n/config"
 
 type NotificationsDropdownProps = {
   notifications: NotificationMessage[]
+  dict: Dictionary
+  lang: Locale
   align?: "start" | "center" | "end"
 }
 
@@ -66,6 +71,8 @@ function formatNotificationDate(value: string) {
 
 function NotificationsDropdown({
   notifications,
+  dict,
+  lang,
   align = "end",
 }: NotificationsDropdownProps) {
   const unreadCount = notifications.filter((n) => n.status === "UNREAD").length
@@ -80,7 +87,7 @@ function NotificationsDropdown({
             variant="ghost"
             size="icon-sm"
             className="relative"
-            aria-label="Notificações"
+            aria-label={dict.header.notifications.ariaLabel}
           >
             <Bell />
             {unreadCount > 0 && (
@@ -98,10 +105,12 @@ function NotificationsDropdown({
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center justify-between p-4">
             <span className="text-base font-medium text-popover-foreground">
-              Notificações
+              {dict.header.notifications.title}
             </span>
             {unreadCount > 0 && (
-              <Badge className="font-normal">{unreadCount} novas</Badge>
+              <Badge className="font-normal">
+                {formatMessage(dict.header.notifications.newCount, { count: unreadCount })}
+              </Badge>
             )}
           </DropdownMenuLabel>
 
@@ -114,7 +123,7 @@ function NotificationsDropdown({
                 <DropdownMenuItem
                   key={notification.id}
                   className="mx-1.5 my-1 flex cursor-pointer items-center justify-between gap-3 p-2"
-                  render={<Link href="/notificacoes" />}
+                  render={<Link href={`/${lang}/notificacoes`} />}
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className={cn("rounded-xl p-2.5", meta.bgColor)}>
@@ -140,16 +149,16 @@ function NotificationsDropdown({
               <div className="rounded-xl bg-muted p-3">
                 <BellOff className="size-5 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium">Nenhuma notificação</p>
+              <p className="text-sm font-medium">{dict.header.notifications.empty}</p>
               <p className="text-xs text-muted-foreground">
-                Tudo em dia por aqui.
+                {dict.header.notifications.emptyHint}
               </p>
             </div>
           )}
 
           <div className="mx-1.5 my-1 p-2">
-            <Button className="h-9 w-full rounded-xl" nativeButton={false} render={<Link href="/notificacoes" />}>
-              Ver todas as notificações
+            <Button className="h-9 w-full rounded-xl" nativeButton={false} render={<Link href={`/${lang}/notificacoes`} />}>
+              {dict.header.notifications.viewAll}
             </Button>
           </div>
         </DropdownMenuGroup>

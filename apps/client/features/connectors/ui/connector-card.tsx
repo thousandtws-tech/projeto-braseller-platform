@@ -8,8 +8,13 @@ import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { syncAllAction } from '@/features/connectors/server/actions'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import { ConnectDialog } from './connect-dialog'
 import type { ConnectorStatus } from '@/shared/types'
+
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 
 const ML_FAVICON = '/favicons/180x180.png'
 const SHOPEE_FAVICON = '/favicons/favicon.ico'
@@ -29,26 +34,25 @@ const PLATFORM_LOGOS: Record<string, { bg: string; initials: string; src?: strin
   olist:           { bg: 'bg-yellow-600', initials: 'OL', src: OLIST_FAVICON, alt: 'Olist' },
 }
 
-const STATUS_MAP = {
-  connected:    { icon: CheckCircle, label: 'Conectado',     className: 'text-emerald-600 dark:text-emerald-400' },
-  disconnected: { icon: XCircle,     label: 'Desconectado',  className: 'text-muted-foreground' },
-  error:        { icon: AlertCircle, label: 'Erro',          className: 'text-destructive' },
-  syncing:      { icon: RefreshCw,   label: 'Sincronizando', className: 'text-primary' },
+const STATUS_ICONS = {
+  connected: { icon: CheckCircle, className: 'text-emerald-600 dark:text-emerald-400' },
+  disconnected: { icon: XCircle, className: 'text-muted-foreground' },
+  error: { icon: AlertCircle, className: 'text-destructive' },
+  syncing: { icon: RefreshCw, className: 'text-primary' },
 }
 
 const JOB_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'secondary' | 'destructive'> = {
   QUEUED: 'secondary', PROCESSING: 'warning', COMPLETE: 'success', ERROR: 'destructive',
 }
-const JOB_STATUS_LABEL: Record<string, string> = {
-  QUEUED: 'Na fila', PROCESSING: 'Processando', COMPLETE: 'Concluído', ERROR: 'Erro',
-}
 
 interface Props {
   connector: ConnectorStatus
   readOnly?: boolean
+  dict: Dictionary
+  lang: Locale
 }
 
-export function ConnectorCard({ connector, readOnly = false }: Props) {
+export function ConnectorCard({ connector, readOnly = false, dict, lang }: Props) {
   const [syncState, syncFormAction, isSyncing] = useActionState(syncAllAction, null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
@@ -64,7 +68,10 @@ export function ConnectorCard({ connector, readOnly = false }: Props) {
     initials: safeName.slice(0, 2).toUpperCase() || '??',
   }
   const isConnected = connector.status === 'connected'
-  const { icon: StatusIcon, label, className } = STATUS_MAP[connector.status] ?? STATUS_MAP.disconnected
+  const statusLabels = dict.connectors.status as Record<string, string>
+  const jobStatusLabels = dict.connectors.jobStatus as Record<string, string>
+  const { icon: StatusIcon, className } = STATUS_ICONS[connector.status] ?? STATUS_ICONS.disconnected
+  const label = statusLabels[connector.status] ?? statusLabels.disconnected
 
   return (
     <>
@@ -99,7 +106,7 @@ export function ConnectorCard({ connector, readOnly = false }: Props) {
           {connector.lastSync && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="size-3 shrink-0" />
-              {new Date(connector.lastSync).toLocaleString('pt-BR', {
+              {new Date(connector.lastSync).toLocaleString(LOCALE_MAP[lang], {
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit',
               })}
@@ -109,15 +116,15 @@ export function ConnectorCard({ connector, readOnly = false }: Props) {
           {syncState?.success === true && (
             <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Resultado do sync</span>
+                <span className="font-medium">{dict.connectors.card.syncResult}</span>
                 <Badge variant={JOB_STATUS_VARIANT[syncState.job.status] ?? 'secondary'} className="text-[10px]">
-                  {JOB_STATUS_LABEL[syncState.job.status] ?? syncState.job.status}
+                  {jobStatusLabels[syncState.job.status] ?? syncState.job.status}
                 </Badge>
               </div>
               <div className="grid grid-cols-3 gap-1 text-muted-foreground">
-                <span>{syncState.job.orders_synced} pedidos</span>
-                <span>{syncState.job.payments_synced} pgtos</span>
-                <span>{syncState.job.fees_synced} taxas</span>
+                <span>{formatMessage(dict.connectors.card.orders, { count: syncState.job.orders_synced })}</span>
+                <span>{formatMessage(dict.connectors.card.payments, { count: syncState.job.payments_synced })}</span>
+                <span>{formatMessage(dict.connectors.card.fees, { count: syncState.job.fees_synced })}</span>
               </div>
               {syncState.job.error_message && (
                 <p className="text-destructive">{syncState.job.error_message}</p>
@@ -135,10 +142,10 @@ export function ConnectorCard({ connector, readOnly = false }: Props) {
               <input type="hidden" name="connectorName" value={safeName} />
               <Button type="submit" size="sm" variant="outline" className="flex-1" disabled={readOnly || isSyncing}>
                 {isSyncing
-                  ? <><Loader2 className="size-3.5 animate-spin" />Sincronizando...</>
+                  ? <><Loader2 className="size-3.5 animate-spin" />{dict.connectors.card.syncingButton}</>
                   : readOnly
-                    ? <><LockKeyhole className="size-3.5 animate-pulse" />Sincronizar</>
-                    : <><RefreshCw className="size-3.5" />Sincronizar</>
+                    ? <><LockKeyhole className="size-3.5 animate-pulse" />{dict.connectors.card.sync}</>
+                    : <><RefreshCw className="size-3.5" />{dict.connectors.card.sync}</>
                 }
               </Button>
               <Button type="button" size="sm" variant="ghost">
@@ -153,7 +160,7 @@ export function ConnectorCard({ connector, readOnly = false }: Props) {
               onClick={() => setDialogOpen(true)}
             >
               {readOnly ? <LockKeyhole className="size-3.5 animate-pulse" /> : <Plug className="size-3.5" />}
-              Conectar
+              {dict.connectors.card.connect}
             </Button>
           )}
         </CardContent>
@@ -164,6 +171,8 @@ export function ConnectorCard({ connector, readOnly = false }: Props) {
         displayName={connector.displayName}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        dict={dict}
+        lang={lang}
       />
     </>
   )

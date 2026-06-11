@@ -9,42 +9,49 @@ import { Card, CardContent } from '@/shared/ui/card'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
 import { markAsReadAction, clearReadAction } from '@/features/notifications/server/actions'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import type { NotificationMessage } from '@/shared/types'
 
-const TYPE_META: Record<string, {
-  icon: typeof Bell
-  bg: string
-  label: string
-}> = {
-  NEW_SALE:                 { icon: ShoppingCart, bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', label: 'Nova venda' },
-  ML_PAYMENT_RELEASE:       { icon: DollarSign,   bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',      label: 'Pagamento ML' },
-  MONTHLY_CLOSING_SUMMARY:  { icon: FileText,      bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',         label: 'Fechamento' },
-  WEEKLY_ACCOUNTANT_REPORT: { icon: BarChart3,     bg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',   label: 'Relatório' },
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
+
+const TYPE_ICONS: Record<string, { icon: typeof Bell; bg: string }> = {
+  NEW_SALE:                 { icon: ShoppingCart, bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  ML_PAYMENT_RELEASE:       { icon: DollarSign,   bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+  MONTHLY_CLOSING_SUMMARY:  { icon: FileText,      bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
+  WEEKLY_ACCOUNTANT_REPORT: { icon: BarChart3,     bg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' },
 }
 
-function relativeTime(date: string): string {
+function relativeTime(date: string, dict: Dictionary, lang: Locale): string {
   const diff = Date.now() - new Date(date).getTime()
   const m = Math.floor(diff / 60000)
-  if (m < 1)  return 'agora'
-  if (m < 60) return `há ${m} min`
+  if (m < 1)  return dict.notifications.relativeTime.now
+  if (m < 60) return formatMessage(dict.notifications.relativeTime.minutesAgo, { count: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `há ${h}h`
+  if (h < 24) return formatMessage(dict.notifications.relativeTime.hoursAgo, { count: h })
   const d = Math.floor(h / 24)
-  if (d < 7)  return `há ${d} dia${d > 1 ? 's' : ''}`
-  return new Date(date).toLocaleDateString('pt-BR')
+  if (d < 7)  return formatMessage(d > 1 ? dict.notifications.relativeTime.daysAgo : dict.notifications.relativeTime.dayAgo, { count: d })
+  return new Date(date).toLocaleDateString(LOCALE_MAP[lang])
 }
 
 function NotificationItem({
   n,
   onMarkRead,
   isPending,
+  dict,
+  lang,
 }: {
   n: NotificationMessage
   onMarkRead: (id: string) => void
   isPending: boolean
+  dict: Dictionary
+  lang: Locale
 }) {
-  const meta = TYPE_META[n.type] ?? { icon: Bell, bg: 'bg-muted text-muted-foreground', label: n.type }
-  const Icon = meta.icon
+  const typeLabels = dict.notifications.types as Record<string, string>
+  const iconMeta = TYPE_ICONS[n.type] ?? { icon: Bell, bg: 'bg-muted text-muted-foreground' }
+  const label = typeLabels[n.type] ?? n.type
+  const Icon = iconMeta.icon
   const isUnread = n.status === 'UNREAD'
 
   return (
@@ -54,7 +61,7 @@ function NotificationItem({
       ${isUnread ? 'bg-primary/[0.03]' : ''}
     `}>
       {/* Icon */}
-      <div className={`size-9 rounded-xl ${meta.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+      <div className={`size-9 rounded-xl ${iconMeta.bg} flex items-center justify-center shrink-0 mt-0.5`}>
         <Icon className="size-4" />
       </div>
 
@@ -65,11 +72,11 @@ function NotificationItem({
             {n.title}
           </span>
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
-            {meta.label}
+            {label}
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">{n.message}</p>
-        <p className="text-[11px] text-muted-foreground/50 pt-0.5">{relativeTime(n.createdAt)}</p>
+        <p className="text-[11px] text-muted-foreground/50 pt-0.5">{relativeTime(n.createdAt, dict, lang)}</p>
       </div>
 
       {/* Right side */}
@@ -81,7 +88,7 @@ function NotificationItem({
               disabled={isPending}
               className="text-[11px] text-primary/70 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap disabled:opacity-30"
             >
-              Marcar lida
+              {dict.notifications.markRead}
             </button>
             <div className="size-2 rounded-full bg-primary" />
           </>
@@ -94,9 +101,11 @@ function NotificationItem({
 interface Props {
   unread: NotificationMessage[]
   read: NotificationMessage[]
+  dict: Dictionary
+  lang: Locale
 }
 
-export function NotificationList({ unread, read }: Props) {
+export function NotificationList({ unread, read, dict, lang }: Props) {
   const [isPending, startTransition] = useTransition()
 
   function handleMarkRead(id: string) {
@@ -115,9 +124,9 @@ export function NotificationList({ unread, read }: Props) {
             <BellOff className="size-7 text-muted-foreground/50" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold">Nenhuma notificação</p>
+            <p className="text-sm font-semibold">{dict.notifications.empty.title}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Você será alertado aqui sobre vendas, pagamentos e relatórios.
+              {dict.notifications.empty.hint}
             </p>
           </div>
         </CardContent>
@@ -132,13 +141,13 @@ export function NotificationList({ unread, read }: Props) {
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Não lidas · {unread.length}
+              {formatMessage(dict.notifications.unreadSection, { count: unread.length })}
             </span>
           </div>
           <Card className="overflow-hidden">
             <CardContent className="p-0 divide-y divide-border/60">
               {unread.map((n) => (
-                <NotificationItem key={n.id} n={n} onMarkRead={handleMarkRead} isPending={isPending} />
+                <NotificationItem key={n.id} n={n} onMarkRead={handleMarkRead} isPending={isPending} dict={dict} lang={lang} />
               ))}
             </CardContent>
           </Card>
@@ -150,7 +159,7 @@ export function NotificationList({ unread, read }: Props) {
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Anteriores · {read.length}
+              {formatMessage(dict.notifications.previousSection, { count: read.length })}
             </span>
             <Button
               variant="ghost"
@@ -163,13 +172,13 @@ export function NotificationList({ unread, read }: Props) {
                 ? <Loader2 className="size-3 animate-spin" />
                 : <CheckCheck className="size-3" />
               }
-              Arquivar lidas
+              {dict.notifications.archiveRead}
             </Button>
           </div>
           <Card className="overflow-hidden opacity-80">
             <CardContent className="p-0 divide-y divide-border/60">
               {read.map((n) => (
-                <NotificationItem key={n.id} n={n} onMarkRead={handleMarkRead} isPending={isPending} />
+                <NotificationItem key={n.id} n={n} onMarkRead={handleMarkRead} isPending={isPending} dict={dict} lang={lang} />
               ))}
             </CardContent>
           </Card>

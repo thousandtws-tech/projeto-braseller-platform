@@ -10,4 +10,5 @@ public interface BankTransactionRepository {
     void saveAll(List<BankTransaction> transactions);
     List<BankTransaction> findByPeriod(String tenantId, LocalDate from, LocalDate to);
     BigDecimal sumExpenses(String tenantId, LocalDate from, LocalDate to);
+    BigDecimal balanceAsOf(String tenantId, LocalDate asOf);
 }

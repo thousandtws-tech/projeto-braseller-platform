@@ -15,23 +15,16 @@ import {
   SelectValue,
 } from '@/shared/ui/select'
 import { createExpenseAction } from '@/features/reports/server/actions'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
-const CATEGORIES = [
-  { value: 'OPERATIONAL', label: 'Operacional' },
-  { value: 'PACKAGING',   label: 'Embalagens' },
-  { value: 'SUPPLIES',    label: 'Suprimentos' },
-  { value: 'LABOR',       label: 'Mão de obra' },
-  { value: 'BANK_FEE',    label: 'Tarifas bancárias' },
-  { value: 'SHIPPING',    label: 'Frete' },
-  { value: 'TAX',         label: 'Impostos' },
-  { value: 'OTHER',       label: 'Outros' },
-]
+const CATEGORY_VALUES = ['OPERATIONAL', 'PACKAGING', 'SUPPLIES', 'LABOR', 'BANK_FEE', 'SHIPPING', 'TAX', 'OTHER'] as const
 
 interface ExpenseFormProps {
   onSuccess?: (expenseDate?: string) => void
+  dict: Dictionary
 }
 
-export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
+export function ExpenseForm({ onSuccess, dict }: ExpenseFormProps) {
   const [state, formAction, isPending] = useActionState(createExpenseAction, null)
   const [fileName, setFileName] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -67,12 +60,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       {state?.success === true && (
         <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-3.5 mt-0.5 shrink-0" />
-          <span>Despesa lançada com sucesso!</span>
+          <span>{dict.expenses.form.success}</span>
         </div>
       )}
 
       <div className="space-y-1">
-        <Label htmlFor="expense_date" className="text-xs">Data</Label>
+        <Label htmlFor="expense_date" className="text-xs">{dict.expenses.form.fields.date}</Label>
         <DatePicker
           id="expense_date"
           name="expense_date"
@@ -83,12 +76,12 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="description" className="text-xs">Descrição</Label>
+        <Label htmlFor="description" className="text-xs">{dict.expenses.form.fields.description}</Label>
         <Input
           id="description"
           name="description"
           type="text"
-          placeholder="Ex: Caixas de embalagem"
+          placeholder={dict.expenses.form.fields.descriptionPlaceholder}
           required
           disabled={isPending}
           className="h-8 text-xs"
@@ -96,7 +89,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="category" className="text-xs">Categoria</Label>
+        <Label htmlFor="category" className="text-xs">{dict.expenses.form.fields.category}</Label>
         <Select
           name="category"
           defaultValue=""
@@ -104,13 +97,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           disabled={isPending}
         >
           <SelectTrigger id="category" className="h-8 w-full text-xs">
-            <SelectValue placeholder="Selecione..." />
+            <SelectValue placeholder={dict.expenses.form.fields.categoryPlaceholder} />
           </SelectTrigger>
           <SelectContent align="start">
             <SelectGroup>
-              <SelectItem value="">Selecione...</SelectItem>
-              {CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              <SelectItem value="">{dict.expenses.form.fields.categoryPlaceholder}</SelectItem>
+              {CATEGORY_VALUES.map((c) => (
+                <SelectItem key={c} value={c}>{dict.dre.categories[c]}</SelectItem>
               ))}
             </SelectGroup>
           </SelectContent>
@@ -118,7 +111,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="amount" className="text-xs">Valor (R$)</Label>
+        <Label htmlFor="amount" className="text-xs">{dict.expenses.form.fields.value}</Label>
         <Input
           id="amount"
           name="amount"
@@ -134,7 +127,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
 
       {/* Comprovante */}
       <div className="space-y-1">
-        <Label className="text-xs">Comprovante</Label>
+        <Label className="text-xs">{dict.expenses.form.receipt.label}</Label>
         <input
           ref={fileRef}
           name="file"
@@ -159,15 +152,15 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer"
           >
             <Paperclip className="size-3.5 shrink-0" />
-            Anexar comprovante
+            {dict.expenses.form.receipt.attach}
           </label>
         )}
       </div>
 
       <Button type="submit" size="sm" className="w-full" disabled={isPending}>
         {isPending
-          ? <><Loader2 className="size-3.5 animate-spin" />Salvando...</>
-          : 'Lançar despesa'
+          ? <><Loader2 className="size-3.5 animate-spin" />{dict.expenses.form.submitting}</>
+          : dict.expenses.form.submit
         }
       </Button>
     </form>

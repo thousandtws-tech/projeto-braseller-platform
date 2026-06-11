@@ -78,6 +78,31 @@ public class JdbcBankTransactionRepository implements BankTransactionRepository 
         }
     }
 
+    @Override
+    public BigDecimal balanceAsOf(String tenantId, LocalDate asOf) {
+        // Credits increase the balance, debits decrease it
+        String sql = """
+                SELECT COALESCE(SUM(
+                    CASE
+                        WHEN tran_type = 'CREDIT' THEN amount
+                        WHEN tran_type = 'DEBIT' THEN -amount
+                        ELSE 0
+                    END
+                ), 0)
+                FROM bank_transactions
+                WHERE tenant_id = ? AND posted_date <= ?
+                """;
+        try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tenantId);
+            ps.setDate(2, Date.valueOf(asOf));
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO;
+            }
+        } catch (SQLException e) {
+            throw new RepositoryException("bank_transactions_balance_failed", e);
+        }
+    }
+
     private BankTransaction map(ResultSet rs) throws SQLException {
         Timestamp importedAt = rs.getTimestamp("imported_at");
         return new BankTransaction(

@@ -4,8 +4,15 @@ import { useActionState, useRef } from 'react'
 import { Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { importOfxAction } from '@/features/bank/server/actions'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
-export function UploadOfxForm({ readOnly = false }: { readOnly?: boolean }) {
+interface Props {
+  readOnly?: boolean
+  dict: Dictionary
+}
+
+export function UploadOfxForm({ readOnly = false, dict }: Props) {
   const [state, action, isPending] = useActionState(importOfxAction, null)
   const inputRef = useRef<HTMLInputElement>(null)
   const disabled = readOnly || isPending
@@ -22,8 +29,8 @@ export function UploadOfxForm({ readOnly = false }: { readOnly?: boolean }) {
         }}
       >
         <Upload className={`size-8 text-muted-foreground ${readOnly ? 'animate-pulse' : ''}`} />
-        <span className="text-sm font-medium">Arraste o extrato OFX ou clique para selecionar</span>
-        <span className="text-xs text-muted-foreground">Formato: .ofx — extrato da conta PJ do banco</span>
+        <span className="text-sm font-medium">{dict.bank.importOfx.dropzone}</span>
+        <span className="text-xs text-muted-foreground">{dict.bank.importOfx.format}</span>
       </label>
       <input
         ref={inputRef}
@@ -44,13 +51,13 @@ export function UploadOfxForm({ readOnly = false }: { readOnly?: boolean }) {
       {state?.success === true && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
-          <span>{state.count} transações importadas e categorizadas.</span>
+          <span>{formatMessage(dict.bank.importOfx.success, { count: state.count })}</span>
         </div>
       )}
       {isPending && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Importando extrato...
+          {dict.bank.importOfx.importing}
         </div>
       )}
     </form>

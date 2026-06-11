@@ -300,6 +300,28 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
         }
     }
 
+    @Override
+    public BigDecimal outstandingReceivables(String tenantId, LocalDate asOf) {
+        String sql = """
+                SELECT COALESCE(SUM(receivable_value), 0)
+                FROM report_entries
+                WHERE tenant_id = ?
+                  AND receivable_value > 0
+                  AND status IN ('PAID', 'PENDING_RELEASE')
+                  AND sale_date <= ?
+                """;
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, tenantId);
+            statement.setDate(2, Date.valueOf(asOf));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getBigDecimal(1) : BigDecimal.ZERO;
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not calculate outstanding receivables", exception);
+        }
+    }
+
     private int updateEntry(Connection connection, UpsertReportEntryCommand command) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE report_entries

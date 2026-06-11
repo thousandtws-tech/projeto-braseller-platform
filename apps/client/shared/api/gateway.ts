@@ -19,6 +19,7 @@ import type {
   ReportsEntry,
   ReportsExpense,
   ReportsDre,
+  ReportsBalanceSheet,
   FiscalProfile,
   CloudinaryUploadSignature,
   Paginated,
@@ -474,6 +475,16 @@ export async function getReportsDre(token: string, tenantId: string, from: strin
     { cache: 'no-store' },
     token
   )
+}
+
+export async function getReportsBalanceSheet(token: string, tenantId: string, asOf: string): Promise<ReportsBalanceSheet | null> {
+  try {
+    return await apiFetch<ReportsBalanceSheet>(
+      `/api/reports/tenants/${tenantId}/balance-sheet?asOf=${asOf}`,
+      { cache: 'no-store' },
+      token
+    )
+  } catch { return null }
 }
 
 export async function getReportsFilters(token: string, tenantId: string): Promise<ReportsFilters | null> {

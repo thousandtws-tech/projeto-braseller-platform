@@ -4,14 +4,16 @@ import { useState } from 'react'
 import { LockKeyhole, Plus } from 'lucide-react'
 import { Card, CardContent } from '@/shared/ui/card'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import { AddMarketplaceDialog } from './add-marketplace-dialog'
 
 interface Props {
   existingConnectors: string[]
   readOnly?: boolean
+  dict: Dictionary
 }
 
-export function AddMarketplaceCard({ existingConnectors, readOnly = false }: Props) {
+export function AddMarketplaceCard({ existingConnectors, readOnly = false, dict }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -32,8 +34,8 @@ export function AddMarketplaceCard({ existingConnectors, readOnly = false }: Pro
             }
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-muted-foreground">Adicionar Marketplace</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Shopee, Magalu, Bling...</p>
+            <p className="text-sm font-medium text-muted-foreground">{dict.connectors.addMarketplaceCard.title}</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">{dict.connectors.addMarketplaceCard.subtitle}</p>
           </div>
           {readOnly && <ReadOnlyLock compact />}
         </CardContent>
@@ -43,6 +45,7 @@ export function AddMarketplaceCard({ existingConnectors, readOnly = false }: Pro
         open={open}
         onOpenChange={setOpen}
         existingConnectors={existingConnectors}
+        dict={dict}
       />
     </>
   )

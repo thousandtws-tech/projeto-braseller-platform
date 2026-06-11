@@ -1,1 +1,1 @@
-export { BankPage as default } from '@/features/bank'
+export { generateBankMetadata as generateMetadata, BankPage as default } from '@/features/bank'

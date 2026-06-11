@@ -13,8 +13,10 @@ import com.example.application.port.out.BankTransactionRepository;
 import com.example.application.port.out.DreCalculationEventPublisher;
 import com.example.application.port.out.DreCalculationJobRepository;
 import com.example.application.port.out.FiscalAccountingRepository;
+import com.example.application.port.out.ReportEntryRepository;
 import com.example.application.port.out.StockRepository;
 import com.example.domain.model.AccountingPeriodClosing;
+import com.example.domain.model.BalanceSheetStatement;
 import com.example.domain.model.DreCalculationJob;
 import com.example.domain.model.DreStatement;
 import com.example.domain.model.ExpenseAttachment;
@@ -27,6 +29,7 @@ import com.example.domain.model.FinancialSummary;
 import com.example.domain.model.FiscalProfile;
 import com.example.domain.model.ProfitAvailability;
 import com.example.domain.model.ProfitDistribution;
+import com.example.domain.model.PurchaseEntry;
 import com.example.domain.model.ReportFilter;
 import com.example.domain.model.TaxRegime;
 import com.example.domain.model.TenantContext;
@@ -52,6 +55,7 @@ public class FiscalAccountingService {
     private static final BigDecimal IRPJ_ADDITIONAL_RATE = new BigDecimal("0.10");
     private static final BigDecimal IRPJ_ADDITIONAL_MONTHLY_THRESHOLD = new BigDecimal("20000.00");
     private static final BigDecimal CSLL_RATE = new BigDecimal("0.09");
+    private static final LocalDate INCEPTION_DATE = LocalDate.of(2000, 1, 1);
     private static final List<SimplesBracket> SIMPLES_COMMERCE_BRACKETS = List.of(
             new SimplesBracket(new BigDecimal("180000.00"), new BigDecimal("0.0400"), ZERO),
             new SimplesBracket(new BigDecimal("360000.00"), new BigDecimal("0.0730"), new BigDecimal("5940.00")),
@@ -67,6 +71,7 @@ public class FiscalAccountingService {
     private final DreCalculationEventPublisher dreCalculationEventPublisher;
     private final StockRepository stockRepository;
     private final BankTransactionRepository bankTransactionRepository;
+    private final ReportEntryRepository reportEntryRepository;
 
     @Inject
     public FiscalAccountingService(
@@ -75,13 +80,15 @@ public class FiscalAccountingService {
             DreCalculationJobRepository dreCalculationJobRepository,
             DreCalculationEventPublisher dreCalculationEventPublisher,
             StockRepository stockRepository,
-            BankTransactionRepository bankTransactionRepository) {
+            BankTransactionRepository bankTransactionRepository,
+            ReportEntryRepository reportEntryRepository) {
         this.fiscalRepository = fiscalRepository;
         this.reportingService = reportingService;
         this.dreCalculationJobRepository = dreCalculationJobRepository;
         this.dreCalculationEventPublisher = dreCalculationEventPublisher;
         this.stockRepository = stockRepository;
         this.bankTransactionRepository = bankTransactionRepository;
+        this.reportEntryRepository = reportEntryRepository;
     }
 
     public FiscalProfile upsertProfile(UpsertFiscalProfileCommand command) {
@@ -271,6 +278,45 @@ public class FiscalAccountingService {
                 summary.entryCount(),
                 expenseCount,
                 expensesByCategory
+        );
+    }
+
+    public BalanceSheetStatement balanceSheet(String tenantId, LocalDate asOf) {
+        String resolvedTenantId = requireText(tenantId, "tenantId");
+        LocalDate resolvedAsOf = asOf == null ? LocalDate.now() : asOf;
+
+        BigDecimal cashAndBank = money(bankTransactionRepository.balanceAsOf(resolvedTenantId, resolvedAsOf));
+        BigDecimal accountsReceivable = money(reportEntryRepository.outstandingReceivables(resolvedTenantId, resolvedAsOf));
+        BigDecimal inventory = money(stockRepository.totalInventoryValue(resolvedTenantId));
+        BigDecimal totalAssets = cashAndBank.add(accountsReceivable).add(inventory).setScale(2, RoundingMode.HALF_UP);
+
+        LocalDate periodStart = resolvedAsOf.withDayOfMonth(1);
+        BigDecimal accountsPayable = money(stockRepository.listPurchaseEntries(resolvedTenantId, periodStart, resolvedAsOf).stream()
+                .map(PurchaseEntry::totalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        DreStatement currentPeriodDre = dre(resolvedTenantId, periodStart, resolvedAsOf);
+        BigDecimal taxesPayable = money(currentPeriodDre.estimatedTaxes());
+        BigDecimal totalLiabilities = accountsPayable.add(taxesPayable).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal equity = totalAssets.subtract(totalLiabilities).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalLiabilitiesAndEquity = totalLiabilities.add(equity).setScale(2, RoundingMode.HALF_UP);
+
+        DreStatement inceptionDre = dre(resolvedTenantId, INCEPTION_DATE, resolvedAsOf);
+        BigDecimal accumulatedNetResult = money(inceptionDre.netResult());
+
+        return new BalanceSheetStatement(
+                resolvedTenantId,
+                resolvedAsOf,
+                cashAndBank,
+                accountsReceivable,
+                inventory,
+                totalAssets,
+                accountsPayable,
+                taxesPayable,
+                totalLiabilities,
+                equity,
+                accumulatedNetResult,
+                totalLiabilitiesAndEquity
         );
     }
 

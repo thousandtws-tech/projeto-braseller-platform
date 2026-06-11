@@ -1,1 +1,1 @@
-export { default as BpoPage, metadata as bpoMetadata } from './ui/bpo-page'
+export { default as BpoPage, generateMetadata as generateBpoMetadata } from './ui/bpo-page'

@@ -14,6 +14,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/shared/ui/sheet'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import { ExpenseForm } from './expense-form'
 
 function monthBounds(dateValue?: string) {
@@ -27,7 +29,13 @@ function monthBounds(dateValue?: string) {
   }
 }
 
-export function ExpenseFormSheet({ readOnly = false }: { readOnly?: boolean }) {
+interface Props {
+  readOnly?: boolean
+  dict: Dictionary
+  lang: Locale
+}
+
+export function ExpenseFormSheet({ readOnly = false, dict, lang }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [formKey, setFormKey] = useState(0)
@@ -42,9 +50,9 @@ export function ExpenseFormSheet({ readOnly = false }: { readOnly?: boolean }) {
     const params = new URLSearchParams({ from, to })
 
     setOpen(false)
-    router.push(`/despesas?${params}`)
+    router.push(`/${lang}/despesas?${params}`)
     router.refresh()
-  }, [router])
+  }, [router, lang])
 
   if (readOnly) {
     return (
@@ -53,10 +61,10 @@ export function ExpenseFormSheet({ readOnly = false }: { readOnly?: boolean }) {
           type="button"
           disabled
           className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'gap-1.5 opacity-80')}
-          title="Contador possui acesso somente para visualizacao"
+          title={dict.expenses.form.readOnlyTitle}
         >
           <LockKeyhole className="size-3.5 animate-pulse" />
-          Nova Despesa
+          {dict.expenses.form.newExpense}
         </button>
         <ReadOnlyLock compact className="max-w-[260px]" />
       </div>
@@ -67,15 +75,15 @@ export function ExpenseFormSheet({ readOnly = false }: { readOnly?: boolean }) {
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5')}>
         <Plus className="size-3.5" />
-        Nova Despesa
+        {dict.expenses.form.newExpense}
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
         <SheetHeader className="shrink-0">
-          <SheetTitle>Nova Despesa</SheetTitle>
-          <SheetDescription>Preencha os dados para lançar uma despesa operacional.</SheetDescription>
+          <SheetTitle>{dict.expenses.form.sheetTitle}</SheetTitle>
+          <SheetDescription>{dict.expenses.form.sheetDescription}</SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto py-4">
-          <ExpenseForm key={formKey} onSuccess={handleSuccess} />
+          <ExpenseForm key={formKey} onSuccess={handleSuccess} dict={dict} />
         </div>
       </SheetContent>
     </Sheet>

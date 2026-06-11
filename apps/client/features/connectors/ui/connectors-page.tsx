@@ -1,4 +1,3 @@
-import type { Metadata } from 'next'
 import Image from 'next/image'
 import { AlertCircle, CheckCircle2, Clock, Wifi } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
@@ -9,10 +8,13 @@ import {
 import { getToken, getSession } from '@/entities/session/server/session'
 import { getConnectors } from '@/shared/api/gateway'
 import { isReadOnlyAccountant } from '@/entities/session/model/permissions'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Locale } from '@/shared/i18n/config'
 import { ConnectorCard } from './connector-card'
 import { AddMarketplaceCard } from './add-marketplace-card'
 
-export const metadata: Metadata = { title: 'Conectores' }
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 
 const DISPLAY_NAMES: Record<string, string> = {
   'mercado-livre': 'Mercado Livre',
@@ -23,10 +25,20 @@ const DISPLAY_NAMES: Record<string, string> = {
 }
 
 interface Props {
+  params: Promise<{ lang: Locale }>
   searchParams: Promise<{ connected?: string; auth_error?: string }>
 }
 
-export default async function ConectoresPage({ searchParams }: Props) {
+export async function generateMetadata({ params }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  return { title: dict.connectors.title }
+}
+
+export default async function ConectoresPage({ params, searchParams }: Props) {
+  const { lang } = await params
+  const dict = await getDictionary(lang)
+  const statusLabels = dict.connectors.status as Record<string, string>
   const { connected: connectedParam, auth_error } = await searchParams
   const token = (await getToken()) ?? ''
   const session = await getSession()
@@ -39,9 +51,9 @@ export default async function ConectoresPage({ searchParams }: Props) {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Conectores</h2>
+          <h2 className="text-xl font-semibold">{dict.connectors.title}</h2>
           <p className="text-sm text-muted-foreground">
-            {connectedCount} de {connectors.length} marketplaces conectados
+            {formatMessage(dict.connectors.subtitle, { connected: connectedCount, total: connectors.length })}
           </p>
         </div>
       </div>
@@ -51,7 +63,7 @@ export default async function ConectoresPage({ searchParams }: Props) {
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
           <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
           <p className="text-sm font-medium">
-            {DISPLAY_NAMES[connectedParam] ?? connectedParam} conectado com sucesso!
+            {formatMessage(dict.connectors.connectedSuccess, { name: DISPLAY_NAMES[connectedParam] ?? connectedParam })}
           </p>
         </div>
       )}
@@ -66,9 +78,9 @@ export default async function ConectoresPage({ searchParams }: Props) {
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 flex items-center gap-3">
           <AlertCircle className="size-4 text-amber-500 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium">Alguns conectores precisam de atenção</p>
+            <p className="text-sm font-medium">{dict.connectors.attentionBanner.title}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Verifique os conectores desconectados ou com erro abaixo.
+              {dict.connectors.attentionBanner.hint}
             </p>
           </div>
         </div>
@@ -76,9 +88,9 @@ export default async function ConectoresPage({ searchParams }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {connectors.map((connector) => (
-          <ConnectorCard key={connector.name} connector={connector} readOnly={readOnly} />
+          <ConnectorCard key={connector.name} connector={connector} readOnly={readOnly} dict={dict} lang={lang} />
         ))}
-        <AddMarketplaceCard existingConnectors={connectors.map((c) => c.name)} readOnly={readOnly} />
+        <AddMarketplaceCard existingConnectors={connectors.map((c) => c.name)} readOnly={readOnly} dict={dict} />
       </div>
 
       {/* Tabela de conectores ativos */}
@@ -88,15 +100,15 @@ export default async function ConectoresPage({ searchParams }: Props) {
             <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Wifi className="size-4 text-primary" />
             </div>
-            <CardTitle>Conectores ativos</CardTitle>
+            <CardTitle>{dict.connectors.table.title}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="pl-6">Marketplace</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Última sincronização</TableHead>
+                  <TableHead className="pl-6">{dict.connectors.table.columns.marketplace}</TableHead>
+                  <TableHead>{dict.connectors.table.columns.status}</TableHead>
+                  <TableHead>{dict.connectors.table.columns.lastSync}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -128,14 +140,14 @@ export default async function ConectoresPage({ searchParams }: Props) {
                         variant={c.status === 'connected' ? 'success' : c.status === 'error' ? 'destructive' : 'secondary'}
                         className="text-xs"
                       >
-                        {c.status === 'connected' ? 'Conectado' : c.status === 'error' ? 'Erro' : c.status === 'syncing' ? 'Sincronizando' : 'Desconectado'}
+                        {statusLabels[c.status] ?? c.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {c.lastSync ? (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Clock className="size-3" />
-                          {new Date(c.lastSync).toLocaleString('pt-BR', {
+                          {new Date(c.lastSync).toLocaleString(LOCALE_MAP[lang], {
                             day: '2-digit', month: '2-digit', year: 'numeric',
                             hour: '2-digit', minute: '2-digit',
                           })}

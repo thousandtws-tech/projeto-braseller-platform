@@ -1,1 +1,1 @@
-export { bpoMetadata as metadata, BpoPage as default } from '@/features/bpo'
+export { generateBpoMetadata as generateMetadata, BpoPage as default } from '@/features/bpo'

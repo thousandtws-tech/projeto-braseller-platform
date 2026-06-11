@@ -1,2 +1,2 @@
 export * from './server/actions'
-export { default as NotificationsPage, metadata as notificationsMetadata } from './ui/notifications-page'
+export { default as NotificationsPage, generateMetadata as generateNotificationsMetadata } from './ui/notifications-page'
