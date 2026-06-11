@@ -12,6 +12,7 @@ import {
   Bell,
   Settings,
   ChevronLeft,
+  ChevronRight,
   LogOut,
   CreditCard,
   UserRound,
@@ -20,11 +21,13 @@ import {
   Landmark,
   BriefcaseBusiness,
   Scale,
+  Search,
 } from 'lucide-react'
+
 import { cn } from '@/shared/lib/utils'
 import { isBpoOperator } from '@/entities/session/model/permissions'
 import { logoutAction } from '@/features/auth/server/actions'
-import { Avatar, AvatarImage, AvatarFallback } from '@/shared/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar'
 import type { UserSession } from '@/shared/types'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { Locale } from '@/shared/i18n/config'
@@ -58,129 +61,162 @@ export function Sidebar({ user, dict, lang }: SidebarProps) {
     { href: 'notificacoes', label: dict.nav.notificacoes, icon: Bell },
     { href: 'contador', label: dict.nav.contador, icon: Calculator },
     { href: 'configuracoes', label: dict.nav.configuracoes, icon: Settings },
+    { href: 'plano', label: dict.nav.plano, icon: CreditCard },
   ]
+
+  const initials = user.fullName
+    ?.split(' ')
+    .slice(0, 2)
+    .map((name) => name[0])
+    .join('')
+    .toUpperCase()
 
   return (
     <aside
       className={cn(
-        'flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-200 ease-in-out relative',
-        collapsed ? 'w-14' : 'w-56'
+        'relative flex h-screen flex-col border-r border-slate-200 bg-white text-slate-700 transition-all duration-300 ease-in-out',
+        collapsed ? 'w-20' : 'w-72'
       )}
     >
-      {/* Logo */}
-      <div className={cn('flex items-center gap-3 h-14 px-3 border-b border-sidebar-border shrink-0', collapsed && 'justify-center')}>
-        <div className="size-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-          <span className="text-sidebar-primary-foreground font-bold text-sm">B</span>
+      <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4">
+        <div className={cn('flex items-center gap-3 min-w-0', collapsed && 'mx-auto')}>
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
+            <span className="text-sm font-bold text-white">B</span>
+          </div>
+
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">Brasaller</p>
+              <p className="truncate text-xs text-slate-500">Enterprise Dashboard</p>
+            </div>
+          )}
         </div>
+
         {!collapsed && (
-          <span className="font-semibold text-base truncate">LogoOficial</span>
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label={dict.nav.collapseMenu}
+          >
+            <ChevronLeft className="size-4" />
+          </button>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
-        {items.map(({ href, label, icon: Icon }) => {
-          const fullHref = `/${lang}/${href}`
-          const active = pathname === fullHref || pathname.startsWith(fullHref + '/')
-          return (
-            <Link
-              key={href}
-              href={fullHref}
-              title={collapsed ? label : undefined}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
-                collapsed && 'justify-center px-2',
-                active
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Icon className="size-4 shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          )
-        })}
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="absolute -right-3 top-5 z-10 flex size-6 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition hover:bg-slate-50"
+          aria-label={dict.nav.expandMenu}
+        >
+          <ChevronRight className="size-3.5 text-slate-500" />
+        </button>
+      )}
+
+      {!collapsed && (
+        <div className="px-4 py-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+        </div>
+      )}
+
+      <nav className="flex-1 overflow-y-auto px-3 py-2 sidebar-scroll">
+        <div className="space-y-1">
+          {items.map(({ href, label, icon: Icon }) => {
+            const fullHref = `/${lang}/${href}`
+            const active = pathname === fullHref || pathname.startsWith(`${fullHref}/`)
+
+            return (
+              <Link
+                key={href}
+                href={fullHref}
+                title={collapsed ? label : undefined}
+                className={cn(
+                  'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all',
+                  collapsed && 'justify-center px-2',
+                  active
+                    ? 'bg-blue-50 font-medium text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'size-4 shrink-0',
+                    active ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'
+                  )}
+                />
+
+                {!collapsed && <span className="truncate">{label}</span>}
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
-      {/* Bottom nav */}
-      <div className="border-t border-sidebar-border py-4 space-y-0.5 px-2">
-        {bottomNav.map(({ href, label, icon: Icon }) => {
-          const fullHref = `/${lang}/${href}`
-          const active = pathname === fullHref
-          return (
-            <Link
-              key={href}
-              href={fullHref}
-              title={collapsed ? label : undefined}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
-                collapsed && 'justify-center px-2',
-                active
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Icon className="size-4 shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          )
-        })}
+      <div className="border-t border-slate-200 px-3 py-3">
+        <div className="space-y-1">
+          {bottomNav.map(({ href, label, icon: Icon }) => {
+            const fullHref = `/${lang}/${href}`
+            const active = pathname === fullHref || pathname.startsWith(`${fullHref}/`)
 
-        <Link
-          href={`/${lang}/plano`}
-          title={collapsed ? dict.nav.plano : undefined}
-          className={cn(
-            'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
-            collapsed && 'justify-center px-2'
-          )}
-        >
-          <CreditCard className="size-4 shrink-0" />
-          {!collapsed && <span className="truncate">{dict.nav.plano}</span>}
-        </Link>
+            return (
+              <Link
+                key={href}
+                href={fullHref}
+                title={collapsed ? label : undefined}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all',
+                  collapsed && 'justify-center px-2',
+                  active
+                    ? 'bg-blue-50 font-medium text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                {!collapsed && <span className="truncate">{label}</span>}
+              </Link>
+            )
+          })}
+        </div>
       </div>
 
-      {/* User footer */}
-      <div className={cn('border-t border-sidebar-border p-3', collapsed && 'flex justify-center')}>
-        {collapsed ? (
-          <Avatar className="size-8">
+      <div className="border-t border-slate-200 bg-slate-50/60 p-3">
+        <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
+          <Avatar className="size-9 shrink-0">
             <AvatarImage src={undefined} alt={user.fullName} />
-            <AvatarFallback className="bg-sidebar-accent">
-              <UserRound className="size-4 text-sidebar-accent-foreground" />
+            <AvatarFallback className="bg-slate-200 text-xs font-semibold text-slate-700">
+              {initials || <UserRound className="size-4" />}
             </AvatarFallback>
           </Avatar>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Avatar className="size-8 shrink-0">
-              <AvatarImage src={undefined} alt={user.fullName} />
-              <AvatarFallback className="bg-sidebar-accent">
-                <UserRound className="size-4 text-sidebar-accent-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate">{user.fullName}</p>
-              <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
-            </div>
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="p-1 rounded hover:bg-sidebar-accent/50 transition-colors"
-                title={dict.nav.signOut}
-              >
-                <LogOut className="size-3.5 text-sidebar-foreground/50" />
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
 
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-[52px] size-6 rounded-full bg-sidebar border border-sidebar-border flex items-center justify-center hover:bg-sidebar-accent transition-colors z-10"
-        aria-label={collapsed ? dict.nav.expandMenu : dict.nav.collapseMenu}
-      >
-        <ChevronLeft className={cn('size-3 text-sidebar-foreground/70 transition-transform', collapsed && 'rotate-180')} />
-      </button>
+          {!collapsed && (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-900">{user.fullName}</p>
+                <p className="truncate text-xs text-slate-500">{user.email}</p>
+              </div>
+
+              <form action={logoutAction}>
+                <button
+                  type="submit"
+                  className="rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+                  title={dict.nav.signOut}
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
     </aside>
   )
 }

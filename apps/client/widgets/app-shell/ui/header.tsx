@@ -11,6 +11,7 @@ import {
   Settings,
   UserRound,
 } from 'lucide-react'
+
 import { logoutAction } from '@/features/auth/server/actions'
 import { Avatar, AvatarFallback } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
@@ -58,29 +59,57 @@ export function Header({ notifications, user, dict, lang }: HeaderProps) {
   const title = breadcrumbs[pathname] ?? dict.header.fallbackTitle
 
   return (
-    <header className="h-14 border-b border-border bg-card flex items-center px-6 gap-4 shrink-0">
+    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-slate-200 bg-white/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-sm font-semibold text-foreground">{title}</h1>
+        <h1 className="truncate text-sm font-semibold text-slate-900">
+          {title}
+        </h1>
       </div>
 
-      <div className="hidden sm:flex items-center gap-2 h-8 w-56 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground cursor-text transition-colors hover:border-ring">
-        <Search className="size-3.5 shrink-0" />
-        <span className="text-xs">{dict.header.searchPlaceholder}</span>
-        <kbd className="ml-auto rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+      <button
+        type="button"
+        className="hidden h-10 w-72 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 transition hover:border-slate-300 hover:bg-white hover:shadow-sm lg:flex"
+        aria-label={dict.header.searchPlaceholder}
+      >
+        <Search className="size-4 shrink-0 text-slate-400" />
+        <span className="truncate text-sm">{dict.header.searchPlaceholder}</span>
+        <kbd className="ml-auto rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-500 shadow-sm">
           ⌘K
         </kbd>
-      </div>
+      </button>
 
-      <div className="flex items-center gap-2">
-        <LanguageSwitcher dict={dict} lang={lang} />
-        <NotificationsDropdown notifications={notifications} dict={dict} lang={lang} />
+      <div className="flex items-center gap-1.5">
+        <HeaderAction>
+          <LanguageSwitcher dict={dict} lang={lang} />
+        </HeaderAction>
+
+        <HeaderAction>
+          <NotificationsDropdown notifications={notifications} dict={dict} lang={lang} />
+        </HeaderAction>
+
         <ProfileDropdown user={user} dict={dict} lang={lang} />
       </div>
     </header>
   )
 }
 
-function ProfileDropdown({ user, dict, lang }: { user: UserSession; dict: Dictionary; lang: Locale }) {
+function HeaderAction({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex size-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-50">
+      {children}
+    </div>
+  )
+}
+
+function ProfileDropdown({
+  user,
+  dict,
+  lang,
+}: {
+  user: UserSession
+  dict: Dictionary
+  lang: Locale
+}) {
   const displayName = user.fullName || user.email
   const initials = getInitials(displayName)
 
@@ -91,63 +120,97 @@ function ProfileDropdown({ user, dict, lang }: { user: UserSession; dict: Dictio
           <Button
             type="button"
             variant="outline"
-            className="h-9 gap-2 px-2 pr-2.5"
+            className="h-10 gap-2 rounded-xl border-slate-200 bg-slate-50 px-2 pr-3 text-slate-700 shadow-none transition hover:border-slate-300 hover:bg-white hover:shadow-sm"
             aria-label="Abrir menu do perfil"
           >
             <Avatar size="sm">
-              <AvatarFallback className="bg-primary/10 text-primary">
+              <AvatarFallback className="bg-blue-100 text-xs font-semibold text-blue-700">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden max-w-32 truncate text-xs font-medium md:inline">
+
+            <span className="hidden max-w-40 truncate text-sm font-medium md:inline">
               {displayName}
             </span>
-            <ChevronDown data-icon="inline-end" />
+
+            <ChevronDown className="size-4 text-slate-400" />
           </Button>
         }
       />
-      <DropdownMenuContent align="end" className="w-64 p-1.5">
+
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-72 rounded-2xl border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/60"
+      >
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="p-3">
+          <DropdownMenuLabel className="rounded-xl p-3">
             <div className="flex items-center gap-3">
               <Avatar>
-                <AvatarFallback className="bg-primary/10 text-primary">
+                <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-700">
                   {initials}
                 </AvatarFallback>
               </Avatar>
+
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-popover-foreground">
+                <p className="truncate text-sm font-semibold text-slate-900">
                   {displayName}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                <p className="truncate text-xs text-slate-500">
+                  {user.email}
+                </p>
               </div>
             </div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+
+        <DropdownMenuSeparator className="my-1 bg-slate-100" />
+
         <DropdownMenuGroup>
-          <DropdownMenuItem render={<Link href={`/${lang}/configuracoes`} />}>
-            <UserRound />
+          <DropdownMenuItem
+            render={<Link href={`/${lang}/configuracoes`} />}
+            className="rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:bg-slate-50 focus:text-slate-900"
+          >
+            <UserRound className="size-4 text-slate-500" />
             {dict.header.profileMenu.profileSecurity}
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href={`/${lang}/configuracoes`} />}>
-            <Building2 />
+
+          <DropdownMenuItem
+            render={<Link href={`/${lang}/configuracoes`} />}
+            className="rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:bg-slate-50 focus:text-slate-900"
+          >
+            <Building2 className="size-4 text-slate-500" />
             {dict.header.profileMenu.fiscalData}
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href={`/${lang}/plano`} />}>
-            <CreditCard />
+
+          <DropdownMenuItem
+            render={<Link href={`/${lang}/plano`} />}
+            className="rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:bg-slate-50 focus:text-slate-900"
+          >
+            <CreditCard className="size-4 text-slate-500" />
             {dict.header.profileMenu.plan}
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href={`/${lang}/configuracoes`} />}>
-            <Settings />
+
+          <DropdownMenuItem
+            render={<Link href={`/${lang}/configuracoes`} />}
+            className="rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:bg-slate-50 focus:text-slate-900"
+          >
+            <Settings className="size-4 text-slate-500" />
             {dict.header.profileMenu.settings}
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+
+        <DropdownMenuSeparator className="my-1 bg-slate-100" />
+
         <DropdownMenuGroup>
           <form action={logoutAction}>
-            <DropdownMenuItem variant="destructive" nativeButton={true} render={<button type="submit" className="w-full" />}>
-              <LogOut />
+            <DropdownMenuItem
+              variant="destructive"
+              nativeButton
+              render={<button type="submit" className="w-full" />}
+              className="rounded-xl px-3 py-2.5 text-sm text-red-600 focus:bg-red-50 focus:text-red-700"
+            >
+              <LogOut className="size-4 text-red-500" />
               {dict.header.profileMenu.signOut}
             </DropdownMenuItem>
           </form>
@@ -158,11 +221,13 @@ function ProfileDropdown({ user, dict, lang }: { user: UserSession; dict: Dictio
 }
 
 function getInitials(value: string) {
-  return value
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase() || 'B'
+  return (
+    value
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'B'
+  )
 }
