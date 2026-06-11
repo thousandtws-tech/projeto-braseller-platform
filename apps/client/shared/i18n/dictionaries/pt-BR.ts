@@ -32,6 +32,12 @@ const dictionary = {
   },
   header: {
     searchPlaceholder: 'Buscar...',
+    theme: {
+      ariaLabel: 'Alternar tema',
+      light: 'Claro',
+      dark: 'Escuro',
+      system: 'Sistema',
+    },
     profileMenu: {
       profileSecurity: 'Perfil e segurança',
       fiscalData: 'Dados fiscais',

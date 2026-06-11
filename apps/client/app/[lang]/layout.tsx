@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import '../globals.css'
 import { cn } from '@/shared/lib/utils'
 import { locales, isLocale } from '@/shared/i18n/config'
+import { ThemeProvider } from '@/shared/providers/theme-provider'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 
@@ -26,9 +27,9 @@ export default async function RootLayout({ children, params }: Props) {
   if (!isLocale(lang)) notFound()
 
   return (
-    <html lang={lang} className={cn('h-full antialiased', inter.variable)}>
+    <html lang={lang} className={cn('h-full antialiased', inter.variable)} suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   )

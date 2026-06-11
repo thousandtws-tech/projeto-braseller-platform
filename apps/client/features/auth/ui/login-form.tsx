@@ -6,93 +6,101 @@ import { loginAction } from '@/features/auth/server/actions'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import { GlassInputWrapper } from '@/shared/ui/glass-input-wrapper'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
 
-export function LoginForm() {
+interface Props {
+  dict: Dictionary
+}
+
+export function LoginForm({ dict }: Props) {
   const [state, formAction, isPending] = useActionState(loginAction, null)
   const [showPassword, setShowPassword] = useState(false)
+  const form = dict.auth.login.form
 
   return (
     <form action={formAction} className="space-y-5">
       {state?.error && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-sm text-destructive">
+        <div className="animate-element flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-sm text-destructive">
           <AlertCircle className="size-4 mt-0.5 shrink-0" />
           <span>{state.error}</span>
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="email">E-mail</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="seu@email.com"
-          required
-          disabled={isPending}
-          aria-invalid={!!state?.error}
-        />
+      <div className="animate-element animate-delay-300 space-y-1.5">
+        <Label htmlFor="email">{form.email}</Label>
+        <GlassInputWrapper>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder={form.emailPlaceholder}
+            required
+            disabled={isPending}
+            aria-invalid={!!state?.error}
+            className="h-auto rounded-2xl border-0 bg-transparent px-4 py-3 text-sm focus-visible:ring-0"
+          />
+        </GlassInputWrapper>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="animate-element animate-delay-400 space-y-1.5">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password">Senha</Label>
+          <Label htmlFor="password">{form.password}</Label>
           <a
             href="#"
             tabIndex={-1}
             className="text-xs text-muted-foreground hover:text-primary transition-colors"
           >
-            Esqueceu a senha?
+            {form.forgotPassword}
           </a>
         </div>
-        <div className="relative">
-          <Input
-            id="password"
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            placeholder="••••••••"
-            required
-            disabled={isPending}
-            aria-invalid={!!state?.error}
-            className="pr-10"
-          />
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-          >
-            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
-        </div>
+        <GlassInputWrapper>
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder={form.passwordPlaceholder}
+              required
+              disabled={isPending}
+              aria-invalid={!!state?.error}
+              className="h-auto rounded-2xl border-0 bg-transparent px-4 py-3 pr-12 text-sm focus-visible:ring-0"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showPassword ? form.hidePassword : form.showPassword}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </GlassInputWrapper>
       </div>
 
-      <Button type="submit" className="w-full" disabled={isPending}>
+      <Button type="submit" className="animate-element animate-delay-600 h-auto w-full rounded-2xl py-3" disabled={isPending}>
         {isPending ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            Entrando...
+            {form.submitting}
           </>
         ) : (
-          'Entrar'
+          form.submit
         )}
       </Button>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">ou continue com</span>
-        </div>
+      <div className="animate-element animate-delay-700 relative flex items-center justify-center">
+        <span className="w-full border-t border-border" />
+        <span className="absolute bg-background px-2 text-xs text-muted-foreground uppercase">{form.orContinueWith}</span>
       </div>
 
       <a
         href="/api/auth/google/authorize"
         aria-disabled={isPending}
-        className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent aria-disabled:pointer-events-none aria-disabled:opacity-50"
+        className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-3 text-sm font-medium transition-colors hover:bg-accent aria-disabled:pointer-events-none aria-disabled:opacity-50"
       >
         <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

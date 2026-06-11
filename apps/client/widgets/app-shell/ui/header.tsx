@@ -26,6 +26,7 @@ import {
 } from '@/shared/ui/dropdown-menu'
 import { NotificationsDropdown } from '@/widgets/app-shell/ui/notifications-dropdown'
 import { LanguageSwitcher } from '@/widgets/app-shell/ui/language-switcher'
+import { ThemeToggle } from '@/widgets/app-shell/ui/theme-toggle'
 import type { NotificationMessage, UserSession } from '@/shared/types'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { Locale } from '@/shared/i18n/config'
@@ -79,6 +80,10 @@ export function Header({ notifications, user, dict, lang }: HeaderProps) {
       </button>
 
       <div className="flex items-center gap-1.5">
+        <HeaderAction>
+          <ThemeToggle dict={dict} />
+        </HeaderAction>
+
         <HeaderAction>
           <LanguageSwitcher dict={dict} lang={lang} />
         </HeaderAction>

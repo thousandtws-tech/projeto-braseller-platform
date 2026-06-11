@@ -1,7 +1,13 @@
 'use client'
 
 import { useTransition } from 'react'
-import { Trash2, Paperclip, Loader2 } from 'lucide-react'
+import {
+  Trash2,
+  Paperclip,
+  Loader2,
+  FileText,
+} from 'lucide-react'
+
 import { deleteExpenseAction } from '@/features/reports/server/actions'
 import { formatCurrency, formatDate } from '@/shared/api/gateway'
 import { ReadOnlyLockInline } from '@/shared/ui/read-only-lock'
@@ -9,21 +15,21 @@ import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { ExpenseEntry } from '@/shared/types'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  OPERATIONAL:  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  PACKAGING:    'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-  SUPPLIES:     'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  LABOR:        'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  BANK_FEE:     'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  SHIPPING:     'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-  TAX:          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  OTHER:        'bg-muted text-muted-foreground',
-  // Legacy Portuguese names
-  Embalagem:    'bg-blue-100 text-blue-700',
-  Frete:        'bg-purple-100 text-purple-700',
-  Produto:      'bg-green-100 text-green-700',
-  Plataforma:   'bg-indigo-100 text-indigo-700',
-  Contabilidade:'bg-gray-100 text-gray-700',
-  Outros:       'bg-muted text-muted-foreground',
+  OPERATIONAL: 'bg-blue-50 text-blue-700 ring-blue-200',
+  PACKAGING: 'bg-sky-50 text-sky-700 ring-sky-200',
+  SUPPLIES: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  LABOR: 'bg-violet-50 text-violet-700 ring-violet-200',
+  BANK_FEE: 'bg-amber-50 text-amber-700 ring-amber-200',
+  SHIPPING: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  TAX: 'bg-red-50 text-red-700 ring-red-200',
+  OTHER: 'bg-slate-50 text-slate-600 ring-slate-200',
+
+  Embalagem: 'bg-sky-50 text-sky-700 ring-sky-200',
+  Frete: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  Produto: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  Plataforma: 'bg-violet-50 text-violet-700 ring-violet-200',
+  Contabilidade: 'bg-slate-50 text-slate-700 ring-slate-200',
+  Outros: 'bg-slate-50 text-slate-600 ring-slate-200',
 }
 
 interface Props {
@@ -32,56 +38,135 @@ interface Props {
   dict: Dictionary
 }
 
-export function ExpenseRow({ expense, readOnly = false, dict }: Props) {
+export function ExpenseRow({
+  expense,
+  readOnly = false,
+  dict,
+}: Props) {
   const [isPending, startTransition] = useTransition()
-  const label = dict.dre.categories[expense.category as keyof typeof dict.dre.categories] ?? expense.category
-  const color = CATEGORY_COLORS[expense.category] ?? CATEGORY_COLORS.OTHER
+
+  const label =
+    dict.dre.categories[
+      expense.category as keyof typeof dict.dre.categories
+    ] ?? expense.category
+
+  const color =
+    CATEGORY_COLORS[expense.category] ??
+    CATEGORY_COLORS.OTHER
 
   function handleDelete() {
-    if (!confirm(dict.expenses.row.confirmDelete)) return
-    startTransition(() => deleteExpenseAction(expense.id))
+    if (!confirm(dict.expenses.row.confirmDelete)) {
+      return
+    }
+
+    startTransition(() => {
+      deleteExpenseAction(expense.id)
+    })
   }
 
   return (
-    <tr className={`border-b border-border/50 hover:bg-muted/30 transition-colors group ${isPending ? 'opacity-50' : ''}`}>
-      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-sm">
+    <tr
+      className={`
+        border-b border-slate-100
+        transition-colors
+        hover:bg-slate-50/70
+        ${isPending ? 'opacity-50' : ''}
+      `}
+    >
+      {/* Data */}
+      <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-500">
         {formatDate(expense.expenseDate)}
       </td>
-      <td className="px-4 py-3 font-medium text-sm">{expense.description}</td>
-      <td className="px-4 py-3">
-        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${color}`}>
+
+      {/* Descrição */}
+      <td className="px-5 py-4">
+        <div className="flex flex-col">
+          <span className="font-medium text-slate-900">
+            {expense.description}
+          </span>
+
+          {expense.attachmentUrl && (
+            <span className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+              <FileText className="size-3" />
+              Comprovante anexado
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* Categoria */}
+      <td className="px-5 py-4">
+        <span
+          className={`
+            inline-flex items-center
+            rounded-full
+            px-2.5
+            py-1
+            text-xs
+            font-medium
+            ring-1
+            ${color}
+          `}
+        >
           {label}
         </span>
       </td>
-      <td className="px-4 py-3 font-medium whitespace-nowrap text-sm">
-        {formatCurrency(expense.amount)}
+
+      {/* Valor */}
+      <td className="whitespace-nowrap px-5 py-4">
+        <span className="text-sm font-semibold text-slate-900">
+          {formatCurrency(expense.amount)}
+        </span>
       </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+      {/* Ações */}
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-1">
           {expense.attachmentUrl && (
             <a
               href={expense.attachmentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1 rounded hover:text-primary transition-colors"
               title={dict.expenses.row.viewReceipt}
+              className="
+                flex size-8 items-center justify-center
+                rounded-lg
+                text-slate-500
+                transition-all
+                hover:bg-blue-50
+                hover:text-blue-600
+              "
             >
-              <Paperclip className="size-3.5" />
+              <Paperclip className="size-4" />
             </a>
           )}
+
           {readOnly ? (
-            <ReadOnlyLockInline />
+            <div className="ml-1">
+              <ReadOnlyLockInline />
+            </div>
           ) : (
             <button
+              type="button"
               onClick={handleDelete}
               disabled={isPending}
-              className="p-1 rounded hover:text-destructive transition-colors disabled:opacity-50"
               title={dict.expenses.row.delete}
+              className="
+                flex size-8 items-center justify-center
+                rounded-lg
+                text-slate-500
+                transition-all
+                hover:bg-red-50
+                hover:text-red-600
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+              "
             >
-              {isPending
-                ? <Loader2 className="size-3.5 animate-spin" />
-                : <Trash2 className="size-3.5" />
-              }
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
             </button>
           )}
         </div>

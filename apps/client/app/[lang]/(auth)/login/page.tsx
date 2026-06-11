@@ -24,14 +24,14 @@ export default async function LoginPage({ params, searchParams }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="mb-2 flex items-center justify-center gap-2 lg:hidden">
+      <div className="animate-element mb-2 flex items-center justify-center gap-2 lg:hidden">
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
           <span className="font-bold text-primary-foreground">B</span>
         </div>
         <span className="text-lg font-semibold">Brasaller</span>
       </div>
 
-      <div className="space-y-2">
+      <div className="animate-element animate-delay-100 space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">{dict.auth.login.title}</h1>
         <p className="text-sm text-muted-foreground">
           {dict.auth.login.subtitle}
@@ -39,22 +39,22 @@ export default async function LoginPage({ params, searchParams }: Props) {
       </div>
 
       {expired === '1' && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3.5 py-3 text-sm text-amber-700 dark:text-amber-400">
+        <div className="animate-element flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3.5 py-3 text-sm text-amber-700 dark:text-amber-400">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span>{dict.auth.login.sessionExpired}</span>
         </div>
       )}
 
       {oauthError && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-sm text-destructive">
+        <div className="animate-element flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-sm text-destructive">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span>{oauthError}</span>
         </div>
       )}
 
-      <LoginForm />
+      <LoginForm dict={dict} />
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="animate-element animate-delay-900 text-center text-sm text-muted-foreground">
         {dict.auth.login.noAccount}{' '}
         <Link href={`/${lang}/register`} className="font-medium text-primary hover:underline">
           {dict.auth.login.createAccount}

@@ -4,7 +4,8 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { resolveGatewayUrl } from '@/shared/config/gateway-url'
 import { COOKIE_NAME } from '@/entities/session/server/session'
-import { localePath } from '@/shared/i18n/server-locale'
+import { getLocale, localePath } from '@/shared/i18n/server-locale'
+import { getDictionary } from '@/shared/i18n/get-dictionary'
 import type { CompanyLookup } from '@/shared/types'
 
 const GATEWAY_URL = resolveGatewayUrl()
@@ -15,9 +16,10 @@ type CompanyLookupState = { data: CompanyLookup; error?: never } | { data?: neve
 export async function loginAction(prevState: AuthState, formData: FormData): Promise<AuthState> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const dict = await getDictionary(await getLocale())
 
   if (!email || !password) {
-    return { error: 'Preencha todos os campos.' }
+    return { error: dict.auth.serverErrors.fillAllFields }
   }
 
   let accessToken: string | null = null
@@ -32,17 +34,17 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      return { error: body.message ?? 'Credenciais invalidas. Verifique e tente novamente.' }
+      return { error: body.message ?? dict.auth.serverErrors.invalidCredentials }
     }
 
     const data = await res.json()
     accessToken = data.accessToken ?? data.access_token ?? null
 
     if (!accessToken) {
-      return { error: 'Resposta invalida do servidor de autenticacao.' }
+      return { error: dict.auth.serverErrors.invalidAuthResponse }
     }
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: dict.auth.serverErrors.serviceUnavailable }
   }
 
   const store = await cookies()
@@ -62,12 +64,13 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
   const fullName = (formData.get('fullName') as string)?.trim()
   const email = (formData.get('email') as string)?.trim()
   const password = formData.get('password') as string
+  const dict = await getDictionary(await getLocale())
 
   if (!tenantName || !fullName || !email || !password) {
-    return { error: 'Preencha todos os campos.' }
+    return { error: dict.auth.serverErrors.fillAllFields }
   }
   if (password.length < 8) {
-    return { error: 'A senha deve ter no minimo 8 caracteres.' }
+    return { error: dict.auth.serverErrors.passwordMinLength }
   }
 
   let accessToken: string | null = null
@@ -82,17 +85,17 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      return { error: body.message ?? 'Erro ao criar conta. Tente novamente.' }
+      return { error: body.message ?? dict.auth.serverErrors.registerError }
     }
 
     const data = await res.json()
     accessToken = data.accessToken ?? data.access_token ?? null
 
     if (!accessToken) {
-      return { error: 'Resposta invalida do servidor de autenticacao.' }
+      return { error: dict.auth.serverErrors.invalidAuthResponse }
     }
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: dict.auth.serverErrors.serviceUnavailable }
   }
 
   const store = await cookies()
@@ -109,9 +112,10 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
 
 export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLookupState> {
   const digits = cnpj.replace(/\D/g, '')
+  const dict = await getDictionary(await getLocale())
 
   if (digits.length !== 14) {
-    return { error: 'Informe um CNPJ com 14 digitos.' }
+    return { error: dict.auth.serverErrors.cnpjDigitsRequired }
   }
 
   try {
@@ -122,17 +126,17 @@ export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLo
     })
 
     if (res.status === 404) {
-      return { error: 'CNPJ nao encontrado na Receita Federal.' }
+      return { error: dict.auth.serverErrors.cnpjNotFound }
     }
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      return { error: body.message ?? 'Nao foi possivel consultar o CNPJ agora.' }
+      return { error: body.message ?? dict.auth.serverErrors.cnpjLookupError }
     }
 
     return { data: await res.json() as CompanyLookup }
   } catch {
-    return { error: 'Servico de consulta CNPJ temporariamente indisponivel.' }
+    return { error: dict.auth.serverErrors.cnpjServiceUnavailable }
   }
 }
 
