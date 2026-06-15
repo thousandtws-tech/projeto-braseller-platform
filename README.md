@@ -2,10 +2,6 @@
 
 ## Equipe Responsável
 
-| Papel | Nome |
-|-------|------|
-| Agencia de Desenvolvimento | **Clarituz** |
-| CEO | **Jerferson** |
 | Engenheiro Full Stack | **Vinicius Moreira** |
 
 ---
