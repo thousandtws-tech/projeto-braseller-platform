@@ -1,0 +1,13 @@
+[build]
+  # Define a pasta do frontend como diretório base
+  base = "apps/client"
+  
+  # Comando de build a ser executado dentro do base path
+  command = "pnpm run build"
+  
+  # Pasta de saída do Next.js (relativa ao base path)
+  publish = ".next"
+
+[build.environment]
+  # Versão estável do Node.js recomendada para Next.js
+  NODE_VERSION = "20"

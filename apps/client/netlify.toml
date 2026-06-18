@@ -1,0 +1,6 @@
+[build]
+  # Comando de build a ser executado
+  command = "pnpm run build"
+  
+  # Pasta de saída do Next.js
+  publish = ".next"
