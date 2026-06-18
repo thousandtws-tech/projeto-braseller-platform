@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { TrendingUp, ShoppingCart, DollarSign, ArrowDownLeft } from 'lucide-react'
+import { TrendingUp, ShoppingCart, DollarSign, ArrowRight, CheckCircle2, TriangleAlert } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Skeleton } from '@/shared/ui/skeleton'
@@ -10,6 +10,7 @@ import { getDictionary } from '@/shared/i18n/get-dictionary'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { Locale } from '@/shared/i18n/config'
 import type { DashboardView, PlatformBreakdown, ReportEntry, ReportsSummary } from '@/shared/types'
+import { FinancialFlowChart } from './financial-flow-chart'
 
 const LOCALE_MAP: Record<Locale, string> = {
   'pt-BR': 'pt-BR',
@@ -51,26 +52,34 @@ export default async function DashboardPage({ params }: PageProps) {
   const period = getCurrentPeriod(lang)
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <div className="flex items-center justify-between">
+    <div className="flex w-full flex-col gap-7">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">{dict.dashboard.title}</h2>
-          <p className="text-sm text-muted-foreground capitalize">{period.label}</p>
+          <h2 className="text-[2rem] font-semibold tracking-[-0.045em]">Hoje na Brasaller</h2>
+          <p className="mt-1 text-sm capitalize text-muted-foreground">{period.label}</p>
         </div>
-        <PeriodSelector dict={dict} period={period} />
+        <div className="flex items-center gap-2">
+          <PeriodSelector dict={dict} period={period} />
+          <a href={`/${lang}/despesas`} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/88">
+            Resolver pendências
+            <ArrowRight className="size-4" />
+          </a>
+        </div>
       </div>
 
       <Suspense fallback={<KpiSkeleton />}>
         <KpiSection token={token} tenantId={tenantId} period={period} dict={dict} />
       </Suspense>
 
-      <Suspense fallback={<ChartSkeleton />}>
-        <ChartsSection token={token} tenantId={tenantId} dict={dict} />
-      </Suspense>
-
-      <Suspense fallback={<OrdersSkeleton />}>
-        <RecentOrdersSection token={token} tenantId={tenantId} dict={dict} lang={lang} />
-      </Suspense>
+      <div className="flex min-w-0 flex-col gap-6">
+        <ActionQueue lang={lang} />
+        <Suspense fallback={<ChartSkeleton />}>
+          <ChartsSection token={token} tenantId={tenantId} dict={dict} />
+        </Suspense>
+        <Suspense fallback={<OrdersSkeleton />}>
+          <RecentOrdersSection token={token} tenantId={tenantId} dict={dict} lang={lang} />
+        </Suspense>
+      </div>
     </div>
   )
 }
@@ -82,7 +91,7 @@ function PeriodSelector({ dict, period }: { dict: Dictionary; period: { from: st
       defaultValue={period.from}
       displayFormat="LLLL yyyy"
       placeholder={dict.dashboard.selectPeriod}
-      buttonClassName="h-8 w-40 capitalize"
+      buttonClassName="h-10 w-40 capitalize"
     />
   )
 }
@@ -111,53 +120,42 @@ async function KpiSection({
 function KpiCards({ summary, dict }: { summary: ReportsSummary | null; dict: Dictionary }) {
   const cards = [
     {
+      title: 'Resumo operacional',
+      value: 'Tudo sob controle',
+      icon: CheckCircle2,
+      helper: 'Operação dentro do esperado',
+    },
+    {
       title: dict.dashboard.kpis.grossRevenue,
       value: formatCurrency(summary?.gross_value ?? 0),
       icon: DollarSign,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
+      helper: 'Faturamento no período',
     },
     {
       title: dict.dashboard.kpis.received,
       value: formatCurrency(summary?.received_value ?? 0),
       icon: TrendingUp,
-      color: 'text-[--success]',
-      bg: 'bg-[--success]/10',
-    },
-    {
-      title: dict.dashboard.kpis.feesAndShipping,
-      value: formatCurrency(summary?.fee_value ?? 0),
-      icon: ArrowDownLeft,
-      color: 'text-destructive',
-      bg: 'bg-destructive/10',
+      helper: 'Disponível após repasses',
     },
     {
       title: dict.dashboard.kpis.totalOrders,
       value: String(summary?.entry_count ?? 0),
       icon: ShoppingCart,
-      color: 'text-[--warning]',
-      bg: 'bg-[--warning]/10',
+      helper: 'Pedidos processados',
     },
   ]
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="metric-rail">
       {cards.map((card) => (
-        <Card key={card.title}>
-          <CardHeader className="pb-2">
-            <CardTitle>{card.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{card.value}</p>
-              </div>
-              <div className={`size-9 rounded-lg ${card.bg} flex items-center justify-center`}>
-                <card.icon className={`size-4 ${card.color}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div key={card.title} className="metric-cell">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">{card.title}</p>
+            <card.icon className="size-4 text-muted-foreground" />
+          </div>
+          <p className="text-2xl font-semibold tracking-[-0.035em] tabular-nums text-foreground">{card.value}</p>
+          <p className="text-[11px] text-muted-foreground">{card.helper}</p>
+        </div>
       ))}
     </div>
   )
@@ -189,7 +187,7 @@ async function ChartsSection({ token, tenantId, dict }: { token: string; tenantI
   const breakdown = realBreakdown.length > 0 ? realBreakdown : data.platformBreakdown
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <RevenueChart data={data} dict={dict} />
       <PlatformBreakdown breakdown={breakdown} dict={dict} />
     </div>
@@ -197,42 +195,43 @@ async function ChartsSection({ token, tenantId, dict }: { token: string; tenantI
 }
 
 function RevenueChart({ data, dict }: { data: DashboardView; dict: Dictionary }) {
-  const max = Math.max(...data.monthlyEvolution.map((m) => m.grossRevenue))
   return (
     <Card className="lg:col-span-2">
       <CardHeader>
         <CardTitle>{dict.dashboard.monthlyEvolution}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex items-end gap-2 h-44">
-          {data.monthlyEvolution.map((m) => (
-            <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: '160px' }}>
-                <div
-                  className="w-full rounded-t-sm bg-primary/20"
-                  style={{ height: `${(m.grossRevenue / max) * 100}%` }}
-                  title={`${dict.dashboard.grossRevenueTooltip}: ${formatCurrency(m.grossRevenue)}`}
-                />
-                <div
-                  className="w-full rounded-t-sm bg-primary"
-                  style={{ height: `${(m.received / max) * 100}%` }}
-                  title={`${dict.dashboard.receivedTooltip}: ${formatCurrency(m.received)}`}
-                />
-              </div>
-              <span className="text-xs text-muted-foreground">{m.month}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="size-2.5 rounded-sm bg-primary/20" />{dict.dashboard.grossRevenueLegend}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="size-2.5 rounded-sm bg-primary" />{dict.dashboard.receivedLegend}
-          </div>
-        </div>
-      </CardContent>
+      <CardContent><FinancialFlowChart data={data.monthlyEvolution} /></CardContent>
     </Card>
+  )
+}
+
+function ActionQueue({ lang }: { lang: Locale }) {
+  const actions = [
+    { title: 'Conciliações aguardando revisão', detail: '12 movimentos', href: `/${lang}/extrato` },
+    { title: 'Diferença de impostos detectada', detail: 'Revisar DRE', href: `/${lang}/dre` },
+    { title: 'SKUs com estoque baixo', detail: '7 produtos', href: `/${lang}/estoque` },
+  ]
+
+  return (
+    <section className="rounded-lg border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2">
+          <TriangleAlert className="size-4" />
+          <h3 className="text-sm font-semibold">3 ações precisam de você</h3>
+        </div>
+        <span className="text-xs text-muted-foreground">Prioridades de hoje</span>
+      </div>
+      <div className="grid divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
+        {actions.map((action) => (
+          <a key={action.title} href={action.href} className="group flex min-h-28 flex-col justify-between gap-3 p-5 transition hover:bg-muted/45">
+            <p className="text-sm font-medium leading-5">{action.title}</p>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-foreground">
+              {action.detail}<ArrowRight className="size-3.5" />
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
   )
 }
 

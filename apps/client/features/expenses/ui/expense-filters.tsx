@@ -77,9 +77,9 @@ export function ExpenseFilters({ from, to, category, dict, lang }: ExpenseFilter
   }).format(fromDate)
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-3">
       {/* Month navigation */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5">
+      <div className="flex h-10 items-center gap-0.5 rounded-md border border-border bg-background p-0.5">
         <Button variant="ghost" size="icon-sm" onClick={prevMonth} aria-label={dict.expenses.filters.previousMonth}>
           <ChevronLeft className="size-3.5" />
         </Button>
@@ -99,7 +99,7 @@ export function ExpenseFilters({ from, to, category, dict, lang }: ExpenseFilter
 
       {/* Jump to current month */}
       {!isCurrentMonth && (
-        <Button variant="outline" size="sm" onClick={goToCurrentMonth} className="text-xs">
+        <Button variant="outline" size="lg" onClick={goToCurrentMonth} className="text-xs">
           {dict.expenses.filters.currentMonth}
         </Button>
       )}
@@ -109,7 +109,7 @@ export function ExpenseFilters({ from, to, category, dict, lang }: ExpenseFilter
         value={category || ''}
         onValueChange={(v) => navigate(from, to, (v as string) || undefined)}
       >
-        <SelectTrigger className="h-8 min-w-44 gap-1.5 text-xs" size="sm">
+        <SelectTrigger className="h-10 min-w-52 gap-1.5 text-xs">
           <SlidersHorizontal className="size-3 text-muted-foreground" />
           <SelectValue placeholder={dict.expenses.filters.allCategories} />
         </SelectTrigger>

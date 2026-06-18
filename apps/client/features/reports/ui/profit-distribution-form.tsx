@@ -33,9 +33,13 @@ export function ProfitDistributionForm({
   }, [state])
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-3">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-4 rounded-md border border-border p-4">
       <input type="hidden" name="period_month" value={periodMonth} />
       {readOnly && <ReadOnlyLock />}
+      <div>
+        <p className="text-sm font-semibold">Registrar retirada</p>
+        <p className="mt-1 text-xs text-muted-foreground">Informe o valor, a data e o destino do recurso.</p>
+      </div>
 
       {state?.success === false && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive">
@@ -50,9 +54,9 @@ export function ProfitDistributionForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="profit_amount" className="text-xs">Valor (R$)</Label>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="profit_amount">Valor (R$)</Label>
           <Input
             id="profit_amount"
             name="amount"
@@ -63,11 +67,10 @@ export function ProfitDistributionForm({
             placeholder="0,00"
             required
             disabled={!canSubmit || isPending}
-            className="h-8 text-xs"
           />
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="distributed_at" className="text-xs">Data</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="distributed_at">Data</Label>
           <Input
             id="distributed_at"
             name="distributed_at"
@@ -75,36 +78,33 @@ export function ProfitDistributionForm({
             defaultValue={today}
             required
             disabled={!canSubmit || isPending}
-            className="h-8 text-xs"
           />
         </div>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="recipient_name" className="text-xs">Destino</Label>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="recipient_name">Destino</Label>
         <Input
           id="recipient_name"
           name="recipient_name"
           type="text"
           placeholder="Socio, administrador ou conta destino"
           disabled={!canSubmit || isPending}
-          className="h-8 text-xs"
         />
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="profit_notes" className="text-xs">Observacao</Label>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="profit_notes">Observação</Label>
         <Input
           id="profit_notes"
           name="notes"
           type="text"
           placeholder="Ex: retirada mensal"
           disabled={!canSubmit || isPending}
-          className="h-8 text-xs"
         />
       </div>
 
-      <Button type="submit" size="sm" className="w-full" disabled={!canSubmit || isPending}>
+      <Button type="submit" size="lg" className="w-full" disabled={!canSubmit || isPending}>
         {isPending
           ? <><Loader2 className="size-3.5 animate-spin" />Registrando...</>
           : <><Wallet className="size-3.5" />Registrar retirada</>

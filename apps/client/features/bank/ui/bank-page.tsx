@@ -1,24 +1,25 @@
-import { TrendingDown } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Building2, FileUp, Landmark, Tags } from 'lucide-react'
+
+import { Badge } from '@/shared/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/shared/ui/table'
 import { getToken, getSession } from '@/entities/session/server/session'
-import { getBankTransactions, formatCurrency } from '@/shared/api/gateway'
+import { formatCurrency, getBankTransactions } from '@/shared/api/gateway'
 import { isReadOnlyAccountant } from '@/entities/session/model/permissions'
 import { getDictionary } from '@/shared/i18n/get-dictionary'
 import { formatMessage } from '@/shared/i18n/format'
 import type { Locale } from '@/shared/i18n/config'
-import { UploadOfxForm } from './upload-ofx-form'
 import type { BankTransaction } from '@/shared/types'
+import { UploadOfxForm } from './upload-ofx-form'
 
 const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
-
-const CATEGORY_COLORS: Record<string, string> = {
-  TARIFA_BANCARIA: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  JUROS: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  PIX: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-  TED_DOC: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  IOF: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  OUTROS: 'bg-muted text-muted-foreground',
-}
 
 function currentMonthBounds() {
   const now = new Date()
@@ -29,12 +30,14 @@ function currentMonthBounds() {
 }
 
 function summarizeByCategory(transactions: BankTransaction[]) {
-  const debits = transactions.filter((t) => t.tran_type === 'DEBIT')
-  const byCategory = debits.reduce<Record<string, number>>((acc, t) => {
-    acc[t.category] = (acc[t.category] ?? 0) + t.amount
-    return acc
-  }, {})
-  return Object.entries(byCategory).sort((a, b) => b[1] - a[1])
+  return Object.entries(
+    transactions
+      .filter((transaction) => transaction.tran_type === 'DEBIT')
+      .reduce<Record<string, number>>((acc, transaction) => {
+        acc[transaction.category] = (acc[transaction.category] ?? 0) + transaction.amount
+        return acc
+      }, {})
+  ).sort((a, b) => b[1] - a[1])
 }
 
 interface Props {
@@ -49,146 +52,140 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ExtratoPage({ params }: Props) {
   const { lang } = await params
-  const dict = await getDictionary(lang)
+  const [dict, token, session] = await Promise.all([
+    getDictionary(lang),
+    getToken().then((value) => value ?? ''),
+    getSession(),
+  ])
   const categoryLabels = dict.bank.categories as Record<string, string>
-  const token = (await getToken()) ?? ''
-  const session = await getSession()
   const tenantId = session?.tenantId ?? ''
   const readOnly = isReadOnlyAccountant(session?.roles)
   const { from, to } = currentMonthBounds()
-
-  const transactions = tenantId
-    ? await getBankTransactions(token, tenantId, from, to)
-    : []
-
-  const debits = transactions.filter((t) => t.tran_type === 'DEBIT')
-  const totalExpenses = debits.reduce((sum, t) => sum + t.amount, 0)
+  const transactions = tenantId ? await getBankTransactions(token, tenantId, from, to) : []
+  const debits = transactions.filter((transaction) => transaction.tran_type === 'DEBIT')
+  const credits = transactions.filter((transaction) => transaction.tran_type !== 'DEBIT')
+  const totalExpenses = debits.reduce((sum, transaction) => sum + transaction.amount, 0)
+  const totalCredits = credits.reduce((sum, transaction) => sum + transaction.amount, 0)
   const categorySummary = summarizeByCategory(transactions)
+  const netMovement = totalCredits - totalExpenses
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h2 className="text-xl font-semibold">{dict.bank.header.title}</h2>
-        <p className="text-sm text-muted-foreground">
-          {dict.bank.header.subtitle}
-        </p>
-      </div>
+    <div className="flex w-full flex-col gap-6">
+      <header>
+        <h2 className="text-[1.8rem] font-semibold tracking-[-0.04em]">{dict.bank.header.title}</h2>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{dict.bank.header.subtitle}</p>
+      </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upload + KPIs */}
-        <div className="lg:col-span-2 space-y-4">
+      <section className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card xl:grid-cols-4">
+        <Metric label="Entradas identificadas" value={formatCurrency(totalCredits)} helper={`${credits.length} créditos`} icon={ArrowDownLeft} />
+        <Metric label={dict.bank.sidebar.totalExpenses} value={formatCurrency(totalExpenses)} helper={`${debits.length} débitos`} icon={ArrowUpRight} />
+        <Metric label="Movimento líquido" value={formatCurrency(netMovement)} helper="Entradas menos saídas" icon={Landmark} />
+        <Metric label="Categorias" value={String(categorySummary.length)} helper={`${transactions.length} movimentos`} icon={Tags} />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
-            <CardHeader><CardTitle>{dict.bank.importOfx.title}</CardTitle></CardHeader>
-            <CardContent>
-              <UploadOfxForm readOnly={readOnly} dict={dict} />
-              <p className="mt-3 text-xs text-muted-foreground">
-                {dict.bank.importOfx.hint}
-              </p>
-            </CardContent>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><FileUp className="size-4" />{dict.bank.importOfx.title}</CardTitle>
+              <p className="text-xs leading-5 text-muted-foreground">{dict.bank.importOfx.hint}</p>
+            </CardHeader>
+            <CardContent><UploadOfxForm readOnly={readOnly} dict={dict} /></CardContent>
           </Card>
 
-          {/* Transactions table */}
-          <Card>
-            <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle>{dict.bank.transactions.title}</CardTitle>
-              <span className="text-xs text-muted-foreground">{formatMessage(dict.bank.transactions.count, { count: transactions.length })}</span>
+          <Card className="overflow-hidden">
+            <CardHeader className="flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>{dict.bank.transactions.title}</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">{formatMessage(dict.bank.transactions.count, { count: transactions.length })}</p>
+              </div>
+              <Badge variant="secondary">Mês atual</Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {transactions.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  {dict.bank.transactions.empty}
+                <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 text-center">
+                  <div className="flex size-11 items-center justify-center rounded-full border border-border bg-muted/40"><Landmark className="size-5 text-muted-foreground" /></div>
+                  <div><p className="font-medium">Nenhuma transação importada</p><p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">{dict.bank.transactions.empty}</p></div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground">
-                        <th className="text-left py-2 pr-4 font-medium">{dict.bank.transactions.columns.date}</th>
-                        <th className="text-left py-2 pr-4 font-medium">{dict.bank.transactions.columns.description}</th>
-                        <th className="text-left py-2 pr-4 font-medium">{dict.bank.transactions.columns.category}</th>
-                        <th className="text-right py-2 font-medium">{dict.bank.transactions.columns.value}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {transactions.map((t) => (
-                        <tr key={t.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-2.5 pr-4 text-muted-foreground tabular-nums whitespace-nowrap">
-                            {new Date(t.posted_date).toLocaleDateString(LOCALE_MAP[lang])}
-                          </td>
-                          <td className="py-2.5 pr-4 text-muted-foreground max-w-[200px] truncate">
-                            {t.description ?? '—'}
-                          </td>
-                          <td className="py-2.5 pr-4">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[t.category] ?? CATEGORY_COLORS.OUTROS}`}>
-                              {categoryLabels[t.category] ?? t.category}
-                            </span>
-                          </td>
-                          <td className={`py-2.5 text-right font-medium tabular-nums ${t.tran_type === 'DEBIT' ? 'text-destructive' : 'text-emerald-600'}`}>
-                            {t.tran_type === 'DEBIT' ? '-' : '+'}{formatCurrency(t.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Table>
+                  <TableHeader className="bg-muted/70">
+                    <TableRow className="hover:bg-muted/70">
+                      <TableHead className="pl-5">{dict.bank.transactions.columns.date}</TableHead>
+                      <TableHead>{dict.bank.transactions.columns.description}</TableHead>
+                      <TableHead>{dict.bank.transactions.columns.category}</TableHead>
+                      <TableHead className="pr-5 text-right">{dict.bank.transactions.columns.value}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="pl-5 text-xs text-muted-foreground">{new Date(transaction.posted_date).toLocaleDateString(LOCALE_MAP[lang])}</TableCell>
+                        <TableCell className="max-w-80 font-medium"><p className="truncate">{transaction.description ?? '—'}</p></TableCell>
+                        <TableCell><Badge variant="secondary">{categoryLabels[transaction.category] ?? transaction.category}</Badge></TableCell>
+                        <TableCell className="pr-5 text-right font-semibold">
+                          <span className={transaction.tran_type === 'DEBIT' ? 'text-destructive' : 'text-foreground'}>
+                            {transaction.tran_type === 'DEBIT' ? '− ' : '+ '}{formatCurrency(transaction.amount)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Summary sidebar */}
-        <div className="space-y-4">
+        <aside className="flex flex-col gap-6">
           <Card>
-            <CardContent className="pt-6 space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <TrendingDown className="size-5 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">{dict.bank.sidebar.totalExpenses}</p>
-                  <p className="text-xl font-bold text-destructive">{formatCurrency(totalExpenses)}</p>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground border-t border-border pt-2">
-                {dict.bank.sidebar.notePrefix} <strong>{dict.bank.sidebar.noteHighlight}</strong> {dict.bank.sidebar.noteSuffix}
-              </p>
-            </CardContent>
-          </Card>
-
-          {categorySummary.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>{dict.bank.sidebar.byCategory}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {categorySummary.map(([category, amount]) => (
-                  <div key={category} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{categoryLabels[category] ?? category}</span>
-                      <span className="font-medium tabular-nums">{formatCurrency(amount)}</span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-destructive/50 rounded-full"
-                        style={{ width: `${totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0}%` }}
-                      />
-                    </div>
+            <CardHeader><CardTitle>{dict.bank.sidebar.byCategory}</CardTitle></CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {categorySummary.length === 0 ? (
+                <p className="text-sm leading-6 text-muted-foreground">As categorias aparecerão depois da primeira importação.</p>
+              ) : categorySummary.map(([category, amount]) => (
+                <div key={category} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate text-muted-foreground">{categoryLabels[category] ?? category}</span>
+                    <span className="font-semibold tabular-nums">{formatCurrency(amount)}</span>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader><CardTitle>{dict.bank.howToExport.title}</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-xs text-muted-foreground">
-              <p><strong className="text-foreground">Itaú:</strong> {dict.bank.howToExport.itau}</p>
-              <p><strong className="text-foreground">Bradesco:</strong> {dict.bank.howToExport.bradesco}</p>
-              <p><strong className="text-foreground">Santander:</strong> {dict.bank.howToExport.santander}</p>
-              <p><strong className="text-foreground">Nubank PJ:</strong> {dict.bank.howToExport.nubank}</p>
-              <p><strong className="text-foreground">Sicoob/Sicredi:</strong> {dict.bank.howToExport.sicoob}</p>
+                  <div className="h-1 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-foreground/55" style={{ width: `${totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
-        </div>
-      </div>
+
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="size-4" />{dict.bank.howToExport.title}</CardTitle></CardHeader>
+            <CardContent className="flex flex-col gap-4 text-xs leading-5 text-muted-foreground">
+              {[
+                ['Itaú', dict.bank.howToExport.itau],
+                ['Bradesco', dict.bank.howToExport.bradesco],
+                ['Santander', dict.bank.howToExport.santander],
+                ['Nubank PJ', dict.bank.howToExport.nubank],
+                ['Sicoob/Sicredi', dict.bank.howToExport.sicoob],
+              ].map(([bank, instruction], index) => (
+                <div key={bank} className="flex gap-3">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground">{index + 1}</span>
+                  <p><strong className="text-foreground">{bank}:</strong> {instruction}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </aside>
+      </section>
+    </div>
+  )
+}
+
+function Metric({ label, value, helper, icon: Icon }: { label: string; value: string; helper: string; icon: React.ComponentType<{ className?: string }> }) {
+  return (
+    <div className="flex min-h-32 flex-col justify-between gap-3 border-b border-r border-border p-5 even:border-r-0 [&:nth-last-child(-n+2)]:border-b-0 xl:min-h-28 xl:border-b-0 xl:even:border-r xl:last:border-r-0">
+      <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">{label}</span><Icon className="size-4 text-muted-foreground" /></div>
+      <p className="text-2xl font-semibold tracking-[-0.035em] tabular-nums">{value}</p>
+      <p className="text-[11px] text-muted-foreground">{helper}</p>
     </div>
   )
 }

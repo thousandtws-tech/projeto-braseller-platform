@@ -20,18 +20,18 @@ export function StockItemForm({ readOnly = false, dict }: Props) {
   const disabled = readOnly || isPending
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="flex flex-col gap-4">
       {readOnly && <ReadOnlyLock />}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="sku">{dict.stock.manualForm.fields.sku}</Label>
           <Input id="sku" name="sku" placeholder={dict.stock.manualForm.fields.skuPlaceholder} required disabled={disabled} autoComplete="off" />
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="description">{dict.stock.manualForm.fields.description}</Label>
           <Input id="description" name="description" placeholder={dict.stock.manualForm.fields.descriptionPlaceholder} disabled={disabled} autoComplete="off" />
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="unit_cost">{dict.stock.manualForm.fields.unitCost}</Label>
           <Input id="unit_cost" name="unit_cost" type="number" step="0.01" min="0" placeholder="0,00" required disabled={disabled} />
         </div>
@@ -50,7 +50,7 @@ export function StockItemForm({ readOnly = false, dict }: Props) {
         </div>
       )}
 
-      <Button type="submit" size="sm" disabled={disabled || isSuccess}>
+      <Button type="submit" size="lg" className="w-full sm:w-fit" disabled={disabled || isSuccess}>
         {isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
         {dict.stock.manualForm.submit}
       </Button>

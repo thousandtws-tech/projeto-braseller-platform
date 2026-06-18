@@ -57,32 +57,24 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
       icon: ShoppingCart,
       label: dict.notifications.preferences.items.newSale.label,
       desc: dict.notifications.preferences.items.newSale.desc,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-500/10',
     },
     {
       key: 'mlPaymentReleaseEnabled' as const,
       icon: DollarSign,
       label: dict.notifications.preferences.items.mlPaymentRelease.label,
       desc: dict.notifications.preferences.items.mlPaymentRelease.desc,
-      color: 'text-amber-600',
-      bg: 'bg-amber-500/10',
     },
     {
       key: 'monthlyClosingEnabled' as const,
       icon: FileText,
       label: dict.notifications.preferences.items.monthlyClosing.label,
       desc: dict.notifications.preferences.items.monthlyClosing.desc,
-      color: 'text-blue-600',
-      bg: 'bg-blue-500/10',
     },
     {
       key: 'weeklyAccountantReportEnabled' as const,
       icon: BarChart3,
       label: dict.notifications.preferences.items.weeklyAccountantReport.label,
       desc: dict.notifications.preferences.items.weeklyAccountantReport.desc,
-      color: 'text-purple-600',
-      bg: 'bg-purple-500/10',
     },
   ]
 
@@ -101,7 +93,7 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
   }
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="flex flex-col gap-6">
       {state?.success === false && (
         <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-sm text-destructive">
           <AlertCircle className="size-4 mt-0.5 shrink-0" />
@@ -118,7 +110,7 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
       {/* Canal e-mail */}
       <div className="flex items-center justify-between gap-6 py-1">
         <div className="flex items-center gap-3">
-          <div className="size-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background">
             <Mail className="size-4 text-muted-foreground" />
           </div>
           <div>
@@ -137,13 +129,13 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
       <Separator />
 
       {/* Alert types */}
-      <div className="space-y-5">
+      <div className="flex flex-col gap-5">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{dict.notifications.preferences.alertTypes}</p>
-        {PREFS_CONFIG.map(({ key, icon: Icon, label, desc, color, bg }) => (
+        {PREFS_CONFIG.map(({ key, icon: Icon, label, desc }) => (
           <div key={key} className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className={`size-9 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-                <Icon className={`size-4 ${color}`} />
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background">
+                <Icon className="size-4 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm font-medium">{label}</p>
@@ -163,10 +155,10 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
       <Separator />
 
       {/* E-mails */}
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{dict.notifications.preferences.recipients}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="recipientEmail">{dict.notifications.preferences.recipientEmail}</Label>
             <Input
               id="recipientEmail"
@@ -178,7 +170,7 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
               disabled={isPending}
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="accountantEmail">{dict.notifications.preferences.accountantEmail}</Label>
             <Input
               id="accountantEmail"
@@ -194,7 +186,7 @@ export function NotificationPrefsForm({ prefs, dict }: Props) {
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" size="lg" className="w-full" disabled={isPending}>
           {isPending
             ? <><Loader2 className="size-4 animate-spin" />{dict.notifications.preferences.saving}</>
             : dict.notifications.preferences.submit

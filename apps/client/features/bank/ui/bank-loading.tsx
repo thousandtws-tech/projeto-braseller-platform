@@ -1,17 +1,11 @@
+import { Skeleton } from '@/shared/ui/skeleton'
+
 export default function Loading() {
   return (
-    <div className="space-y-6 max-w-5xl animate-pulse">
-      <div className="h-6 w-48 bg-muted rounded" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="h-48 bg-muted rounded-xl" />
-          <div className="h-64 bg-muted rounded-xl" />
-        </div>
-        <div className="space-y-4">
-          <div className="h-28 bg-muted rounded-xl" />
-          <div className="h-48 bg-muted rounded-xl" />
-        </div>
-      </div>
+    <div className="flex w-full flex-col gap-6">
+      <div className="flex flex-col gap-2"><Skeleton className="h-8 w-48" /><Skeleton className="h-4 w-[560px] max-w-full" /></div>
+      <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border xl:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="flex min-h-28 flex-col justify-between border-r border-border p-5"><Skeleton className="h-3 w-24" /><Skeleton className="h-7 w-32" /><Skeleton className="h-3 w-28" /></div>)}</div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"><div className="flex flex-col gap-6"><Skeleton className="h-60 w-full rounded-lg" /><Skeleton className="h-72 w-full rounded-lg" /></div><div className="flex flex-col gap-6"><Skeleton className="h-60 w-full rounded-lg" /><Skeleton className="h-72 w-full rounded-lg" /></div></div>
     </div>
   )
 }

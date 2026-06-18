@@ -73,16 +73,16 @@ export function ExpenseFormSheet({ readOnly = false, dict, lang }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetTrigger className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5')}>
+      <SheetTrigger className={cn(buttonVariants({ size: 'lg' }), 'gap-2')}>
         <Plus className="size-3.5" />
         {dict.expenses.form.newExpense}
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader className="shrink-0">
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-lg">
+        <SheetHeader className="shrink-0 border-b p-6">
           <SheetTitle>{dict.expenses.form.sheetTitle}</SheetTitle>
           <SheetDescription>{dict.expenses.form.sheetDescription}</SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-y-auto p-6">
           <ExpenseForm key={formKey} onSuccess={handleSuccess} dict={dict} />
         </div>
       </SheetContent>

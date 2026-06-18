@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 'use client'
 
 import Link from 'next/link'
@@ -35,10 +36,19 @@ type NotificationsDropdownProps = {
   align?: 'start' | 'center' | 'end'
 }
 
-const TYPE_META: Record<
-  NotificationMessage['type'],
-  { icon: LucideIcon; iconColor: string; bgColor: string }
-> = {
+type NotificationTypeMeta = {
+  icon: LucideIcon
+  iconColor: string
+  bgColor: string
+}
+
+const DEFAULT_TYPE_META: NotificationTypeMeta = {
+  icon: Bell,
+  iconColor: 'text-slate-600',
+  bgColor: 'bg-slate-50',
+}
+
+const TYPE_META = {
   NEW_SALE: {
     icon: ShoppingCart,
     iconColor: 'text-blue-600',
@@ -59,6 +69,11 @@ const TYPE_META: Record<
     iconColor: 'text-sky-600',
     bgColor: 'bg-sky-50',
   },
+} satisfies Record<string, NotificationTypeMeta>
+
+function getNotificationMeta(type: string | null | undefined) {
+  // @ts-ignore
+  return TYPE_META[type ?? ''] ?? DEFAULT_TYPE_META
 }
 
 function formatNotificationDate(value: string) {
@@ -132,7 +147,7 @@ function NotificationsDropdown({
           {latest.length > 0 ? (
             <div className="max-h-80 overflow-y-auto pr-1 scroll-hidden">
               {latest.map((notification) => {
-                const meta = TYPE_META[notification.type]
+                const meta = getNotificationMeta(notification.type)
                 const Icon = meta.icon
                 const unread = notification.status === 'UNREAD'
 

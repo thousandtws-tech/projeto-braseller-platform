@@ -18,17 +18,17 @@ export function UploadOfxForm({ readOnly = false, dict }: Props) {
   const disabled = readOnly || isPending
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="flex flex-col gap-3">
       {readOnly && <ReadOnlyLock />}
       <label
-        className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-8 transition-colors ${
-          readOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-primary/40 hover:bg-muted/50'
+        className={`flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/25 px-6 py-8 text-center transition-colors ${
+          readOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-foreground/35 hover:bg-muted/50'
         }`}
         onClick={() => {
           if (!readOnly) inputRef.current?.click()
         }}
       >
-        <Upload className={`size-8 text-muted-foreground ${readOnly ? 'animate-pulse' : ''}`} />
+        <div className="flex size-11 items-center justify-center rounded-full border border-border bg-background"><Upload className={`size-5 text-muted-foreground ${readOnly ? 'animate-pulse' : ''}`} /></div>
         <span className="text-sm font-medium">{dict.bank.importOfx.dropzone}</span>
         <span className="text-xs text-muted-foreground">{dict.bank.importOfx.format}</span>
       </label>

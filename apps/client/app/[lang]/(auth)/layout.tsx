@@ -1,41 +1,50 @@
+import { CheckCircle2 } from 'lucide-react'
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel - brand */}
-      <div className="hidden lg:flex lg:w-1/2 bg-sidebar flex-col justify-between p-12">
+    <main className="grid min-h-dvh bg-background lg:grid-cols-[minmax(420px,0.86fr)_1.14fr]">
+      <section className="relative hidden overflow-hidden border-r border-border bg-foreground text-background lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16">
         <div className="flex items-center gap-3">
-          <div className="size-9 rounded-xl bg-sidebar-primary flex items-center justify-center">
-            <span className="text-sidebar-primary-foreground font-bold text-lg">B</span>
+          <div className="flex size-9 items-center justify-center rounded-md bg-background text-sm font-bold text-foreground">
+            B
           </div>
-          <span className="text-sidebar-foreground font-semibold text-xl">Brasaller</span>
+          <span className="text-xl font-semibold tracking-[-0.035em]">Brasaller</span>
         </div>
 
-        <div className="space-y-4">
-          <blockquote className="text-sidebar-foreground/80 text-lg leading-relaxed">
-            &ldquo;Conecte seus marketplaces, consolide suas vendas e tenha controle total
-            das suas finanças em um só lugar.&rdquo;
-          </blockquote>
-          <div className="flex items-center gap-3 mt-6">
-            <div className="size-10 rounded-full bg-sidebar-accent flex items-center justify-center">
-              <span className="text-sidebar-accent-foreground font-semibold text-sm">BR</span>
-            </div>
-            <div>
-              <p className="text-sidebar-foreground font-medium text-sm">Equipe Brasaller</p>
-              <p className="text-sidebar-foreground/50 text-xs">Brasaller</p>
-            </div>
+        <div className="max-w-lg">
+          <p className="mb-6 text-xs font-medium uppercase tracking-[0.18em] text-background/55">
+            Operação financeira conectada
+          </p>
+          <h1 className="max-w-md text-4xl font-semibold leading-[1.08] tracking-[-0.05em] xl:text-5xl">
+            Clareza para decidir. Automação para avançar.
+          </h1>
+          <p className="mt-6 max-w-md text-base leading-7 text-background/62">
+            Vendas, despesas, estoque e contabilidade reunidos em um fluxo simples e verificável.
+          </p>
+
+          <div className="mt-10 flex flex-col gap-4 border-t border-background/15 pt-7">
+            {[
+              'Conciliação automática de marketplaces',
+              'Visão financeira em tempo real',
+              'DRE, balanço e contador no mesmo lugar',
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-3 text-sm text-background/78">
+                <CheckCircle2 className="size-4" />
+                {item}
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="flex gap-6 text-sidebar-foreground/40 text-xs">
+        <div className="flex items-center justify-between border-t border-background/15 pt-6 text-xs text-background/45">
           <span>© 2026 Brasaller</span>
-          <span>Clarituz Development</span>
+          <span>Segurança e privacidade por padrão</span>
         </div>
-      </div>
+      </section>
 
-      {/* Right panel - form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-sm">{children}</div>
-      </div>
-    </div>
+      <section className="flex min-h-dvh items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
+        <div className="w-full max-w-[440px]">{children}</div>
+      </section>
+    </main>
   )
 }

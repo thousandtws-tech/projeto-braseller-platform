@@ -18,26 +18,27 @@ export default async function RegisterPage({ params }: Props) {
   const dict = await getDictionary(lang)
 
   return (
-    <div className="space-y-8">
-      <div className="flex lg:hidden items-center gap-2 justify-center mb-2">
-        <div className="size-8 rounded-lg bg-primary flex items-center justify-center">
+    <div className="flex flex-col gap-8">
+      <div className="flex items-center gap-2 lg:hidden">
+        <div className="flex size-8 items-center justify-center rounded-md bg-primary">
           <span className="text-primary-foreground font-bold">B</span>
         </div>
         <span className="font-semibold text-lg">Brasaller</span>
       </div>
 
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{dict.auth.register.title}</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Comece agora</p>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em]">{dict.auth.register.title}</h1>
+        <p className="text-sm leading-6 text-muted-foreground">
           {dict.auth.register.subtitle}
         </p>
       </div>
 
       <RegisterForm />
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="border-t border-border pt-6 text-center text-sm text-muted-foreground">
         {dict.auth.register.hasAccount}{' '}
-        <Link href={`/${lang}/login`} className="text-primary hover:underline font-medium">
+        <Link href={`/${lang}/login`} className="font-medium text-foreground underline-offset-4 hover:underline">
           {dict.auth.register.signIn}
         </Link>
       </p>

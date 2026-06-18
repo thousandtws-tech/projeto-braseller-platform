@@ -3,7 +3,7 @@ import { COOKIE_NAME } from '@/entities/session/server/session'
 import { defaultLocale, isLocale, locales, LOCALE_COOKIE, type Locale } from '@/shared/i18n/config'
 
 const PROTECTED = ['/dashboard', '/lancamentos', '/despesas', '/estoque', '/extrato', '/dre', '/balanco', '/conectores', '/notificacoes', '/configuracoes', '/contador', '/plano', '/conectores/callback', '/bpo']
-const AUTH_ONLY = ['/login', '/register']
+const AUTH_ONLY = ['/login', '/register', '/recuperar-senha']
 const UNLOCALIZED_PREFIXES = ['/auth', '/api']
 
 function decodeBase64Url(value: string) {

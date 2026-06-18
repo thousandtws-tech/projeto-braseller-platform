@@ -55,7 +55,7 @@ export function FiscalProfileForm({ profile, readOnly = false }: Props) {
   const cnpjReady = cnpj.replace(/\D/g, '').length === 14
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="flex flex-col gap-5">
       {readOnly && <ReadOnlyLock />}
       {state?.success === false && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">
@@ -70,7 +70,7 @@ export function FiscalProfileForm({ profile, readOnly = false }: Props) {
         </div>
       )}
 
-      <div className="space-y-1.5">
+      <div className="flex flex-col gap-2">
         <Label htmlFor="cnpj_lookup">CNPJ</Label>
         <div className="flex gap-2">
           <Input
@@ -101,7 +101,7 @@ export function FiscalProfileForm({ profile, readOnly = false }: Props) {
       </div>
 
       {company && (
-        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-2 rounded-md border bg-muted/30 p-4 text-xs text-muted-foreground">
           <div className="flex items-start gap-2">
             <Building2 className="mt-0.5 size-4 shrink-0 text-foreground" />
             <div className="min-w-0">
@@ -122,22 +122,22 @@ export function FiscalProfileForm({ profile, readOnly = false }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="tax_regime">Regime Tributario</Label>
           <select
             id="tax_regime"
             name="tax_regime"
             defaultValue={profile?.tax_regime ?? 'SIMPLES_NACIONAL'}
             disabled={readOnly || isPending}
-            className="h-8 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
           >
             {TAX_REGIMES.map((regime) => (
               <option key={regime.value} value={regime.value}>{regime.label}</option>
             ))}
           </select>
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="estimated_tax_rate">Aliquota manual (%)</Label>
           <Input
             id="estimated_tax_rate"
@@ -154,7 +154,7 @@ export function FiscalProfileForm({ profile, readOnly = false }: Props) {
         </div>
       </div>
 
-      <Button type="submit" size="sm" disabled={readOnly || isPending}>
+      <Button type="submit" size="lg" className="w-full sm:w-fit" disabled={readOnly || isPending}>
         {isPending ? <><Loader2 className="size-4 animate-spin" />Salvando...</> : 'Salvar perfil fiscal'}
       </Button>
     </form>

@@ -20,14 +20,14 @@ export function AddMarketplaceCard({ existingConnectors, readOnly = false, dict 
     <>
       <Card
         className={`border-dashed transition-colors ${
-          readOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-primary/50 hover:bg-accent/30'
+          readOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-foreground/35 hover:bg-muted/35'
         }`}
         onClick={() => {
           if (!readOnly) setOpen(true)
         }}
       >
-        <CardContent className="flex flex-col items-center justify-center h-full min-h-[180px] gap-3 p-6">
-          <div className="size-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+        <CardContent className="flex h-full min-h-[210px] flex-col items-center justify-center gap-3 p-6">
+          <div className="flex size-10 items-center justify-center rounded-full border border-dashed border-muted-foreground/40">
             {readOnly
               ? <LockKeyhole className="size-5 animate-pulse text-amber-600" />
               : <Plus className="size-5 text-muted-foreground/50" />

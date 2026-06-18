@@ -10,6 +10,7 @@ import type { CompanyLookup } from '@/shared/types'
 const GATEWAY_URL = resolveGatewayUrl()
 
 type AuthState = { error: string } | null
+export type RecoveryState = { error?: string; success?: boolean } | null
 type CompanyLookupState = { data: CompanyLookup; error?: never } | { data?: never; error: string }
 
 export async function loginAction(prevState: AuthState, formData: FormData): Promise<AuthState> {
@@ -105,6 +106,32 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
   })
 
   redirect(await localePath('/dashboard'))
+}
+
+export async function requestPasswordRecoveryAction(
+  prevState: RecoveryState,
+  formData: FormData
+): Promise<RecoveryState> {
+  const email = (formData.get('email') as string)?.trim()
+  if (!email) return { error: 'Informe seu e-mail.' }
+
+  try {
+    const res = await fetch(`${GATEWAY_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      return { error: body.message ?? 'Não foi possível iniciar a recuperação agora.' }
+    }
+
+    return { success: true }
+  } catch {
+    return { error: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }
+  }
 }
 
 export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLookupState> {

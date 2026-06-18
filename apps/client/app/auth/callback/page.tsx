@@ -46,10 +46,14 @@ export default function AuthCallbackPage({
   }, [code, error, router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-3">
-        <div className="size-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-muted-foreground">Autenticando com Google...</p>
+    <div className="flex min-h-dvh items-center justify-center bg-background px-6">
+      <div className="flex w-full max-w-sm flex-col items-center gap-5 rounded-lg border border-border bg-card p-8 text-center">
+        <div className="flex size-10 items-center justify-center rounded-md bg-foreground text-sm font-bold text-background">B</div>
+        <div className="size-7 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+        <div>
+          <p className="font-medium">Validando seu acesso</p>
+          <p className="mt-1 text-sm text-muted-foreground">Autenticando com Google...</p>
+        </div>
       </div>
     </div>
   )

@@ -16,11 +16,11 @@ import type { NotificationMessage } from '@/shared/types'
 
 const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 
-const TYPE_ICONS: Record<string, { icon: typeof Bell; bg: string }> = {
-  NEW_SALE:                 { icon: ShoppingCart, bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
-  ML_PAYMENT_RELEASE:       { icon: DollarSign,   bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
-  MONTHLY_CLOSING_SUMMARY:  { icon: FileText,      bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
-  WEEKLY_ACCOUNTANT_REPORT: { icon: BarChart3,     bg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' },
+const TYPE_ICONS: Record<string, { icon: typeof Bell }> = {
+  NEW_SALE:                 { icon: ShoppingCart },
+  ML_PAYMENT_RELEASE:       { icon: DollarSign },
+  MONTHLY_CLOSING_SUMMARY:  { icon: FileText },
+  WEEKLY_ACCOUNTANT_REPORT: { icon: BarChart3 },
 }
 
 function relativeTime(date: string, dict: Dictionary, lang: Locale): string {
@@ -49,7 +49,7 @@ function NotificationItem({
   lang: Locale
 }) {
   const typeLabels = dict.notifications.types as Record<string, string>
-  const iconMeta = TYPE_ICONS[n.type] ?? { icon: Bell, bg: 'bg-muted text-muted-foreground' }
+  const iconMeta = TYPE_ICONS[n.type] ?? { icon: Bell }
   const label = typeLabels[n.type] ?? n.type
   const Icon = iconMeta.icon
   const isUnread = n.status === 'UNREAD'
@@ -58,11 +58,11 @@ function NotificationItem({
     <div className={`
       group flex items-start gap-4 px-5 py-4 transition-colors
       hover:bg-muted/40
-      ${isUnread ? 'bg-primary/[0.03]' : ''}
+      ${isUnread ? 'bg-muted/35' : ''}
     `}>
       {/* Icon */}
-      <div className={`size-9 rounded-xl ${iconMeta.bg} flex items-center justify-center shrink-0 mt-0.5`}>
-        <Icon className="size-4" />
+      <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background">
+        <Icon className="size-4 text-muted-foreground" />
       </div>
 
       {/* Content */}
@@ -86,11 +86,11 @@ function NotificationItem({
             <button
               onClick={() => onMarkRead(n.id)}
               disabled={isPending}
-              className="text-[11px] text-primary/70 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap disabled:opacity-30"
+              className="whitespace-nowrap text-[11px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 disabled:opacity-30"
             >
               {dict.notifications.markRead}
             </button>
-            <div className="size-2 rounded-full bg-primary" />
+            <div className="size-2 rounded-full bg-foreground" />
           </>
         )}
       </div>
@@ -135,10 +135,10 @@ export function NotificationList({ unread, read, dict, lang }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       {/* Unread section */}
       {unread.length > 0 && (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {formatMessage(dict.notifications.unreadSection, { count: unread.length })}
@@ -156,7 +156,7 @@ export function NotificationList({ unread, read, dict, lang }: Props) {
 
       {/* Read section */}
       {read.length > 0 && (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {formatMessage(dict.notifications.previousSection, { count: read.length })}

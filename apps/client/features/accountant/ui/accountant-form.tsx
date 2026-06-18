@@ -21,7 +21,7 @@ export function AccountantForm({ readOnly = false, dict }: Props) {
   const fields = dict.accountant.grantForm.fields
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="flex flex-col gap-4">
       {readOnly && <ReadOnlyLock />}
       {state?.success === false && (
         <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-sm text-destructive">
@@ -36,14 +36,14 @@ export function AccountantForm({ readOnly = false, dict }: Props) {
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground">
+      <p className="text-xs leading-5 text-muted-foreground">
         {dict.accountant.grantForm.descriptionPrefix}
         <strong>{dict.accountant.grantForm.descriptionRole}</strong>
         {dict.accountant.grantForm.descriptionSuffix}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="accountantFirstName">{fields.firstName}</Label>
           <Input
             id="accountantFirstName"
@@ -55,7 +55,7 @@ export function AccountantForm({ readOnly = false, dict }: Props) {
             disabled={disabled}
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="accountantLastName">{fields.lastName}</Label>
           <Input
             id="accountantLastName"
@@ -69,7 +69,7 @@ export function AccountantForm({ readOnly = false, dict }: Props) {
         </div>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="flex flex-col gap-2">
         <Label htmlFor="accountantEmail">{fields.email}</Label>
         <Input
           id="accountantEmail"
@@ -82,7 +82,7 @@ export function AccountantForm({ readOnly = false, dict }: Props) {
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="flex flex-col gap-2">
         <Label htmlFor="accountantPassword">{fields.password}</Label>
         <div className="relative">
           <Input
@@ -114,7 +114,7 @@ export function AccountantForm({ readOnly = false, dict }: Props) {
         </p>
       </div>
 
-      <Button type="submit" size="sm" disabled={disabled}>
+      <Button type="submit" size="lg" className="w-full" disabled={disabled}>
         {isPending ? (
           <>
             <Loader2 className="size-4 animate-spin" />
