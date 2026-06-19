@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle,
@@ -56,7 +56,10 @@ export function ConnectorCard({ connector, readOnly = false, dict, lang }: Props
 
   const safeName = connector.name ?? ''
   const actionJob = syncState?.success === true ? syncState.job : null
-  const effectiveJob = liveJob ?? actionJob
+  const effectiveJob =
+    actionJob && liveJob?.job_id !== actionJob.job_id
+      ? actionJob
+      : liveJob ?? actionJob
   const jobIsRunning = effectiveJob?.status === 'QUEUED' || effectiveJob?.status === 'PROCESSING'
   const effectiveConnectorStatus = jobIsRunning ? 'syncing' : connector.status
   const isConnected = connector.status === 'connected'
@@ -66,10 +69,6 @@ export function ConnectorCard({ connector, readOnly = false, dict, lang }: Props
   const status = STATUS_ICONS[effectiveConnectorStatus] ?? STATUS_ICONS.disconnected
   const StatusIcon = status.icon
   const label = statusLabels[effectiveConnectorStatus] ?? statusLabels.disconnected
-
-  useEffect(() => {
-    if (actionJob) setLiveJob(actionJob)
-  }, [actionJob])
 
   useConnectorRealtimeEvent((event) => {
     if (!event.event_type.startsWith('connector.sync-job.')) return

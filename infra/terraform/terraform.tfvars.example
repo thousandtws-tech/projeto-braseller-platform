@@ -1,8 +1,8 @@
-# Azure
-subscription_id = "00000000-0000-0000-0000-000000000000"
-location        = "brazilsouth"
-project_name    = "brasaller"
-environment     = "prod"
+# Azure. Omit subscription_id to use the active `az account` subscription.
+# subscription_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+location     = "brazilsouth"
+project_name = "brasaller"
+environment  = "prod"
 
 # ACR names are global. Change this before applying.
 acr_name  = "acrbrasallerprod001"
@@ -37,16 +37,24 @@ auth_jwt_secret                = "change-me-auth-jwt-secret-with-at-least-32-cha
 internal_service_token         = "change-me-internal-service-token-32-chars"
 billing_webhook_token          = "change-me-billing-webhook-token-32-chars"
 connector_token_encryption_key = "change-me-connector-token-key-32-chars"
+realtime_ticket_secret         = "change-me-realtime-ticket-secret-32-chars"
+
+# Connector realtime. Core remains private; the Gateway is the public SSE/WS edge.
+core_realtime_http_idle_timeout  = "5M"
+core_realtime_poll_interval      = "750ms"
+core_realtime_batch_size         = 500
+core_realtime_ticket_ttl_seconds = 45
+core_realtime_retention_days     = 7
 
 # Keycloak
-keycloak_base_url             = "https://auth.seudominio.com.br"
-keycloak_public_base_url      = "https://auth.seudominio.com.br"
-keycloak_realm                = "brasaller"
-keycloak_client_id            = "auth-service"
-keycloak_client_secret        = "change-me"
-keycloak_admin_username       = "admin"
-keycloak_admin_password       = "change-me"
-keycloak_redirect_uri         = "https://app.seudominio.com.br/auth/callback"
+keycloak_base_url               = "https://auth.seudominio.com.br"
+keycloak_public_base_url        = "https://auth.seudominio.com.br"
+keycloak_realm                  = "brasaller"
+keycloak_client_id              = "auth-service"
+keycloak_client_secret          = "change-me"
+keycloak_admin_username         = "admin"
+keycloak_admin_password         = "change-me"
+keycloak_redirect_uri           = "https://app.seudominio.com.br/auth/callback"
 keycloak_require_email_verified = true
 
 # Mercado Livre
@@ -63,10 +71,10 @@ clicksign_access_token   = "not-configured"
 clicksign_webhook_secret = "not-configured"
 
 # Notification e-mail
-notification_mail_from = "no-reply@seudominio.com.br"
-smtp_host              = "smtp.seudominio.com.br"
-smtp_port              = 587
-smtp_username          = "apikey"
-smtp_password          = "not-configured"
-smtp_mock              = false
+notification_mail_from          = "no-reply@seudominio.com.br"
+smtp_host                       = "smtp.seudominio.com.br"
+smtp_port                       = 587
+smtp_username                   = "apikey"
+smtp_password                   = "not-configured"
+smtp_mock                       = false
 email_verification_hash_secret = "change-me-email-verification-secret-32-chars"

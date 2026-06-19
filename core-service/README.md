@@ -20,6 +20,11 @@ O contexto espera JWT HS256 com `AUTH_JWT_SECRET`, `AUTH_JWT_ISSUER` e `AUTH_JWT
 
 Ao executar `POST /core/connectors/{connectorName}/sync-all`, o servico cria um job em `connector_sync_jobs`, grava a solicitacao no outbox interno e responde `202 Accepted` com `job_id`. Um scheduler do proprio Core processa o job em background, e o status pode ser consultado em `GET /core/connectors/sync-jobs/{jobId}`.
 
+Cada transicao do job tambem e gravada atomicamente em
+`connector_realtime_events`. O navegador acompanha essas transicoes por SSE ou
+WebSocket e pode recuperar eventos perdidos usando o cursor monotonicamente
+crescente.
+
 Depois da sincronizacao, o Core usa chamadas REST internas protegidas por `X-Internal-Token` para:
 
 - Enviar lancamentos normalizados para `POST /reports/internal/entries`.
@@ -53,6 +58,10 @@ Endpoints:
 | `POST` | `/core/connectors/{connectorName}/sync-all` | Enfileira `syncAll(desde)` para processamento assincrono |
 | `GET` | `/core/connectors/sync-jobs/{jobId}` | Consulta status/resultado do job de sincronizacao |
 | `GET` | `/core/connectors/{connectorName}/status` | `getStatus()` |
+| `GET` | `/core/connectors/events` | Stream SSE duravel com `cursor`/`Last-Event-ID` |
+| `GET` | `/core/connectors/events/replay` | Replay JSON dos eventos posteriores ao cursor |
+| `POST` | `/core/connectors/realtime-ticket` | Emite ticket curto para WebSocket |
+| `WS` | `/core/connectors/events/ws/{ticket}/{cursor}` | Stream WebSocket com replay |
 
 Todos os endpoints de conector, exceto a listagem de conectores registrados, exigem Bearer JWT. Consultas aceitam `ADMIN`, `VENDEDOR` ou `CONTADOR`; autenticacao, refresh e sincronizacao exigem `ADMIN` ou `VENDEDOR`. Respostas HTTP nunca expõem `access_token` ou `refresh_token` de marketplace.
 

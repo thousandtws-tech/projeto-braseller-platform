@@ -235,7 +235,10 @@ const connectorRealtimeClient = new ConnectorRealtimeClient()
 
 export function useConnectorRealtimeEvent(listener: Listener) {
   const listenerRef = useRef(listener)
-  listenerRef.current = listener
+
+  useEffect(() => {
+    listenerRef.current = listener
+  }, [listener])
 
   useEffect(
     () => connectorRealtimeClient.subscribe((event) => listenerRef.current(event)),

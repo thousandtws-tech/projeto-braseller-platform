@@ -12,6 +12,7 @@ Stack Terraform para publicar os microservicos Quarkus do Brasaller no Azure Con
 - Sete Azure Container Apps:
   - `gateway-api` com ingress externo.
   - `auth-service`, `user-service`, `billing-service`, `core-service`, `notification-service` e `reporting-service` com ingress interno.
+  - SSE e WebSocket dos conectores publicados exclusivamente pelo `gateway-api`.
 
 O banco PostgreSQL continua externo ao Terraform, seguindo a decisao documentada em `docs/azure-container-apps-deployment.md`: crie os databases no Neon ou em outro PostgreSQL antes do `apply`.
 
@@ -33,21 +34,35 @@ az provider register --namespace Microsoft.ManagedIdentity
 
 No diretorio `infra/terraform`, crie um arquivo `prod.auto.tfvars` baseado em `terraform.tfvars.example` e ajuste:
 
-- `subscription_id`
+- `subscription_id`, somente quando nao quiser usar a subscription ativa do Azure CLI
 - `acr_name`
 - `image_tag`
 - `postgres_host`, `postgres_username`, `postgres_password`
 - secrets da plataforma
+- `realtime_ticket_secret`
 - URLs do Keycloak, CORS e integracoes externas
 
 Depois execute:
 
 ```powershell
 cd infra/terraform
+az account show --query "{name:name,id:id,state:state}" -o table
 terraform init
 terraform plan -out brasaller.tfplan
 terraform apply brasaller.tfplan
 ```
+
+Nunca use o UUID `00000000-0000-0000-0000-000000000000`; ele e apenas um
+placeholder invalido. Para selecionar outra subscription:
+
+```powershell
+az account set --subscription "<nome-ou-id-real>"
+```
+
+Se os recursos ja existem, mas `terraform state list` estiver vazio, nao
+execute `apply`: recupere o backend/state original ou importe os recursos
+existentes primeiro. Um plano com todos os recursos marcados como `+ create`
+contra um resource group ja existente indica state ausente.
 
 Por padrao, `build_images_with_acr = true`; durante o `apply`, o Terraform executa `az acr build` para cada servico usando os Dockerfiles `src/main/docker/Dockerfile.jvm`. Para ambientes com CI/CD, deixe `build_images_with_acr = false`, publique as imagens no ACR com a mesma `image_tag` e rode o `apply`.
 
@@ -95,10 +110,22 @@ Ao final do `apply`, use:
 
 ```powershell
 terraform output gateway_url
+terraform output client_realtime_environment
 terraform output container_app_fqdns
 ```
 
-O primeiro endpoint publico esperado e o `gateway-api`; os demais apps ficam acessiveis apenas dentro do Container Apps Environment.
+O output `client_realtime_environment` retorna os valores reais gerados pelo
+Azure para configurar no runtime Next.js:
+
+```text
+GATEWAY_URL=https://gateway-api.<ambiente>.azurecontainerapps.io
+CORE_REALTIME_WS_PUBLIC_URL=wss://gateway-api.<ambiente>.azurecontainerapps.io/api/core/connectors/events/ws
+```
+
+O cliente atual e publicado no Netlify e nao faz parte desta stack Terraform.
+Depois do `apply`, copie esses dois outputs para as variaveis de ambiente do
+site. Apenas o `gateway-api` fica publico; todos os servicos de dominio,
+incluindo o `core-service`, permanecem privados no Container Apps Environment.
 
 ## Alta disponibilidade e escala
 

@@ -27,6 +27,7 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
                     "gateway.services.notification.url", baseUrl,
                     "gateway.services.reporting.url", baseUrl,
                     "quarkus.rest-client.gateway-downstream.url", baseUrl,
+                    "quarkus.rest-client.core-realtime.url", baseUrl,
                     "quarkus.flyway.migrate-at-start", "false"
             );
         } catch (IOException exception) {
@@ -42,6 +43,23 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
     }
 
     private void handle(HttpExchange exchange) throws IOException {
+        if (exchange.getRequestURI().getPath().equals("/core/connectors/events")) {
+            String payload = """
+                    id: 42
+                    event: connector.sync-job.processing.v1
+                    data: {"sequence":42,"event_type":"connector.sync-job.processing.v1","aggregate_id":"job-42","payload":{"status":"PROCESSING"}}
+
+                    : keepalive
+
+                    """;
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().write(payload.getBytes(StandardCharsets.UTF_8));
+            exchange.close();
+            return;
+        }
+
         if (exchange.getRequestURI().getPath().contains("/exports/")) {
             byte[] payload = "%PDF-1.4\nmock export\n%%EOF".getBytes(StandardCharsets.US_ASCII);
             exchange.getResponseHeaders().set("Content-Type", "application/pdf");

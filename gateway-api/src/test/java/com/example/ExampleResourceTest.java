@@ -63,6 +63,21 @@ class ExampleResourceTest {
     }
 
     @Test
+    void streamsConnectorEventsThroughDedicatedGatewayEndpoint() {
+        given()
+                .header("Authorization", "Bearer test-token")
+                .header("Last-Event-ID", "41")
+                .queryParam("cursor", 41)
+                .when().get("/api/core/connectors/events")
+                .then()
+                .statusCode(200)
+                .header("Content-Type", containsString("text/event-stream"))
+                .body(containsString("id:42"))
+                .body(containsString("event:connector.sync-job.processing.v1"))
+                .body(containsString("\"sequence\":42"));
+    }
+
+    @Test
     void forwardsOpenApiRequestsToServiceOperationalEndpoint() {
         given()
                 .when().get("/api/users/q/openapi")

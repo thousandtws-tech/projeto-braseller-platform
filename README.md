@@ -144,6 +144,7 @@ graph TB
 | **Domain-Driven Design** | Cada serviço possui domínio e entidades próprias |
 | **Multi-tenancy** | `tenant_id` em todas as tabelas; isolamento total |
 | **Outbox Pattern** | Publicação confiável de eventos via tabela + dispatcher |
+| **Event-Driven Realtime** | Log durável, replay por cursor, SSE e WebSocket ([detalhes](docs/realtime-connectors.md)) |
 | **Connector Pattern** | Integrações de marketplace plugáveis |
 | **Clean Architecture** | Separação: interfaces → application → domain → infrastructure |
 | **Async Jobs** | Sync de pedidos e DRE via tabelas de job |

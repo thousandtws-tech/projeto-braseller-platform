@@ -188,17 +188,18 @@ locals {
     }
     "user-service" = {
       NOTIFICATION_SERVICE_URL = local.internal_service_urls["notification-service"]
-      KEYCLOAK_ADMIN_URL      = var.keycloak_base_url
-      KEYCLOAK_ADMIN_REALM    = var.keycloak_realm
-      KEYCLOAK_ADMIN_USERNAME = var.keycloak_admin_username
-      USER_MAIL_FROM          = var.notification_mail_from
-      SMTP_HOST               = var.smtp_host
-      SMTP_PORT               = tostring(var.smtp_port)
-      SMTP_USERNAME           = var.smtp_username
-      SMTP_MOCK               = tostring(var.smtp_mock)
+      KEYCLOAK_ADMIN_URL       = var.keycloak_base_url
+      KEYCLOAK_ADMIN_REALM     = var.keycloak_realm
+      KEYCLOAK_ADMIN_USERNAME  = var.keycloak_admin_username
+      USER_MAIL_FROM           = var.notification_mail_from
+      SMTP_HOST                = var.smtp_host
+      SMTP_PORT                = tostring(var.smtp_port)
+      SMTP_USERNAME            = var.smtp_username
+      SMTP_MOCK                = tostring(var.smtp_mock)
     }
     "billing-service" = {}
     "core-service" = {
+      HTTP_IDLE_TIMEOUT                          = var.core_realtime_http_idle_timeout
       NOTIFICATION_SERVICE_URL                   = local.internal_service_urls["notification-service"]
       REPORTING_SERVICE_URL                      = local.internal_service_urls["reporting-service"]
       MERCADOLIVRE_API_BASE_URL                  = var.mercadolivre_api_base_url
@@ -227,6 +228,10 @@ locals {
       MESSAGING_OUTBOX_MAX_ATTEMPTS              = tostring(var.messaging_outbox_max_attempts)
       MESSAGING_OUTBOX_RETRY_DELAY_SECONDS       = tostring(var.messaging_outbox_retry_delay_seconds)
       MESSAGING_OUTBOX_IN_FLIGHT_TIMEOUT_SECONDS = tostring(var.messaging_outbox_in_flight_timeout_seconds)
+      REALTIME_POLL_INTERVAL                     = var.core_realtime_poll_interval
+      REALTIME_BATCH_SIZE                        = tostring(var.core_realtime_batch_size)
+      REALTIME_TICKET_TTL_SECONDS                = tostring(var.core_realtime_ticket_ttl_seconds)
+      REALTIME_RETENTION_DAYS                    = tostring(var.core_realtime_retention_days)
     }
     "reporting-service" = {
       CLOUDINARY_CLOUD_NAME                      = var.cloudinary_cloud_name
@@ -282,8 +287,8 @@ locals {
       KEYCLOAK_ADMIN_PASSWORD = "keycloak-admin-password"
     }
     "user-service" = {
-      KEYCLOAK_ADMIN_PASSWORD = "keycloak-admin-password"
-      SMTP_PASSWORD           = "smtp-password"
+      KEYCLOAK_ADMIN_PASSWORD        = "keycloak-admin-password"
+      SMTP_PASSWORD                  = "smtp-password"
       EMAIL_VERIFICATION_HASH_SECRET = "email-verification-hash-secret"
     }
     "billing-service" = {
@@ -291,6 +296,7 @@ locals {
     }
     "core-service" = {
       CONNECTOR_TOKEN_ENCRYPTION_KEY = "connector-token-encryption-key"
+      REALTIME_TICKET_SECRET         = "realtime-ticket-secret"
       MERCADOLIVRE_CLIENT_SECRET     = "mercadolivre-client-secret"
       SHOPEE_PARTNER_KEY             = "shopee-partner-key"
       AMAZON_CLIENT_SECRET           = "amazon-client-secret"
@@ -357,6 +363,7 @@ locals {
       "internal-service-token"         = var.internal_service_token
       "billing-webhook-token"          = var.billing_webhook_token
       "connector-token-encryption-key" = var.connector_token_encryption_key
+      "realtime-ticket-secret"         = var.realtime_ticket_secret
       "keycloak-client-secret"         = var.keycloak_client_secret
       "keycloak-admin-password"        = var.keycloak_admin_password
       "email-verification-hash-secret" = var.email_verification_hash_secret

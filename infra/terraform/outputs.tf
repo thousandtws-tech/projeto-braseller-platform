@@ -28,6 +28,19 @@ output "gateway_url" {
   value       = "https://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}"
 }
 
+output "core_realtime_ws_public_url" {
+  description = "Value for CORE_REALTIME_WS_PUBLIC_URL in the Next.js runtime."
+  value       = "wss://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}/api/core/connectors/events/ws"
+}
+
+output "client_realtime_environment" {
+  description = "Runtime environment values to configure on the deployed Next.js client."
+  value = {
+    GATEWAY_URL                 = "https://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}"
+    CORE_REALTIME_WS_PUBLIC_URL = "wss://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}/api/core/connectors/events/ws"
+  }
+}
+
 output "container_app_fqdns" {
   description = "FQDNs generated for each Container App."
   value = {

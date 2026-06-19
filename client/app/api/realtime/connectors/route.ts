@@ -1,14 +1,8 @@
 import { getToken } from '@/entities/session/server/session'
+import { resolveGatewayUrl } from '@/shared/config/gateway-url'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-function coreServiceUrl() {
-  return (process.env.CORE_SERVICE_URL ?? 'http://localhost:8081')
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .replace(/\/+$/, '')
-}
 
 export async function GET(request: Request) {
   const token = await getToken()
@@ -19,7 +13,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const cursor = requestUrl.searchParams.get('cursor') ?? '0'
   const upstream = await fetch(
-    `${coreServiceUrl()}/core/connectors/events?cursor=${encodeURIComponent(cursor)}`,
+    `${resolveGatewayUrl()}/api/core/connectors/events?cursor=${encodeURIComponent(cursor)}`,
     {
       headers: {
         Accept: 'text/event-stream',

@@ -2,6 +2,17 @@ variable "subscription_id" {
   description = "Azure subscription ID. Leave null to use ARM_SUBSCRIPTION_ID or the current Azure CLI context."
   type        = string
   default     = null
+
+  validation {
+    condition = (
+      var.subscription_id == null ||
+      (
+        can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.subscription_id)) &&
+        var.subscription_id != "00000000-0000-0000-0000-000000000000"
+      )
+    )
+    error_message = "subscription_id must be a real Azure subscription UUID; omit it to use the active Azure CLI subscription."
+  }
 }
 
 variable "location" {
@@ -213,6 +224,62 @@ variable "connector_token_encryption_key" {
   validation {
     condition     = length(var.connector_token_encryption_key) >= 32
     error_message = "connector_token_encryption_key must have at least 32 characters."
+  }
+}
+
+variable "realtime_ticket_secret" {
+  description = "HMAC secret used by core-service to issue short-lived WebSocket tickets."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.realtime_ticket_secret) >= 32
+    error_message = "realtime_ticket_secret must have at least 32 characters."
+  }
+}
+
+variable "core_realtime_http_idle_timeout" {
+  description = "Quarkus HTTP idle timeout for long-lived SSE and WebSocket connections."
+  type        = string
+  default     = "5M"
+}
+
+variable "core_realtime_poll_interval" {
+  description = "Interval used by core-service to poll the durable realtime event log."
+  type        = string
+  default     = "750ms"
+}
+
+variable "core_realtime_batch_size" {
+  description = "Maximum number of durable connector events read per realtime poll."
+  type        = number
+  default     = 500
+
+  validation {
+    condition     = var.core_realtime_batch_size >= 1 && var.core_realtime_batch_size <= 1000
+    error_message = "core_realtime_batch_size must be between 1 and 1000."
+  }
+}
+
+variable "core_realtime_ticket_ttl_seconds" {
+  description = "Lifetime of signed WebSocket connection tickets."
+  type        = number
+  default     = 45
+
+  validation {
+    condition     = var.core_realtime_ticket_ttl_seconds >= 15 && var.core_realtime_ticket_ttl_seconds <= 300
+    error_message = "core_realtime_ticket_ttl_seconds must be between 15 and 300."
+  }
+}
+
+variable "core_realtime_retention_days" {
+  description = "Retention window for replayable connector realtime events."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.core_realtime_retention_days >= 1
+    error_message = "core_realtime_retention_days must be greater than or equal to 1."
   }
 }
 
