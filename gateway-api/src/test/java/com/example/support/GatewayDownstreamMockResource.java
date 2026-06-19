@@ -44,6 +44,16 @@ public class GatewayDownstreamMockResource implements QuarkusTestResourceLifecyc
 
     private void handle(HttpExchange exchange) throws IOException {
         if (exchange.getRequestURI().getPath().equals("/core/connectors/events")) {
+            boolean authorized = "Bearer test-token".equals(
+                    exchange.getRequestHeaders().getFirst("Authorization"));
+            boolean cursorForwarded = "cursor=41".equals(exchange.getRequestURI().getRawQuery());
+            boolean lastEventForwarded = "41".equals(
+                    exchange.getRequestHeaders().getFirst("Last-Event-ID"));
+            if (!authorized || !cursorForwarded || !lastEventForwarded) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
             String payload = """
                     id: 42
                     event: connector.sync-job.processing.v1

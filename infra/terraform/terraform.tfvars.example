@@ -10,6 +10,17 @@ image_tag = "prod-202606011530"
 
 # Set to false when images are built by CI/CD before terraform apply.
 build_images_with_acr = true
+build_services_with_acr = [
+  "core-service",
+  "gateway-api"
+]
+
+# Optional when production services currently run different immutable tags.
+# service_image_tags = {
+#   "core-service"    = "deploy-20260619090000"
+#   "gateway-api"     = "deploy-20260619090000"
+#   "reporting-service" = "deploy-20260612041835-r3"
+# }
 
 # PostgreSQL/Neon. Create the databases before applying.
 postgres_host     = "ep-xxxxx.us-east-2.aws.neon.tech"
@@ -45,6 +56,11 @@ core_realtime_poll_interval      = "750ms"
 core_realtime_batch_size         = 500
 core_realtime_ticket_ttl_seconds = 45
 core_realtime_retention_days     = 7
+gateway_realtime_connect_timeout_ms     = 2000
+gateway_realtime_read_timeout_ms        = 60000
+gateway_realtime_max_connections        = 5000
+gateway_realtime_auto_ping_interval     = "15s"
+gateway_realtime_tls_configuration_name = "core-realtime"
 
 # Keycloak
 keycloak_base_url               = "https://auth.seudominio.com.br"

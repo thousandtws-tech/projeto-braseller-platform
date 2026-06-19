@@ -13,10 +13,11 @@ flowchart LR
     GW --> CORE[Core Service]
     CORE -->|mesma transação| JOB[(connector_sync_jobs)]
     CORE -->|mesma transação| LOG[(connector_realtime_events)]
-    LOG --> SSE[SSE com Last-Event-ID]
-    LOG --> WS[WebSocket com ticket curto]
-    SSE --> UI
-    WS --> UI
+    LOG --> CORE
+    CORE -->|SSE interno| GW
+    CORE -->|WebSocket interno| GW
+    GW -->|SSE com Last-Event-ID| UI
+    GW -->|WebSocket com ticket curto| UI
 ```
 
 ## Garantias
@@ -34,12 +35,12 @@ flowchart LR
 
 ## Endpoints
 
-| Método | Endpoint | Uso |
+| Método | Endpoint público no Gateway | Uso |
 | --- | --- | --- |
-| `GET` | `/core/connectors/events` | Stream SSE; aceita `cursor` e `Last-Event-ID` |
-| `GET` | `/core/connectors/events/replay` | Replay JSON para diagnóstico/recuperação |
-| `POST` | `/core/connectors/realtime-ticket` | Ticket curto para abrir WebSocket |
-| `WS` | `/core/connectors/events/ws/{ticket}/{cursor}` | Stream bidirecional |
+| `GET` | `/api/core/connectors/events` | Stream SSE; aceita `cursor` e `Last-Event-ID` |
+| `GET` | `/api/core/connectors/events/replay` | Replay JSON para diagnóstico/recuperação |
+| `POST` | `/api/core/connectors/realtime-ticket` | Ticket curto para abrir WebSocket |
+| `WS` | `/api/core/connectors/events/ws/{ticket}/{cursor}` | Relay bidirecional |
 
 O Next.js expõe `/api/realtime/connectors` como proxy autenticado para o
 `gateway-api`. Isso mantém o JWT em cookie `HttpOnly`. O gateway possui

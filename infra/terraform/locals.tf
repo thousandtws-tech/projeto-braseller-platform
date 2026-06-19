@@ -27,6 +27,17 @@ locals {
 
   service_database_names = merge(local.default_service_database_names, var.service_database_names)
 
+  service_image_tags = {
+    for service_name in keys(local.default_service_database_names) :
+    service_name => lookup(var.service_image_tags, service_name, var.image_tag)
+  }
+
+  acr_build_services = var.build_images_with_acr ? {
+    for service_name, service in local.services :
+    service_name => service
+    if length(var.build_services_with_acr) == 0 || contains(var.build_services_with_acr, service_name)
+  } : {}
+
   default_service_scaling = {
     "auth-service" = {
       min_replicas             = 2
@@ -277,6 +288,11 @@ locals {
 
       GATEWAY_DOWNSTREAM_CONNECT_TIMEOUT_MS = tostring(var.gateway_downstream_connect_timeout_ms)
       GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS    = tostring(var.gateway_downstream_read_timeout_ms)
+      CORE_REALTIME_CONNECT_TIMEOUT_MS      = tostring(var.gateway_realtime_connect_timeout_ms)
+      CORE_REALTIME_READ_TIMEOUT_MS         = tostring(var.gateway_realtime_read_timeout_ms)
+      CORE_REALTIME_TLS_CONFIGURATION_NAME  = var.gateway_realtime_tls_configuration_name
+      REALTIME_MAX_CONNECTIONS              = tostring(var.gateway_realtime_max_connections)
+      REALTIME_AUTO_PING_INTERVAL           = var.gateway_realtime_auto_ping_interval
       SWAGGER_UI_ENABLED                    = "true"
     }
   }

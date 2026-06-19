@@ -15,7 +15,7 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.resteasy.reactive.RestStreamElementType;
 import org.jboss.resteasy.reactive.client.SseEvent;
 
-@Path("/api/core/connectors")
+@Path("/api/core/connectors/events")
 public class ConnectorRealtimeGatewayResource {
     @Inject
     @RestClient
@@ -25,7 +25,6 @@ public class ConnectorRealtimeGatewayResource {
     Sse sse;
 
     @GET
-    @Path("/events")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     public Multi<OutboundSseEvent> events(

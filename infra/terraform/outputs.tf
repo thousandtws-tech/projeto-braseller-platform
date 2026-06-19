@@ -20,25 +20,34 @@ output "container_apps_environment_default_domain" {
 
 output "gateway_fqdn" {
   description = "Public FQDN for gateway-api."
-  value       = azurerm_container_app.services["gateway-api"].ingress[0].fqdn
+  value       = try(azurerm_container_app.services["gateway-api"].ingress[0].fqdn, null)
 }
 
 output "gateway_url" {
   description = "Public HTTPS URL for gateway-api."
-  value       = "https://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}"
+  value = try(
+    "https://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}",
+    null
+  )
 }
 
 output "core_realtime_ws_public_url" {
   description = "Value for CORE_REALTIME_WS_PUBLIC_URL in the Next.js runtime."
-  value       = "wss://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}/api/core/connectors/events/ws"
+  value = try(
+    "wss://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}/api/core/connectors/events/ws",
+    null
+  )
 }
 
 output "client_realtime_environment" {
   description = "Runtime environment values to configure on the deployed Next.js client."
-  value = {
-    GATEWAY_URL                 = "https://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}"
-    CORE_REALTIME_WS_PUBLIC_URL = "wss://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}/api/core/connectors/events/ws"
-  }
+  value = try(
+    {
+      GATEWAY_URL                 = "https://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}"
+      CORE_REALTIME_WS_PUBLIC_URL = "wss://${azurerm_container_app.services["gateway-api"].ingress[0].fqdn}/api/core/connectors/events/ws"
+    },
+    null
+  )
 }
 
 output "container_app_fqdns" {

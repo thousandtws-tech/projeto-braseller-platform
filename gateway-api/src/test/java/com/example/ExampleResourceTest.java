@@ -63,6 +63,33 @@ class ExampleResourceTest {
     }
 
     @Test
+    void forwardsConnectorListToCoreWithoutRealtimeRouteShadowing() {
+        given()
+                .header("Authorization", "Bearer test-token")
+                .when().get("/api/core/connectors")
+                .then()
+                .statusCode(200)
+                .body("method", is("GET"))
+                .body("path", is("/core/connectors"))
+                .body("authorization", is("Bearer test-token"));
+    }
+
+    @Test
+    void forwardsConnectorAuthenticationToCoreWithoutRealtimeRouteShadowing() {
+        given()
+                .contentType("application/json")
+                .header("Authorization", "Bearer test-token")
+                .body("{\"credentials\":{\"code\":\"oauth-code\",\"redirect_uri\":\"https://client.example/callback\"}}")
+                .when().post("/api/core/connectors/mercado-livre/authenticate")
+                .then()
+                .statusCode(200)
+                .body("method", is("POST"))
+                .body("path", is("/core/connectors/mercado-livre/authenticate"))
+                .body("authorization", is("Bearer test-token"))
+                .body("body", containsString("oauth-code"));
+    }
+
+    @Test
     void streamsConnectorEventsThroughDedicatedGatewayEndpoint() {
         given()
                 .header("Authorization", "Bearer test-token")

@@ -92,10 +92,38 @@ variable "image_tag" {
   default     = "manual"
 }
 
+variable "service_image_tags" {
+  description = "Optional image tag override by Container App service name."
+  type        = map(string)
+  default     = {}
+}
+
 variable "build_images_with_acr" {
   description = "When true, Terraform runs az acr build for each service before creating/updating Container Apps."
   type        = bool
   default     = true
+}
+
+variable "build_services_with_acr" {
+  description = "Optional subset of service names to build when build_images_with_acr is true. Empty means all services."
+  type        = set(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for service_name in var.build_services_with_acr :
+      contains([
+        "auth-service",
+        "user-service",
+        "billing-service",
+        "core-service",
+        "reporting-service",
+        "notification-service",
+        "gateway-api"
+      ], service_name)
+    ])
+    error_message = "build_services_with_acr contains an unknown service name."
+  }
 }
 
 variable "postgres_host" {
@@ -281,6 +309,41 @@ variable "core_realtime_retention_days" {
     condition     = var.core_realtime_retention_days >= 1
     error_message = "core_realtime_retention_days must be greater than or equal to 1."
   }
+}
+
+variable "gateway_realtime_connect_timeout_ms" {
+  description = "Connection timeout from gateway-api to the private Core realtime endpoints."
+  type        = number
+  default     = 2000
+}
+
+variable "gateway_realtime_read_timeout_ms" {
+  description = "Read timeout for the gateway SSE client; Core heartbeats keep active streams alive."
+  type        = number
+  default     = 60000
+}
+
+variable "gateway_realtime_max_connections" {
+  description = "Maximum simultaneous public realtime WebSocket relays per gateway replica."
+  type        = number
+  default     = 5000
+
+  validation {
+    condition     = var.gateway_realtime_max_connections >= 1
+    error_message = "gateway_realtime_max_connections must be greater than or equal to 1."
+  }
+}
+
+variable "gateway_realtime_auto_ping_interval" {
+  description = "WebSocket ping interval used by gateway-api."
+  type        = string
+  default     = "15s"
+}
+
+variable "gateway_realtime_tls_configuration_name" {
+  description = "Named Quarkus TLS registry configuration used by gateway-api for the private Core WSS connection."
+  type        = string
+  default     = "core-realtime"
 }
 
 variable "auth_access_token_ttl_seconds" {

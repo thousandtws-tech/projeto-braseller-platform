@@ -16,6 +16,22 @@ Gateway HTTP dos microservices BraSeller usando Quarkus REST e Quarkus REST Clie
 
 O gateway repassa `Authorization`, `X-Tenant-Id`, `X-Request-Id`, `Accept`, `Content-Type` e `X-Billing-Webhook-Token`. Endpoints internos do `user-service`, como `/users/internal/**`, eventos internos do `notification-service`, como `/notifications/events/**`, e ingestao interna do `reporting-service`, como `/reports/internal/**`, ficam bloqueados no gateway.
 
+## Realtime de conectores
+
+O gateway e a unica borda publica para o realtime. O `core-service` permanece
+com ingress interno.
+
+| Transporte | Endpoint publico |
+| --- | --- |
+| SSE | `GET /api/core/connectors/events` |
+| WebSocket | `/api/core/connectors/events/ws/{ticket}/{cursor}` |
+| Ticket | `POST /api/core/connectors/realtime-ticket` |
+| Replay | `GET /api/core/connectors/events/replay` |
+
+O SSE usa um REST Client reativo e preserva `Authorization`, `Last-Event-ID`,
+nome, ID e payload sem materializar a resposta inteira. O WebSocket cria uma
+conexao interna por sessao com o Core e faz relay bidirecional.
+
 ## Configuracao
 
 ```properties
@@ -27,6 +43,11 @@ NOTIFICATION_SERVICE_URL=http://localhost:8083
 REPORTING_SERVICE_URL=http://localhost:8087
 GATEWAY_DOWNSTREAM_CONNECT_TIMEOUT_MS=2000
 GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS=30000
+CORE_REALTIME_CONNECT_TIMEOUT_MS=2000
+CORE_REALTIME_READ_TIMEOUT_MS=60000
+CORE_REALTIME_TLS_CONFIGURATION_NAME=core-realtime
+REALTIME_MAX_CONNECTIONS=5000
+REALTIME_AUTO_PING_INTERVAL=15s
 ```
 
 No Compose, essas URLs apontam para os nomes dos servicos na rede Docker. Em dev mode, os defaults usam as portas locais do README raiz. O timeout de leitura fica em 30s para cobrir fluxos de cadastro que chamam `auth-service`, `user-service` e Keycloak em sequencia.

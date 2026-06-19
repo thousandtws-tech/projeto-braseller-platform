@@ -47,7 +47,8 @@ Depois execute:
 ```powershell
 cd infra/terraform
 az account show --query "{name:name,id:id,state:state}" -o table
-terraform init
+.\scripts\bootstrap-state-backend.ps1
+terraform init -backend-config=backend.hcl
 terraform plan -out brasaller.tfplan
 terraform apply brasaller.tfplan
 ```
@@ -64,7 +65,51 @@ execute `apply`: recupere o backend/state original ou importe os recursos
 existentes primeiro. Um plano com todos os recursos marcados como `+ create`
 contra um resource group ja existente indica state ausente.
 
+## Backend remoto e recuperacao de state
+
+O state de producao usa Azure Blob. `backend.hcl` e local/ignorado; use
+`backend.hcl.example` como modelo. Para criar o backend:
+
+```powershell
+.\scripts\bootstrap-state-backend.ps1
+terraform init -migrate-state -force-copy -backend-config=backend.hcl
+```
+
+Se os recursos Azure ja existem e o state esta vazio, execute:
+
+```powershell
+.\scripts\recover-existing-state.ps1 -SubscriptionId "<subscription-id>"
+terraform plan -refresh-only
+terraform plan -out reviewed.tfplan
+```
+
+O script e idempotente e importa Resource Group, Log Analytics, ACR, Container
+Apps Environment, Managed Identity, role `AcrPull` e os sete Container Apps.
+Nao recupera nem imprime valores de secrets.
+
 Por padrao, `build_images_with_acr = true`; durante o `apply`, o Terraform executa `az acr build` para cada servico usando os Dockerfiles `src/main/docker/Dockerfile.jvm`. Para ambientes com CI/CD, deixe `build_images_with_acr = false`, publique as imagens no ACR com a mesma `image_tag` e rode o `apply`.
+
+Para publicar somente os servicos alterados:
+
+```hcl
+build_images_with_acr = true
+build_services_with_acr = [
+  "core-service",
+  "gateway-api"
+]
+```
+
+Quando os servicos usam tags diferentes, declare `service_image_tags`. Isso
+evita que a recuperacao de state troque imagens em execucao apenas para
+uniformizar uma tag:
+
+```hcl
+service_image_tags = {
+  "core-service"      = "prod"
+  "gateway-api"       = "prod"
+  "reporting-service" = "deploy-20260612041835-r3"
+}
+```
 
 ## Bancos esperados
 
