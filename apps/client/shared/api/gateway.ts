@@ -56,7 +56,8 @@ const EMPTY_DRE: DreStatement = {
   grossRevenue: 0, fees: 0, taxes: 0, expenses: 0, netProfit: 0, profitMargin: 0, period: '',
 }
 
-const BLOCKED_PLATFORMS = new Set(['sandbox'])
+const TEST_CONNECTOR_ENABLED = process.env.ENABLE_TEST_CONNECTOR === 'true'
+const BLOCKED_PLATFORMS = TEST_CONNECTOR_ENABLED ? new Set<string>() : new Set(['sandbox'])
 
 function isBlockedPlatform(platform?: string | null): boolean {
   return BLOCKED_PLATFORMS.has((platform ?? '').toLowerCase().trim())
@@ -211,7 +212,7 @@ function mapReportsEntry(e: ReportsEntry): ReportEntry {
 const PLATFORM_DISPLAY_REPORTS: Record<string, string> = {
   mercadolivre: 'Mercado Livre', 'mercado-livre': 'Mercado Livre',
   shopee: 'Shopee', amazon: 'Amazon', magalu: 'Magalu',
-  bling: 'Bling',
+  bling: 'Bling', sandbox: 'Ambiente de Teste',
 }
 
 function mapReportsDashboardToView(d: ReportsDashboard): DashboardView {
@@ -664,6 +665,7 @@ const PLATFORM_DISPLAY: Record<string, string> = {
   amazon:        'Amazon',
   magalu:        'Magalu',
   bling:         'Bling',
+  sandbox:       'Ambiente de Teste',
 }
 
 function coreStatusToUi(status: CoreConnector['status']): ConnectorStatus['status'] {
@@ -719,7 +721,9 @@ export async function getConnectors(token: string): Promise<ConnectorStatus[]> {
 
     return results
       .map((r) => (r.status === 'fulfilled' ? r.value : null))
-      .filter((c): c is ConnectorStatus => c !== null && c.name !== 'sandbox')
+      .filter((c): c is ConnectorStatus =>
+        c !== null && (TEST_CONNECTOR_ENABLED || c.name !== 'sandbox')
+      )
   } catch {
     return []
   }
@@ -747,9 +751,20 @@ export async function syncConnector(token: string, connectorName: string, since?
   const text = await res.text()
   try {
     const parsed = JSON.parse(text)
-    return typeof parsed === 'string' ? parsed : String(parsed)
+    if (typeof parsed === 'string') return parsed
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'job_id' in parsed &&
+      typeof parsed.job_id === 'string'
+    ) {
+      return parsed.job_id
+    }
+    throw new Error('Resposta inválida ao iniciar sincronização.')
   } catch {
-    return text.trim()
+    const plainTextJobId = text.trim()
+    if (/^[0-9a-f-]{36}$/i.test(plainTextJobId)) return plainTextJobId
+    throw new Error('Resposta inválida ao iniciar sincronização.')
   }
 }
 

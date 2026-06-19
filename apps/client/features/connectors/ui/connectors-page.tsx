@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Clock3, Plug, RefreshCw, Unplug } from 'lucide-react'
+import { CheckCircle2, Clock3, Plug, RefreshCw, Unplug } from 'lucide-react'
 
 import { Badge } from '@/shared/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
@@ -19,6 +19,7 @@ import type { Locale } from '@/shared/i18n/config'
 import { ConnectorCard } from './connector-card'
 import { AddMarketplaceCard } from './add-marketplace-card'
 import { MarketplaceLogo } from './marketplace-brand'
+import { OAuthResultFeedback } from './oauth-result-feedback'
 
 const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 const DISPLAY_NAMES: Record<string, string> = {
@@ -54,6 +55,23 @@ export default async function ConectoresPage({ params, searchParams }: Props) {
   const attention = connectors.filter((item) => item.status === 'error' || item.status === 'disconnected')
   const syncing = connectors.filter((item) => item.status === 'syncing')
   const statusLabels = dict.connectors.status as Record<string, string>
+  const authErrorMessages: Record<string, string> = {
+    access_denied: dict.connectors.callback.accessDenied,
+    invalid_state: dict.connectors.callback.invalidState,
+    missing_code: dict.connectors.callback.missingCode,
+    oauth_not_configured: dict.connectors.callback.notConfigured,
+    service_unavailable: dict.connectors.callback.serviceUnavailable,
+    authentication_failed: dict.connectors.callback.authError,
+    invalid_locale: dict.connectors.callback.authError,
+  }
+  const successMessage = query.connected
+    ? formatMessage(dict.connectors.connectedSuccess, {
+        name: DISPLAY_NAMES[query.connected] ?? query.connected,
+      })
+    : undefined
+  const errorMessage = query.auth_error
+    ? authErrorMessages[query.auth_error] ?? dict.connectors.callback.authError
+    : undefined
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -71,10 +89,7 @@ export default async function ConectoresPage({ params, searchParams }: Props) {
         <Metric label="Cobertura" value={connectors.length > 0 ? Math.round((connected.length / connectors.length) * 100) : 0} helper="Dos canais cadastrados" icon={CheckCircle2} suffix="%" />
       </section>
 
-      {query.connected ? (
-        <Feedback icon={CheckCircle2} text={formatMessage(dict.connectors.connectedSuccess, { name: DISPLAY_NAMES[query.connected] ?? query.connected })} />
-      ) : null}
-      {query.auth_error ? <Feedback icon={AlertCircle} text={decodeURIComponent(query.auth_error)} destructive /> : null}
+      <OAuthResultFeedback successMessage={successMessage} errorMessage={errorMessage} />
 
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
@@ -85,7 +100,7 @@ export default async function ConectoresPage({ params, searchParams }: Props) {
           {connectors.map((connector) => (
             <ConnectorCard key={connector.name} connector={connector} readOnly={readOnly} dict={dict} lang={lang} />
           ))}
-          <AddMarketplaceCard existingConnectors={connectors.map((item) => item.name)} readOnly={readOnly} dict={dict} />
+          <AddMarketplaceCard existingConnectors={connectors.map((item) => item.name)} readOnly={readOnly} dict={dict} lang={lang} />
         </div>
       </section>
 
@@ -128,8 +143,4 @@ export default async function ConectoresPage({ params, searchParams }: Props) {
 
 function Metric({ label, value, helper, icon: Icon, suffix = '' }: { label: string; value: number; helper: string; icon: React.ComponentType<{ className?: string }>; suffix?: string }) {
   return <div className="flex min-h-32 flex-col justify-between gap-3 border-b border-r border-border p-5 even:border-r-0 [&:nth-last-child(-n+2)]:border-b-0 xl:min-h-28 xl:border-b-0 xl:even:border-r xl:last:border-r-0"><div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">{label}</span><Icon className="size-4 text-muted-foreground" /></div><p className="text-2xl font-semibold tracking-[-0.035em] tabular-nums">{value}{suffix}</p><p className="text-[11px] text-muted-foreground">{helper}</p></div>
-}
-
-function Feedback({ icon: Icon, text, destructive = false }: { icon: React.ComponentType<{ className?: string }>; text: string; destructive?: boolean }) {
-  return <div className={destructive ? 'flex items-center gap-3 rounded-md border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive' : 'flex items-center gap-3 rounded-md border border-border bg-muted/40 p-4 text-sm'}><Icon className="size-4 shrink-0" /><p className="font-medium">{text}</p></div>
 }

@@ -52,7 +52,7 @@ keycloak_require_email_verified = true
 # Mercado Livre
 mercadolivre_client_id     = ""
 mercadolivre_client_secret = "not-configured"
-mercadolivre_redirect_uri  = "https://api.seudominio.com.br/integrations/mercado-livre/callback"
+mercadolivre_redirect_uri  = "https://app.seudominio.com.br/pt-BR/conectores/callback/mercado-livre"
 
 # Reporting integrations
 cloudinary_cloud_name    = "not-configured"

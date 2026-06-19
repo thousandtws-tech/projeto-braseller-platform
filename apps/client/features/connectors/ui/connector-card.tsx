@@ -54,6 +54,7 @@ export function ConnectorCard({ connector, readOnly = false, dict, lang }: Props
 
   const safeName = connector.name ?? ''
   const isConnected = connector.status === 'connected'
+  const isTestConnector = safeName === 'sandbox'
   const statusLabels = dict.connectors.status as Record<string, string>
   const jobStatusLabels = dict.connectors.jobStatus as Record<string, string>
   const status = STATUS_ICONS[connector.status] ?? STATUS_ICONS.disconnected
@@ -74,12 +75,24 @@ export function ConnectorCard({ connector, readOnly = false, dict, lang }: Props
             <div className={`mt-0.5 flex items-center gap-1 text-xs ${status.className}`}>
               <StatusIcon className="size-3 shrink-0" />
               {label}
+              {isTestConnector ? (
+                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-[9px]">
+                  TESTE
+                </Badge>
+              ) : null}
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4">
           {readOnly && <ReadOnlyLock compact />}
+
+          {isTestConnector ? (
+            <p className="text-xs leading-5 text-muted-foreground">
+              Gera pedidos, pagamentos e taxas fictícios para validar dashboards,
+              lançamentos e notificações sem movimentar uma conta real.
+            </p>
+          ) : null}
 
           {connector.lastSync && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

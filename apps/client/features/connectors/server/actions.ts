@@ -3,9 +3,16 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { getToken, COOKIE_NAME } from '@/entities/session/server/session'
+import { isLocale } from '@/shared/i18n/config'
 import { localePath } from '@/shared/i18n/server-locale'
 import { syncConnector, getSyncJob } from '@/shared/api/gateway'
 import type { SyncJob } from '@/shared/types'
+import {
+  buildMercadoLivreOAuthUrl,
+  createMercadoLivreOAuthState,
+  MERCADO_LIVRE_OAUTH_STATE_COOKIE,
+  MERCADO_LIVRE_OAUTH_STATE_TTL_SECONDS,
+} from './mercado-livre-oauth'
 
 const GATEWAY_URL = process.env.GATEWAY_URL 
 
@@ -21,6 +28,39 @@ type AuthenticateState =
   | { success: true; platform: string; status: string; expires_at?: string }
   | { success: false; error: string }
   | null
+
+export async function startMercadoLivreOAuthAction(formData: FormData): Promise<never> {
+  const langValue = formData.get('lang')
+  const lang = typeof langValue === 'string' && isLocale(langValue) ? langValue : null
+
+  if (!lang) {
+    redirect('/pt-BR/conectores?auth_error=invalid_locale')
+  }
+
+  const token = await getToken()
+  if (!token) {
+    redirect(`/${lang}/login?expired=1`)
+  }
+
+  let authorizationUrl: string
+  try {
+    const state = createMercadoLivreOAuthState()
+    authorizationUrl = buildMercadoLivreOAuthUrl(lang, state)
+    const store = await cookies()
+
+    store.set(MERCADO_LIVRE_OAUTH_STATE_COOKIE, state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: MERCADO_LIVRE_OAUTH_STATE_TTL_SECONDS,
+      path: `/${lang}/conectores/callback/mercado-livre`,
+    })
+  } catch {
+    authorizationUrl = `/${lang}/conectores?auth_error=oauth_not_configured`
+  }
+
+  redirect(authorizationUrl)
+}
 
 export async function authenticateAction(
   prevState: AuthenticateState,

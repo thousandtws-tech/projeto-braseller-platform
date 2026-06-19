@@ -102,6 +102,16 @@ O frontend envia apenas o `code` OAuth e nunca trafega tokens da plataforma dire
 
 Datas retornadas em UTC pela MELI API sao normalizadas para `America/Sao_Paulo` no formato padrao do Core. Taxas normalizadas somam `sale_fee` e `shipping_cost`.
 
+## Ambiente de teste no frontend
+
+Defina `ENABLE_TEST_CONNECTOR=true` no Next.js para exibir o conector `sandbox`.
+Ao sincroniza-lo, o Core publica pedidos, pagamentos e taxas sinteticos pelos mesmos
+jobs e eventos usados pelos conectores reais. Esses dados passam a aparecer em
+dashboard, lancamentos e notificacoes do tenant de teste.
+
+Mantenha a flag desabilitada em tenants de producao que nao devam receber dados
+ficticios.
+
 ## Desenvolvimento
 
 ```shell

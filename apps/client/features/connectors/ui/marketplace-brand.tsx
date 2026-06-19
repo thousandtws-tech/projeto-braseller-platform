@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { Store } from 'lucide-react'
+import { FlaskConical, Store } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 
@@ -41,6 +41,7 @@ export function MarketplaceLogo({
   imageClassName,
 }: MarketplaceLogoProps) {
   const brand = MARKETPLACE_BRANDS[name.toLowerCase().trim()]
+  const isTestConnector = name.toLowerCase().trim() === 'sandbox'
 
   return (
     <span
@@ -58,6 +59,8 @@ export function MarketplaceLogo({
           unoptimized
           className={cn('size-full object-contain p-1.5', imageClassName)}
         />
+      ) : isTestConnector ? (
+        <FlaskConical className="size-5 text-violet-600" aria-hidden="true" />
       ) : (
         <Store className="size-5 text-muted-foreground" aria-hidden="true" />
       )}

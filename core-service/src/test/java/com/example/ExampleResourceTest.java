@@ -98,14 +98,14 @@ class ExampleResourceTest {
                 .body("[0].order_id", is("SANDBOX-1001"))
                 .body("[0].platform", is("sandbox"))
                 .body("[0].gross_value", is(199.90F))
-                .body("[0].platform_fee", is(26.40F))
-                .body("[0].net_value", is(173.50F))
+                .body("[0].platform_fee", is(27.49F))
+                .body("[0].net_value", is(172.41F))
                 .body("[0].payment_method", is("PIX"))
                 .body("[0].payment_date", containsString("-"))
                 .body("[0].release_date", containsString("-"))
                 .body("[0].status", is("paid"))
-                .body("[0].buyer_name", is("Comprador Sandbox"))
-                .body("[0].items[0].sku", is("SKU-001"))
+                .body("[0].buyer_name", is("Cliente Teste PIX"))
+                .body("[0].items[0].sku", is("SKU-1001"))
                 .body("[0].invoice_number", is("NF-SANDBOX-1001"));
     }
 
@@ -274,7 +274,9 @@ class ExampleResourceTest {
                 .when().get("/core/connectors/sandbox/orders?status=cancelled")
                 .then()
                 .statusCode(200)
-                .body("size()", is(0));
+                .body("size()", is(1))
+                .body("[0].order_id", is("SANDBOX-1005"))
+                .body("[0].status", is("cancelled"));
 
         given()
                 .header("Authorization", "Bearer " + token())

@@ -557,7 +557,11 @@ const dictionary = {
     },
     callback: {
       authError: 'Erro ao autenticar o Mercado Livre.',
-      serviceUnavailable: 'Serviço indisponível',
+      serviceUnavailable: 'Serviço temporariamente indisponível. Tente novamente em instantes.',
+      accessDenied: 'A autorização do Mercado Livre foi cancelada.',
+      invalidState: 'A sessão de autorização expirou ou é inválida. Tente conectar novamente.',
+      missingCode: 'O Mercado Livre não retornou um código de autorização.',
+      notConfigured: 'A integração com o Mercado Livre ainda não está configurada.',
     },
   },
   notifications: {

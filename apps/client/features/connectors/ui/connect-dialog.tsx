@@ -7,15 +7,17 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
-  ExternalLink,
   Loader2,
   LockKeyhole,
   Plug,
   ShieldCheck,
 } from 'lucide-react'
 
-import { authenticateAction } from '@/features/connectors/server/actions'
-import { Button, buttonVariants } from '@/shared/ui/button'
+import {
+  authenticateAction,
+  startMercadoLivreOAuthAction,
+} from '@/features/connectors/server/actions'
+import { Button } from '@/shared/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -31,17 +33,11 @@ import type { Dictionary } from '@/shared/i18n/get-dictionary'
 import type { Locale } from '@/shared/i18n/config'
 
 import { MarketplaceLogo, normalizeMarketplaceName } from './marketplace-brand'
+import { OAuthSubmitButton } from './oauth-submit-button'
 
 const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
 
-const ML_OAUTH_URL =
-  'https://auth.mercadolivre.com.br/authorization?response_type=code' +
-  '&client_id=4587994283757685' +
-  '&redirect_uri=https%3A%2F%2Fgateway-api.salmonrock-4d3f2812.brazilsouth.azurecontainerapps.io%2Fintegrations%2Fmercado-livre%2Fcallback'
-
-const OAUTH_CONNECTORS: Record<string, { url: string }> = {
-  'mercado-livre': { url: ML_OAUTH_URL },
-}
+const OAUTH_CONNECTORS = new Set(['mercado-livre'])
 
 interface CredentialField {
   name: string
@@ -98,7 +94,7 @@ export function ConnectDialog({
   const router = useRouter()
   const [state, formAction, isPending] = useActionState(authenticateAction, null)
   const normalizedName = normalizeMarketplaceName(connectorName)
-  const oauth = OAUTH_CONNECTORS[normalizedName]
+  const oauth = OAUTH_CONNECTORS.has(normalizedName)
   const fields = getCredentialFields(dict)[normalizedName] ?? getDefaultFields(dict)
 
   useEffect(() => {
@@ -164,10 +160,16 @@ export function ConnectDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 {dict.connectors.dialog.cancel}
               </Button>
-              <a href={oauth.url} className={buttonVariants({ size: 'lg' })}>
-                {formatMessage(dict.connectors.addMarketplaceDialog.authorizeWith, { displayName })}
-                <ExternalLink className="size-4" />
-              </a>
+              <form action={startMercadoLivreOAuthAction}>
+                <input type="hidden" name="lang" value={lang} />
+                <OAuthSubmitButton
+                  idleLabel={formatMessage(
+                    dict.connectors.addMarketplaceDialog.authorizeWith,
+                    { displayName }
+                  )}
+                  pendingLabel={dict.connectors.dialog.connecting}
+                />
+              </form>
             </DialogFooter>
           </div>
         ) : (

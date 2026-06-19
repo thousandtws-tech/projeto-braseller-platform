@@ -559,7 +559,11 @@ const dictionary: Dictionary = {
     },
     callback: {
       authError: 'Error authenticating with Mercado Livre.',
-      serviceUnavailable: 'Service unavailable',
+      serviceUnavailable: 'Service temporarily unavailable. Please try again shortly.',
+      accessDenied: 'Mercado Livre authorization was canceled.',
+      invalidState: 'The authorization session expired or is invalid. Please connect again.',
+      missingCode: 'Mercado Livre did not return an authorization code.',
+      notConfigured: 'The Mercado Livre integration is not configured yet.',
     },
   },
   notifications: {

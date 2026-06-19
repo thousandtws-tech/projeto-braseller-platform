@@ -8,15 +8,17 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
-  ExternalLink,
   Loader2,
   LockKeyhole,
   Plug,
   ShieldCheck,
 } from 'lucide-react'
 
-import { authenticateAction } from '@/features/connectors/server/actions'
-import { Button, buttonVariants } from '@/shared/ui/button'
+import {
+  authenticateAction,
+  startMercadoLivreOAuthAction,
+} from '@/features/connectors/server/actions'
+import { Button } from '@/shared/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -29,19 +31,16 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { formatMessage } from '@/shared/i18n/format'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
 import { MarketplaceLogo, normalizeMarketplaceName } from './marketplace-brand'
-
-const ML_OAUTH_URL =
-  'https://auth.mercadolivre.com.br/authorization?response_type=code' +
-  '&client_id=4587994283757685' +
-  '&redirect_uri=https%3A%2F%2Fgateway-api.salmonrock-4d3f2812.brazilsouth.azurecontainerapps.io%2Fintegrations%2Fmercado-livre%2Fcallback'
+import { OAuthSubmitButton } from './oauth-submit-button'
 
 interface Marketplace {
   name: string
   displayName: string
   connectionType: 'OAuth' | 'API'
-  oauthUrl?: string
+  oauth?: boolean
   fields: {
     name: string
     label: string
@@ -57,7 +56,7 @@ function getMarketplaces(dict: Dictionary): Marketplace[] {
       name: 'mercado-livre',
       displayName: 'Mercado Livre',
       connectionType: 'OAuth',
-      oauthUrl: ML_OAUTH_URL,
+      oauth: true,
       fields: [],
     },
     {
@@ -111,6 +110,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   existingConnectors?: string[]
   dict: Dictionary
+  lang: Locale
 }
 
 export function AddMarketplaceDialog({
@@ -118,6 +118,7 @@ export function AddMarketplaceDialog({
   onOpenChange,
   existingConnectors = [],
   dict,
+  lang,
 }: Props) {
   const [selected, setSelected] = useState<Marketplace | null>(null)
   const existing = new Set(existingConnectors.map(normalizeMarketplaceName))
@@ -157,7 +158,7 @@ export function AddMarketplaceDialog({
                   })}
                 </DialogTitle>
                 <DialogDescription className="mt-1">
-                  {selected.oauthUrl
+                  {selected.oauth
                     ? dict.connectors.dialog.oauthDescription
                     : dict.connectors.addMarketplaceDialog.credentialDescription}
                 </DialogDescription>
@@ -213,10 +214,11 @@ export function AddMarketplaceDialog({
               </div>
             )}
           </div>
-        ) : selected.oauthUrl ? (
+        ) : selected.oauth ? (
           <OAuthConnection
             marketplace={selected}
             dict={dict}
+            lang={lang}
             onCancel={() => handleOpenChange(false)}
           />
         ) : (
@@ -235,10 +237,12 @@ export function AddMarketplaceDialog({
 function OAuthConnection({
   marketplace,
   dict,
+  lang,
   onCancel,
 }: {
   marketplace: Marketplace
   dict: Dictionary
+  lang: Locale
   onCancel: () => void
 }) {
   return (
@@ -284,12 +288,15 @@ function OAuthConnection({
         <Button type="button" variant="outline" onClick={onCancel}>
           {dict.connectors.dialog.cancel}
         </Button>
-        <a href={marketplace.oauthUrl} className={buttonVariants({ size: 'lg' })}>
-          {formatMessage(dict.connectors.addMarketplaceDialog.authorizeWith, {
-            displayName: marketplace.displayName,
-          })}
-          <ExternalLink className="size-4" />
-        </a>
+        <form action={startMercadoLivreOAuthAction}>
+          <input type="hidden" name="lang" value={lang} />
+          <OAuthSubmitButton
+            idleLabel={formatMessage(dict.connectors.addMarketplaceDialog.authorizeWith, {
+              displayName: marketplace.displayName,
+            })}
+            pendingLabel={dict.connectors.dialog.connecting}
+          />
+        </form>
       </DialogFooter>
     </div>
   )
