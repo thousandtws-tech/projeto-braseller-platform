@@ -1,5 +1,6 @@
 package com.example.application.service;
 
+import com.example.application.command.EmailVerificationNotificationCommand;
 import com.example.application.command.MonthlyClosingNotificationCommand;
 import com.example.application.command.MlPaymentReleaseNotificationCommand;
 import com.example.application.command.NewSaleNotificationCommand;
@@ -145,6 +146,41 @@ public class NotificationService {
         String message = "Periodo " + weekStart + " a " + weekEnd + ": " + command.totalSales()
                 + " vendas e faturamento bruto de " + money(command.grossRevenue()) + ".";
         return Optional.of(createAndDeliver(tenantId, recipient, NotificationType.WEEKLY_ACCOUNTANT_REPORT, title, message, preference));
+    }
+
+    public NotificationMessage sendEmailVerification(EmailVerificationNotificationCommand command) {
+        String tenantId = requireText(command.tenantId(), "tenantId");
+        String recipientEmail = requireText(command.recipientEmail(), "recipientEmail");
+        String code = requireText(command.code(), "code");
+
+        String recipientName = blankToNull(command.recipientName());
+        String title = "Codigo de verificacao Brasaller";
+        String message = recipientName == null
+                ? "Seu codigo de verificacao e " + code + ". Ele expira em " + command.expiresAt() + "."
+                : recipientName + ", seu codigo de verificacao e " + code + ". Ele expira em " + command.expiresAt() + ".";
+
+        NotificationMessage notification = repository.save(new NotificationMessage(
+                UUID.randomUUID().toString(),
+                tenantId,
+                NotificationType.EMAIL_VERIFICATION,
+                title,
+                message,
+                recipientEmail,
+                NotificationChannel.EMAIL,
+                NotificationStatus.UNREAD,
+                null,
+                Instant.now()
+        ));
+
+        try {
+            emailSender.send(notification);
+            repository.recordDelivery(notification.id(), NotificationChannel.EMAIL, DeliveryStatus.SENT, null);
+        } catch (RuntimeException exception) {
+            repository.recordDelivery(notification.id(), NotificationChannel.EMAIL, DeliveryStatus.FAILED, exception.getMessage());
+            throw exception;
+        }
+
+        return notification;
     }
 
     private NotificationMessage createAndDeliver(

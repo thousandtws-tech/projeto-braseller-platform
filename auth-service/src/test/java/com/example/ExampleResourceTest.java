@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 
 @QuarkusTest
@@ -26,7 +25,7 @@ class ExampleResourceTest {
     void registersLogsInRefreshesAndLogsOutWithKeycloak() {
         String email = "auth-" + System.nanoTime() + "@brasaller.test";
 
-        String refreshToken = given()
+        given()
                 .contentType("application/json")
                 .body("""
                         {
@@ -39,17 +38,39 @@ class ExampleResourceTest {
                 .when().post("/auth/register")
                 .then()
                 .statusCode(200)
-                .body("tokenType", is("Bearer"))
-                .body("refreshToken", startsWith("kc-refresh-"))
                 .body("email", is(email))
-                .body("profile.provider", is("KEYCLOAK"))
-                .body("profile.email", is(email))
-                .body("profile.fullName", is("Auth Owner"))
-                .body("profile.subject", notNullValue())
-                .body("roles.size()", is(2))
-                .extract().path("refreshToken");
+                .body("status", is("PENDING_EMAIL_VERIFICATION"))
+                .body("verificationRequired", is(true));
 
         given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/login")
+                .then()
+                .statusCode(403)
+                .body("message", is("email_verification_required"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "code": "123456"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/verify-email")
+                .then()
+                .statusCode(200)
+                .body("email", is(email))
+                .body("status", is("ACTIVE"))
+                .body("emailVerified", is(true));
+
+        String refreshToken = given()
                 .contentType("application/json")
                 .body("""
                         {
@@ -65,7 +86,8 @@ class ExampleResourceTest {
                 .body("email", is(email))
                 .body("profile.provider", is("KEYCLOAK"))
                 .body("profile.email", is(email))
-                .body("profile.fullName", is("Auth Owner"));
+                .body("profile.fullName", is("Auth Owner"))
+                .extract().path("refreshToken");
 
         String renewedRefreshToken = given()
                 .contentType("application/json")

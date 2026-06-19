@@ -5,6 +5,7 @@ import com.example.application.command.MlPaymentReleaseNotificationCommand;
 import com.example.application.command.NewSaleNotificationCommand;
 import com.example.application.command.UpdateNotificationPreferenceCommand;
 import com.example.application.command.WeeklyAccountantReportCommand;
+import com.example.application.command.EmailVerificationNotificationCommand;
 import com.example.application.port.out.NewSaleSummaryQuery;
 import com.example.application.service.NotificationService;
 import com.example.application.service.TenantAuthorizationService;
@@ -149,6 +150,23 @@ public class NotificationResource {
     }
 
     @POST
+    @Path("/events/email-verification")
+    @Operation(summary = "Enviar codigo de verificacao de e-mail", description = "Dispara um e-mail transacional de verificacao para fluxo de cadastro.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = EmailVerificationRequest.class)))
+    public Response emailVerification(@HeaderParam("X-Internal-Token") String internalToken, EmailVerificationRequest request) {
+        internalServiceAuthorizer.requireInternal(internalToken);
+        NotificationMessage notification = notificationService.sendEmailVerification(new EmailVerificationNotificationCommand(
+                request.tenantId(),
+                request.recipientEmail(),
+                request.recipientName(),
+                request.code(),
+                request.expiresAt()
+        ));
+        return Response.status(Response.Status.CREATED).entity(notification).build();
+    }
+
+    @POST
     @Path("/events/new-sale")
     @Operation(summary = "Notificar nova venda", description = "Cria notificacao de nova venda quando o usuario habilitou esse alerta.")
     @SecurityRequirement(name = "internalToken")
@@ -243,6 +261,15 @@ public class NotificationResource {
             String marketplace,
             String orderId,
             BigDecimal amount) {
+    }
+
+    @Schema(name = "EmailVerificationNotificationRequest")
+    public record EmailVerificationRequest(
+            String tenantId,
+            String recipientEmail,
+            String recipientName,
+            String code,
+            java.time.Instant expiresAt) {
     }
 
     @Schema(name = "MlPaymentReleaseNotificationRequest")

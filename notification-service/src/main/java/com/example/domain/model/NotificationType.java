@@ -1,6 +1,7 @@
 package com.example.domain.model;
 
 public enum NotificationType {
+    EMAIL_VERIFICATION,
     MONTHLY_CLOSING_SUMMARY,
     ML_PAYMENT_RELEASE_SOON,
     NEW_SALE,

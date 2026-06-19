@@ -61,8 +61,9 @@ class ExampleResourceTest {
                 .body("adminUser.email", is(email))
                 .body("adminUser.fullName", is("Owner Test"))
                 .body("adminUser.preferredUsername", is(email))
-                .body("adminUser.emailVerified", is(true))
+                .body("adminUser.emailVerified", is(false))
                 .body("adminUser.provider", is("PASSWORD"))
+                .body("adminUser.status", is("PENDING_EMAIL_VERIFICATION"))
                 .body("adminUser.roles.size()", is(2));
     }
 
@@ -113,7 +114,8 @@ class ExampleResourceTest {
                 .body("email", is(email))
                 .body("fullName", is("Verify Owner"))
                 .body("preferredUsername", is(email))
-                .body("emailVerified", is(true))
+                .body("emailVerified", is(false))
+                .body("status", is("PENDING_EMAIL_VERIFICATION"))
                 .body("provider", is("PASSWORD"))
                 .body("roles.size()", is(2));
     }
@@ -183,7 +185,8 @@ class ExampleResourceTest {
                 .body("lastName", is("Owner"))
                 .body("pictureUrl", is("https://example.com/avatar.png"))
                 .body("provider", is("KEYCLOAK"))
-                .body("providerSubject", is("keycloak-subject-123"));
+                .body("providerSubject", is("keycloak-subject-123"))
+                .body("status", is("PENDING_EMAIL_VERIFICATION"));
     }
 
     @Test

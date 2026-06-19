@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +24,7 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
     private static final String INTERNAL_TOKEN = "test-internal-token";
     private static final String ADMIN_TOKEN = "test-admin-token";
     private static final Map<String, StoredIdentity> IDENTITIES = new ConcurrentHashMap<>();
+    private static final Map<String, String> VERIFICATION_CODES = new ConcurrentHashMap<>();
     private static final Map<String, KeycloakUser> KEYCLOAK_USERS_BY_EMAIL = new ConcurrentHashMap<>();
     private static final Map<String, KeycloakUser> KEYCLOAK_USERS_BY_ID = new ConcurrentHashMap<>();
     private static final Map<String, KeycloakUser> ACCESS_TOKENS = new ConcurrentHashMap<>();
@@ -37,6 +39,8 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
             server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             server.createContext("/users/tenants/register", this::handleRegister);
             server.createContext("/users/internal/identity/verify-password", this::handleVerifyPassword);
+            server.createContext("/users/internal/identity/email-verification/resend", this::handleResendEmailVerification);
+            server.createContext("/users/internal/identity/email-verification/verify", this::handleVerifyEmailCode);
             server.createContext("/users/internal/identity/sync-profile", this::handleSyncProfile);
             server.createContext("/realms", this::handleKeycloakRealm);
             server.createContext("/admin/realms/brasaller/users", this::handleKeycloakAdminUsers);
@@ -69,6 +73,7 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
 
     private void clearState() {
         IDENTITIES.clear();
+        VERIFICATION_CODES.clear();
         KEYCLOAK_USERS_BY_EMAIL.clear();
         KEYCLOAK_USERS_BY_ID.clear();
         ACCESS_TOKENS.clear();
@@ -99,9 +104,10 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
                 null,
                 null,
                 null,
-                true,
+                false,
                 "PASSWORD",
                 null,
+                "PENDING_EMAIL_VERIFICATION",
                 request.get("password"),
                 List.of("ADMIN", "VENDEDOR")
         );
@@ -139,6 +145,77 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
         send(exchange, 200, verificationResponse(identity));
     }
 
+    private void handleResendEmailVerification(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            send(exchange, 405, Map.of("message", "method_not_allowed"));
+            return;
+        }
+        if (!INTERNAL_TOKEN.equals(exchange.getRequestHeaders().getFirst("X-Internal-Token"))) {
+            send(exchange, 403, Map.of("message", "invalid_internal_token"));
+            return;
+        }
+
+        Map<String, String> request = OBJECT_MAPPER.readValue(exchange.getRequestBody(), new TypeReference<>() {
+        });
+        String normalizedEmail = normalize(request.get("email"));
+        StoredIdentity identity = IDENTITIES.get(normalizedEmail);
+        if (identity == null) {
+            send(exchange, 404, Map.of("message", "user_not_found"));
+            return;
+        }
+
+        VERIFICATION_CODES.put(normalizedEmail, "123456");
+        send(exchange, 200, Map.of(
+                "email", identity.email(),
+                "expiresAt", Instant.now().plusSeconds(900).toString(),
+                "lastSentAt", Instant.now().toString()
+        ));
+    }
+
+    private void handleVerifyEmailCode(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            send(exchange, 405, Map.of("message", "method_not_allowed"));
+            return;
+        }
+        if (!INTERNAL_TOKEN.equals(exchange.getRequestHeaders().getFirst("X-Internal-Token"))) {
+            send(exchange, 403, Map.of("message", "invalid_internal_token"));
+            return;
+        }
+
+        Map<String, String> request = OBJECT_MAPPER.readValue(exchange.getRequestBody(), new TypeReference<>() {
+        });
+        String normalizedEmail = normalize(request.get("email"));
+        StoredIdentity current = IDENTITIES.get(normalizedEmail);
+        if (current == null) {
+            send(exchange, 404, Map.of("message", "user_not_found"));
+            return;
+        }
+        if (!"123456".equals(request.get("code")) || !request.get("code").equals(VERIFICATION_CODES.get(normalizedEmail))) {
+            send(exchange, 400, Map.of("message", "invalid_verification_code"));
+            return;
+        }
+
+        StoredIdentity updated = new StoredIdentity(
+                current.tenantId(),
+                current.userId(),
+                current.email(),
+                current.fullName(),
+                current.preferredUsername(),
+                current.firstName(),
+                current.lastName(),
+                current.pictureUrl(),
+                true,
+                current.provider(),
+                current.providerSubject(),
+                "ACTIVE",
+                current.password(),
+                current.roles()
+        );
+        IDENTITIES.put(normalizedEmail, updated);
+        VERIFICATION_CODES.remove(normalizedEmail);
+        send(exchange, 200, userResponse(updated));
+    }
+
     private void handleSyncProfile(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             send(exchange, 405, Map.of("message", "method_not_allowed"));
@@ -171,6 +248,7 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
                 Boolean.parseBoolean(String.valueOf(request.getOrDefault("emailVerified", current.emailVerified()))),
                 stringValue(request.get("provider"), current.provider()),
                 stringValue(request.get("providerSubject"), current.providerSubject()),
+                current.status(),
                 current.password(),
                 current.roles()
         );
@@ -404,7 +482,7 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
         response.put("emailVerified", identity.emailVerified());
         response.put("provider", identity.provider());
         response.put("providerSubject", identity.providerSubject());
-        response.put("status", "ACTIVE");
+        response.put("status", identity.status());
         response.put("roles", identity.roles());
         return response;
     }
@@ -422,6 +500,7 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
         response.put("emailVerified", identity.emailVerified());
         response.put("provider", identity.provider());
         response.put("providerSubject", identity.providerSubject());
+        response.put("status", identity.status());
         response.put("roles", identity.roles());
         return response;
     }
@@ -549,7 +628,7 @@ public class UserServiceMockResource implements QuarkusTestResourceLifecycleMana
 
     private record StoredIdentity(String tenantId, String userId, String email, String fullName, String preferredUsername,
                                   String firstName, String lastName, String pictureUrl, boolean emailVerified,
-                                  String provider, String providerSubject, String password, List<String> roles) {
+                                  String provider, String providerSubject, String status, String password, List<String> roles) {
     }
 
     private record KeycloakUser(String id, String email, String fullName, String preferredUsername, String firstName,

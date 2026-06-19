@@ -549,6 +549,17 @@ variable "smtp_mock" {
   default     = false
 }
 
+variable "email_verification_hash_secret" {
+  description = "Secret used to hash email verification codes in user-service."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.email_verification_hash_secret) >= 32
+    error_message = "email_verification_hash_secret must have at least 32 characters."
+  }
+}
+
 variable "notification_service_connect_timeout_ms" {
   description = "Core service connect timeout for notification-service."
   type        = number

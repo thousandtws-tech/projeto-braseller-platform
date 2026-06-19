@@ -1,30 +1,34 @@
 package com.example.infrastructure.client;
 
-import com.example.application.command.LoginCommand;
-import com.example.application.command.RegisterCommand;
-import com.example.application.command.SyncExternalProfileCommand;
-import com.example.application.exception.IdentityGatewayException;
-import com.example.application.exception.TransientIdentityGatewayException;
-import com.example.application.port.out.UserIdentityGateway;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import java.time.temporal.ChronoUnit;
-import com.example.domain.model.AuthIdentity;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Retry;
+
+import com.example.application.command.LoginCommand;
+import com.example.application.command.RegisterCommand;
+import com.example.application.command.SyncExternalProfileCommand;
+import com.example.application.exception.IdentityGatewayException;
+import com.example.application.exception.TransientIdentityGatewayException;
+import com.example.application.port.out.UserIdentityGateway;
+import com.example.domain.model.AuthIdentity;
+import com.example.domain.model.EmailVerificationDispatch;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class HttpUserIdentityGateway implements UserIdentityGateway {
@@ -84,8 +88,7 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
         }
 
         RegisteredTenantResponse registeredTenant = read(response.body(), RegisteredTenantResponse.class);
-        UserResponse adminUser = registeredTenant.adminUser();
-        return toAuthIdentity(adminUser);
+        return toAuthIdentity(registeredTenant.adminUser());
     }
 
     @Override
@@ -127,6 +130,56 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
             successThreshold = 3,
             failOn = {TransientIdentityGatewayException.class}
     )
+    @Fallback(fallbackMethod = "resendEmailVerificationCodeFallback")
+    public EmailVerificationDispatch resendEmailVerificationCode(String email) {
+        HttpResponse<String> response = send(
+                "/users/internal/identity/email-verification/resend",
+                new EmailVerificationRequest(email.trim()),
+                true
+        );
+        if (response.statusCode() != 200) {
+            throw userServiceError("Could not resend email verification code", response.statusCode(), response.body());
+        }
+        return read(response.body(), EmailVerificationDispatch.class);
+    }
+
+    @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "verifyEmailCodeFallback")
+    public AuthIdentity verifyEmailCode(String email, String code) {
+        HttpResponse<String> response = send(
+                "/users/internal/identity/email-verification/verify",
+                new VerifyEmailCodeRequest(email.trim(), code.trim()),
+                true
+        );
+        if (response.statusCode() != 200) {
+            throw userServiceError("Could not verify email code", response.statusCode(), response.body());
+        }
+        return toAuthIdentity(read(response.body(), UserResponse.class));
+    }
+
+    @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
     @Fallback(fallbackMethod = "syncExternalProfileFallback")
     public Optional<AuthIdentity> syncExternalProfile(SyncExternalProfileCommand command) {
         UserProfileSyncRequest userRequest = new UserProfileSyncRequest(
@@ -148,8 +201,7 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
             throw userServiceError("Could not synchronize external profile", response.statusCode(), response.body());
         }
 
-        UserResponse user = read(response.body(), UserResponse.class);
-        return Optional.of(toAuthIdentity(user));
+        return Optional.of(toAuthIdentity(read(response.body(), UserResponse.class)));
     }
 
     private AuthIdentity registerTenantFallback(RegisterCommand command) {
@@ -157,6 +209,14 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     }
 
     private Optional<AuthIdentity> verifyPasswordFallback(LoginCommand command) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private EmailVerificationDispatch resendEmailVerificationCodeFallback(String email) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private AuthIdentity verifyEmailCodeFallback(String email, String code) {
         throw new IdentityGatewayException(503, "user_service_unavailable");
     }
 
@@ -247,7 +307,7 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
                 verification.email(),
                 verification.fullName(),
                 verification.roles(),
-                "ACTIVE",
+                verification.status(),
                 verification.provider(),
                 verification.providerSubject(),
                 verification.preferredUsername(),
@@ -281,6 +341,12 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     public record VerifyPasswordRequest(String email, String password) {
     }
 
+    public record EmailVerificationRequest(String email) {
+    }
+
+    public record VerifyEmailCodeRequest(String email, String code) {
+    }
+
     public record UserProfileSyncRequest(String email, String provider, String providerSubject, String fullName,
                                          String preferredUsername, String firstName, String lastName, String pictureUrl,
                                          boolean emailVerified) {
@@ -301,7 +367,8 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     public record IdentityVerificationResponse(String userId, String tenantId, String email, String fullName,
                                                String preferredUsername, String firstName, String lastName,
                                                String pictureUrl, boolean emailVerified, String provider,
-                                               String providerSubject, List<String> roles, List<String> accountantTenantIds) {
+                                               String providerSubject, String status, List<String> roles,
+                                               List<String> accountantTenantIds) {
     }
 
     public record ErrorResponse(String message) {

@@ -1,17 +1,36 @@
 package com.example.application.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
 import com.example.application.command.GrantAccountantAccessCommand;
 import com.example.application.command.RegisterTenantCommand;
+import com.example.application.command.ResendEmailVerificationCodeCommand;
 import com.example.application.command.SyncExternalProfileCommand;
+import com.example.application.command.VerifyEmailCodeCommand;
 import com.example.application.command.VerifyPasswordCommand;
 import com.example.application.exception.ConflictException;
 import com.example.application.exception.ForbiddenException;
+import com.example.application.exception.RateLimitException;
 import com.example.application.exception.ValidationException;
+import com.example.application.port.out.EmailVerificationSender;
 import com.example.application.port.out.InternalServiceAuthorizer;
 import com.example.application.port.out.PasswordHasher;
 import com.example.application.port.out.UserIdentityRepository;
 import com.example.domain.model.AccountantAccessView;
 import com.example.domain.model.AccountantClientView;
+import com.example.domain.model.EmailVerificationChallenge;
+import com.example.domain.model.EmailVerificationChallengeRecord;
 import com.example.domain.model.IdentityVerification;
 import com.example.domain.model.RegisteredTenant;
 import com.example.domain.model.StoredUserCredentials;
@@ -21,16 +40,18 @@ import com.example.domain.model.UserView;
 import com.example.infrastructure.keycloak.KeycloakAdminClient;
 import com.example.infrastructure.keycloak.KeycloakIntegrationException;
 import com.example.infrastructure.persistence.RepositoryException;
+
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 @ApplicationScoped
 public class UserIdentityService {
+    private static final Logger LOG = Logger.getLogger(UserIdentityService.class);
     private static final String DEFAULT_TEMPORARY_PASSWORD = "ChangeMe123!";
+    private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_PENDING_EMAIL_VERIFICATION = "PENDING_EMAIL_VERIFICATION";
+    private static final int VERIFICATION_CODE_LENGTH = 6;
 
     @Inject
     UserIdentityRepository userIdentityRepository;
@@ -44,8 +65,39 @@ public class UserIdentityService {
     @Inject
     KeycloakAdminClient keycloakAdminClient;
 
+    @Inject
+    EmailVerificationSender emailVerificationSender;
+
+    @ConfigProperty(name = "user.email-verification.code-ttl-minutes")
+    long verificationCodeTtlMinutes;
+
+    @ConfigProperty(name = "user.email-verification.resend-cooldown-seconds")
+    long resendCooldownSeconds;
+
+    @ConfigProperty(name = "user.email-verification.max-attempts")
+    int maxVerificationAttempts;
+
+    @ConfigProperty(name = "user.email-verification.hash-secret")
+    String verificationHashSecret;
+
+    private final SecureRandom secureRandom = new SecureRandom();
+
+    @PostConstruct
+    void validateVerificationConfiguration() {
+        if (verificationCodeTtlMinutes <= 0) {
+            throw new IllegalStateException("user.email-verification.code-ttl-minutes must be positive");
+        }
+        if (resendCooldownSeconds < 0) {
+            throw new IllegalStateException("user.email-verification.resend-cooldown-seconds must be >= 0");
+        }
+        if (maxVerificationAttempts <= 0) {
+            throw new IllegalStateException("user.email-verification.max-attempts must be positive");
+        }
+    }
+
     public RegisteredTenant registerTenant(RegisterTenantCommand command) {
-        if (isBlank(command.legalName()) || isBlank(command.adminName()) || isBlank(command.email()) || isWeakPassword(command.password())) {
+        if (isBlank(command.legalName()) || isBlank(command.adminName()) || isBlank(command.email())
+                || isWeakPassword(command.password())) {
             throw new ValidationException("legalName, adminName, email and a password with at least 8 characters are required");
         }
 
@@ -80,36 +132,32 @@ public class UserIdentityService {
             throw new ValidationException("email, firstName, lastName and grantedByUserId are required");
         }
 
-        String email      = command.email().trim();
-        String firstName  = command.firstName().trim();
-        String lastName   = command.lastName().trim();
-        String fullName   = command.fullName() != null ? command.fullName().trim() : firstName + " " + lastName;
+        String email = command.email().trim();
+        String firstName = command.firstName().trim();
+        String lastName = command.lastName().trim();
+        String fullName = command.fullName() != null ? command.fullName().trim() : firstName + " " + lastName;
         String rawPassword = command.temporaryPassword() != null ? command.temporaryPassword() : DEFAULT_TEMPORARY_PASSWORD;
         Optional<UserView> existingUser = userIdentityRepository.findUserByEmail(email);
         String accountantUserId = existingUser.map(UserView::id).orElseGet(() -> UUID.randomUUID().toString());
 
-        // 1. Tenta criar o usuário no Keycloak primeiro
         Optional<String> keycloakSubject = Optional.empty();
         if (existingUser.isEmpty()) {
             try {
                 keycloakSubject = keycloakAdminClient.createAccountantUser(
                         accountantUserId, command.tenantId(), email, firstName, lastName, rawPassword);
-            } catch (KeycloakIntegrationException e) {
-                throw new ValidationException("Falha ao criar usuario no Keycloak: " + e.getMessage());
+            } catch (KeycloakIntegrationException exception) {
+                throw new ValidationException("Falha ao criar usuario no Keycloak: " + exception.getMessage());
             }
         }
 
-        // 2. Determina provider/status conforme resultado do Keycloak
-        String provider        = existingUser.map(UserView::provider).orElse(keycloakSubject.isPresent() ? "KEYCLOAK" : "PASSWORD");
+        String provider = existingUser.map(UserView::provider).orElse(keycloakSubject.isPresent() ? "KEYCLOAK" : "PASSWORD");
         String providerSubject = existingUser.map(UserView::providerSubject).orElse(keycloakSubject.orElse(null));
-        String status          = existingUser.map(UserView::status).orElse(keycloakSubject.isPresent() ? "ACTIVE" : "INVITED");
+        String status = existingUser.map(UserView::status).orElse(keycloakSubject.isPresent() ? STATUS_ACTIVE : "INVITED");
 
-        // Usuários Keycloak não usam senha local; armazenamos hash de valor inacessível
         String passwordHash = keycloakSubject.isPresent()
                 ? "KEYCLOAK_MANAGED_" + UUID.randomUUID()
                 : passwordHasher.hash(rawPassword);
 
-        // 3. Persiste localmente
         try {
             return userIdentityRepository.grantAccountantAccess(
                     accountantUserId,
@@ -151,9 +199,69 @@ public class UserIdentityService {
             throw new ValidationException("email and password are required");
         }
 
-        return userIdentityRepository.findActiveCredentialsByEmail(command.email())
+        return userIdentityRepository.findCredentialsByEmail(command.email())
                 .filter(credentials -> passwordHasher.verify(command.password(), credentials.passwordHash()))
                 .map(this::toVerification);
+    }
+
+    public EmailVerificationChallenge resendEmailVerificationCode(String internalToken,
+                                                                  ResendEmailVerificationCodeCommand command) {
+        if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
+            throw new ForbiddenException("invalid_internal_token");
+        }
+        if (isBlank(command.email())) {
+            throw new ValidationException("email is required");
+        }
+
+        UserView user = userIdentityRepository.findUserByEmail(command.email().trim())
+                .orElseThrow(() -> new ValidationException("user_not_found"));
+
+        if (user.emailVerified() || STATUS_ACTIVE.equals(user.status())) {
+            throw new ValidationException("email_already_verified");
+        }
+
+        return issueEmailVerificationCode(user, false);
+    }
+
+    public UserView verifyEmailCode(String internalToken, VerifyEmailCodeCommand command) {
+        if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
+            throw new ForbiddenException("invalid_internal_token");
+        }
+        if (isBlank(command.email()) || isBlank(command.code())) {
+            throw new ValidationException("email and code are required");
+        }
+
+        UserView user = userIdentityRepository.findUserByEmail(command.email().trim())
+                .orElseThrow(() -> new ValidationException("user_not_found"));
+
+        if (user.emailVerified() || STATUS_ACTIVE.equals(user.status())) {
+            return user;
+        }
+
+        EmailVerificationChallengeRecord challenge = userIdentityRepository.findEmailVerificationChallenge(command.email().trim())
+                .orElseThrow(() -> new ValidationException("verification_code_expired"));
+
+        Instant now = Instant.now();
+        if (challenge.expiresAt().isBefore(now)) {
+            userIdentityRepository.deleteEmailVerificationChallenge(command.email().trim());
+            throw new ValidationException("verification_code_expired");
+        }
+
+        String expectedHash = hashVerificationCode(command.email().trim(), command.code().trim(), challenge.codeSalt());
+        if (!constantTimeEquals(expectedHash, challenge.codeHash())) {
+            int remainingAttempts = Math.max(0, challenge.attemptsRemaining() - 1);
+            if (remainingAttempts == 0) {
+                userIdentityRepository.deleteEmailVerificationChallenge(command.email().trim());
+            } else {
+                userIdentityRepository.updateEmailVerificationAttempts(command.email().trim(), remainingAttempts, now);
+            }
+            throw new ValidationException("invalid_verification_code");
+        }
+
+        UserView verifiedUser = userIdentityRepository.activateUserEmail(command.email().trim(), now)
+                .orElseThrow(() -> new ValidationException("user_not_found"));
+        userIdentityRepository.deleteEmailVerificationChallenge(command.email().trim());
+        return verifiedUser;
     }
 
     public Optional<UserView> syncExternalProfile(String internalToken, SyncExternalProfileCommand command) {
@@ -166,7 +274,7 @@ public class UserIdentityService {
 
         return userIdentityRepository.syncExternalProfile(
                 command.email().trim(),
-                command.provider().trim().toUpperCase(),
+                command.provider().trim().toUpperCase(Locale.ROOT),
                 command.providerSubject().trim(),
                 blankToNull(command.fullName()),
                 blankToNull(command.preferredUsername()),
@@ -190,9 +298,73 @@ public class UserIdentityService {
                 credentials.emailVerified(),
                 credentials.provider(),
                 credentials.providerSubject(),
+                credentials.status(),
                 credentials.roles(),
                 userIdentityRepository.listAccountantTenantIds(credentials.userId(), credentials.email())
         );
+    }
+
+    private EmailVerificationChallenge issueEmailVerificationCode(UserView user, boolean ignoreCooldown) {
+        Instant now = Instant.now();
+        Optional<EmailVerificationChallengeRecord> existingChallenge = userIdentityRepository
+                .findEmailVerificationChallenge(user.email());
+
+        if (!ignoreCooldown && existingChallenge.isPresent()
+                && existingChallenge.get().lastSentAt().plusSeconds(resendCooldownSeconds).isAfter(now)) {
+            throw new RateLimitException("verification_code_recently_sent");
+        }
+
+        String code = generateVerificationCode();
+        String salt = UUID.randomUUID().toString();
+        Instant expiresAt = now.plus(verificationCodeTtlMinutes, ChronoUnit.MINUTES);
+
+        userIdentityRepository.saveEmailVerificationChallenge(
+                user.email(),
+                hashVerificationCode(user.email(), code, salt),
+                salt,
+                expiresAt,
+                maxVerificationAttempts,
+                now
+        );
+
+        try {
+            emailVerificationSender.send(user.tenantId(), user.email(), user.fullName(), code, expiresAt);
+        } catch (RuntimeException exception) {
+            LOG.warnf(exception, "Failed to dispatch email verification code for %s", user.email());
+        }
+
+        return new EmailVerificationChallenge(user.email(), expiresAt, now);
+    }
+
+    private String generateVerificationCode() {
+        int value = secureRandom.nextInt((int) Math.pow(10, VERIFICATION_CODE_LENGTH));
+        return String.format("%0" + VERIFICATION_CODE_LENGTH + "d", value);
+    }
+
+    private String hashVerificationCode(String email, String code, String salt) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] value = digest.digest((normalizeEmail(email) + ":" + code + ":" + salt + ":" + verificationHashSecret)
+                    .getBytes(StandardCharsets.UTF_8));
+            return toHex(value);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Could not hash verification code", exception);
+        }
+    }
+
+    private boolean constantTimeEquals(String left, String right) {
+        return MessageDigest.isEqual(
+                left.getBytes(StandardCharsets.UTF_8),
+                right.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
+    private String toHex(byte[] value) {
+        StringBuilder builder = new StringBuilder(value.length * 2);
+        for (byte item : value) {
+            builder.append(String.format("%02x", item));
+        }
+        return builder.toString();
     }
 
     private boolean isBlank(String value) {
@@ -213,6 +385,10 @@ public class UserIdentityService {
         }
         String digits = value.replaceAll("\\D", "");
         return digits.isBlank() ? null : digits;
+    }
+
+    private String normalizeEmail(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean isGlobalBpoOperator(TenantContext context) {

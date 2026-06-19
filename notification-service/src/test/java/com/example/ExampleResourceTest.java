@@ -84,6 +84,29 @@ class ExampleResourceTest {
     }
 
     @Test
+    void sendsEmailVerificationNotificationWithInternalToken() {
+        given()
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .contentType("application/json")
+                .body("""
+                        {
+                          "tenantId": "tenant-verify",
+                          "recipientEmail": "seller@example.com",
+                          "recipientName": "Seller Test",
+                          "code": "123456",
+                          "expiresAt": "2026-06-19T12:00:00Z"
+                        }
+                        """)
+                .when().post("/notifications/events/email-verification")
+                .then()
+                .statusCode(201)
+                .body("tenantId", is("tenant-verify"))
+                .body("type", is("EMAIL_VERIFICATION"))
+                .body("recipientEmail", is("seller@example.com"))
+                .body("message", containsString("123456"));
+    }
+
+    @Test
     void skipsNewSaleNotificationWhenDisabled() {
         given()
                 .header("X-Internal-Token", "dev-internal-token-change-me")

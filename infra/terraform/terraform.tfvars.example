@@ -69,3 +69,4 @@ smtp_port              = 587
 smtp_username          = "apikey"
 smtp_password          = "not-configured"
 smtp_mock              = false
+email_verification_hash_secret = "change-me-email-verification-secret-32-chars"

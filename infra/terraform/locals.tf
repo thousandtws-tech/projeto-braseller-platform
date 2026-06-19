@@ -187,9 +187,15 @@ locals {
       AUTH_HTTP_REQUEST_TIMEOUT_MS    = tostring(var.auth_http_request_timeout_ms)
     }
     "user-service" = {
+      NOTIFICATION_SERVICE_URL = local.internal_service_urls["notification-service"]
       KEYCLOAK_ADMIN_URL      = var.keycloak_base_url
       KEYCLOAK_ADMIN_REALM    = var.keycloak_realm
       KEYCLOAK_ADMIN_USERNAME = var.keycloak_admin_username
+      USER_MAIL_FROM          = var.notification_mail_from
+      SMTP_HOST               = var.smtp_host
+      SMTP_PORT               = tostring(var.smtp_port)
+      SMTP_USERNAME           = var.smtp_username
+      SMTP_MOCK               = tostring(var.smtp_mock)
     }
     "billing-service" = {}
     "core-service" = {
@@ -277,6 +283,8 @@ locals {
     }
     "user-service" = {
       KEYCLOAK_ADMIN_PASSWORD = "keycloak-admin-password"
+      SMTP_PASSWORD           = "smtp-password"
+      EMAIL_VERIFICATION_HASH_SECRET = "email-verification-hash-secret"
     }
     "billing-service" = {
       BILLING_WEBHOOK_TOKEN = "billing-webhook-token"
@@ -351,6 +359,7 @@ locals {
       "connector-token-encryption-key" = var.connector_token_encryption_key
       "keycloak-client-secret"         = var.keycloak_client_secret
       "keycloak-admin-password"        = var.keycloak_admin_password
+      "email-verification-hash-secret" = var.email_verification_hash_secret
       "mercadolivre-client-secret"     = var.mercadolivre_client_secret
       "shopee-partner-key"             = var.shopee_partner_key
       "amazon-client-secret"           = var.amazon_client_secret

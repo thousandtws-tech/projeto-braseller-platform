@@ -2,11 +2,13 @@ package com.example.application.port.out;
 
 import com.example.domain.model.AccountantAccessView;
 import com.example.domain.model.AccountantClientView;
+import com.example.domain.model.EmailVerificationChallengeRecord;
 import com.example.domain.model.RegisteredTenant;
 import com.example.domain.model.StoredUserCredentials;
 import com.example.domain.model.TenantCompanyProfile;
 import com.example.domain.model.UserView;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,7 +56,18 @@ public interface UserIdentityRepository {
 
     Optional<UserView> findUserByEmail(String email);
 
-    Optional<StoredUserCredentials> findActiveCredentialsByEmail(String email);
+    Optional<StoredUserCredentials> findCredentialsByEmail(String email);
+
+    void saveEmailVerificationChallenge(String email, String codeHash, String codeSalt, Instant expiresAt,
+                                        int attemptsRemaining, Instant lastSentAt);
+
+    Optional<EmailVerificationChallengeRecord> findEmailVerificationChallenge(String email);
+
+    void updateEmailVerificationAttempts(String email, int attemptsRemaining, Instant updatedAt);
+
+    void deleteEmailVerificationChallenge(String email);
+
+    Optional<UserView> activateUserEmail(String email, Instant updatedAt);
 
     Optional<UserView> syncExternalProfile(String email, String provider, String providerSubject, String fullName,
                                            String preferredUsername, String firstName, String lastName,

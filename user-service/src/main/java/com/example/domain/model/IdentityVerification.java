@@ -7,7 +7,7 @@ import java.util.List;
 @Schema(name = "IdentityVerification", description = "Identidade validada pelo user-service para o auth-service.")
 public record IdentityVerification(String userId, String tenantId, String email, String fullName,
                                    String preferredUsername, String firstName, String lastName, String pictureUrl,
-                                   boolean emailVerified, String provider, String providerSubject, List<String> roles,
+                                   boolean emailVerified, String provider, String providerSubject, String status, List<String> roles,
                                    List<String> accountantTenantIds) {
     public IdentityVerification {
         roles = roles == null ? List.of() : List.copyOf(roles);

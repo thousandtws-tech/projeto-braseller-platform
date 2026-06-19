@@ -1,18 +1,5 @@
 package com.example.infrastructure.persistence;
 
-import com.example.application.port.out.UserIdentityRepository;
-import com.example.domain.model.AccountantAccessView;
-import com.example.domain.model.AccountantClientView;
-import com.example.domain.model.RegisteredTenant;
-import com.example.domain.model.StoredUserCredentials;
-import com.example.domain.model.TenantCompanyProfile;
-import com.example.domain.model.TenantView;
-import com.example.domain.model.UserRole;
-import com.example.domain.model.UserView;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -25,8 +12,27 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
+import javax.sql.DataSource;
+
+import com.example.application.port.out.UserIdentityRepository;
+import com.example.domain.model.AccountantAccessView;
+import com.example.domain.model.AccountantClientView;
+import com.example.domain.model.EmailVerificationChallengeRecord;
+import com.example.domain.model.RegisteredTenant;
+import com.example.domain.model.StoredUserCredentials;
+import com.example.domain.model.TenantCompanyProfile;
+import com.example.domain.model.TenantView;
+import com.example.domain.model.UserRole;
+import com.example.domain.model.UserView;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
 @ApplicationScoped
 public class JdbcUserIdentityRepository implements UserIdentityRepository {
+    private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_PENDING_EMAIL_VERIFICATION = "PENDING_EMAIL_VERIFICATION";
+
     @Inject
     DataSource dataSource;
 
@@ -41,14 +47,29 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             connection.setAutoCommit(false);
             try {
                 insertTenant(connection, tenantId, legalName, tradeName, companyProfile);
-                insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, null, null, passwordHash, "PASSWORD", null, "ACTIVE");
+                insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, null, null, passwordHash,
+                        "PASSWORD", null, STATUS_PENDING_EMAIL_VERIFICATION);
                 insertRole(connection, tenantId, userId, UserRole.ADMIN);
                 insertRole(connection, tenantId, userId, UserRole.VENDEDOR);
                 connection.commit();
                 return new RegisteredTenant(
                         toTenantView(tenantId, legalName, tradeName, companyProfile),
-                        new UserView(userId, tenantId, email, adminName, email, null, null, null, true,
-                                "PASSWORD", null, "ACTIVE", List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()), List.of())
+                        new UserView(
+                                userId,
+                                tenantId,
+                                email,
+                                adminName,
+                                email,
+                                null,
+                                null,
+                                null,
+                                false,
+                                "PASSWORD",
+                                null,
+                                STATUS_PENDING_EMAIL_VERIFICATION,
+                                List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()),
+                                List.of()
+                        )
                 );
             } catch (SQLException exception) {
                 connection.rollback();
@@ -62,19 +83,10 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     }
 
     @Override
-    public AccountantAccessView grantAccountantAccess(
-            String accountantUserId,
-            String tenantId,
-            String accountantEmail,
-            String accountantFullName,
-            String firstName,
-            String lastName,
-            String passwordHash,
-            String provider,
-            String providerSubject,
-            String status,
-            String grantedByUserId
-    ) {
+    public AccountantAccessView grantAccountantAccess(String accountantUserId, String tenantId, String accountantEmail,
+                                                      String accountantFullName, String firstName, String lastName,
+                                                      String passwordHash, String provider, String providerSubject,
+                                                      String status, String grantedByUserId) {
         String accessId = UUID.randomUUID().toString();
         String normalizedEmail = normalizeEmail(accountantEmail);
 
@@ -106,12 +118,12 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                     statement.setString(3, accountantUserId);
                     statement.setString(4, grantedByUserId);
                     statement.setBoolean(5, true);
-                    statement.setString(6, "ACTIVE");
+                    statement.setString(6, STATUS_ACTIVE);
                     statement.executeUpdate();
                 }
 
                 connection.commit();
-                return new AccountantAccessView(accessId, tenantId, accountantUserId, accountantEmail, true, "ACTIVE");
+                return new AccountantAccessView(accessId, tenantId, accountantUserId, accountantEmail, true, STATUS_ACTIVE);
             } catch (SQLException exception) {
                 connection.rollback();
                 throw exception;
@@ -237,7 +249,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     }
 
     @Override
-    public Optional<StoredUserCredentials> findActiveCredentialsByEmail(String email) {
+    public Optional<StoredUserCredentials> findCredentialsByEmail(String email) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT id, tenant_id, email, full_name, preferred_username, first_name, last_name, picture_url,
@@ -247,7 +259,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                      """)) {
             statement.setString(1, normalizeEmail(email));
             try (ResultSet resultSet = statement.executeQuery()) {
-                if (!resultSet.next() || !"ACTIVE".equals(resultSet.getString("status"))) {
+                if (!resultSet.next()) {
                     return Optional.empty();
                 }
                 String tenantId = resultSet.getString("tenant_id");
@@ -264,6 +276,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                         resultSet.getBoolean("email_verified"),
                         resultSet.getString("provider"),
                         resultSet.getString("provider_subject"),
+                        resultSet.getString("status"),
                         resultSet.getString("password_hash"),
                         listRoles(connection, tenantId, userId)
                 ));
@@ -274,17 +287,136 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
     }
 
     @Override
-    public Optional<UserView> syncExternalProfile(
-            String email,
-            String provider,
-            String providerSubject,
-            String fullName,
-            String preferredUsername,
-            String firstName,
-            String lastName,
-            String pictureUrl,
-            boolean emailVerified
-    ) {
+    public void saveEmailVerificationChallenge(String email, String codeHash, String codeSalt, Instant expiresAt,
+                                               int attemptsRemaining, Instant lastSentAt) {
+        String normalizedEmail = normalizeEmail(email);
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                String userId = requireUserIdByEmail(connection, normalizedEmail);
+                try (PreparedStatement delete = connection.prepareStatement("""
+                        DELETE FROM email_verification_codes
+                        WHERE email_normalized = ?
+                        """)) {
+                    delete.setString(1, normalizedEmail);
+                    delete.executeUpdate();
+                }
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO email_verification_codes
+                        (user_id, email_normalized, code_hash, code_salt, expires_at, attempts_remaining, last_sent_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """)) {
+                    statement.setString(1, userId);
+                    statement.setString(2, normalizedEmail);
+                    statement.setString(3, codeHash);
+                    statement.setString(4, codeSalt);
+                    statement.setTimestamp(5, Timestamp.from(expiresAt));
+                    statement.setInt(6, attemptsRemaining);
+                    statement.setTimestamp(7, Timestamp.from(lastSentAt));
+                    statement.setTimestamp(8, Timestamp.from(lastSentAt));
+                    statement.executeUpdate();
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not save email verification challenge", exception);
+        }
+    }
+
+    @Override
+    public Optional<EmailVerificationChallengeRecord> findEmailVerificationChallenge(String email) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT email_normalized, code_hash, code_salt, expires_at, attempts_remaining, last_sent_at
+                     FROM email_verification_codes
+                     WHERE email_normalized = ?
+                     """)) {
+            statement.setString(1, normalizeEmail(email));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new EmailVerificationChallengeRecord(
+                        resultSet.getString("email_normalized"),
+                        resultSet.getString("code_hash"),
+                        resultSet.getString("code_salt"),
+                        resultSet.getTimestamp("expires_at").toInstant(),
+                        resultSet.getInt("attempts_remaining"),
+                        resultSet.getTimestamp("last_sent_at").toInstant()
+                ));
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not find email verification challenge", exception);
+        }
+    }
+
+    @Override
+    public void updateEmailVerificationAttempts(String email, int attemptsRemaining, Instant updatedAt) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE email_verification_codes
+                     SET attempts_remaining = ?,
+                         updated_at = ?
+                     WHERE email_normalized = ?
+                     """)) {
+            statement.setInt(1, attemptsRemaining);
+            statement.setTimestamp(2, Timestamp.from(updatedAt));
+            statement.setString(3, normalizeEmail(email));
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not update email verification attempts", exception);
+        }
+    }
+
+    @Override
+    public void deleteEmailVerificationChallenge(String email) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     DELETE FROM email_verification_codes
+                     WHERE email_normalized = ?
+                     """)) {
+            statement.setString(1, normalizeEmail(email));
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not delete email verification challenge", exception);
+        }
+    }
+
+    @Override
+    public Optional<UserView> activateUserEmail(String email, Instant updatedAt) {
+        String normalizedEmail = normalizeEmail(email);
+        try (Connection connection = dataSource.getConnection()) {
+            int updated;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE user_accounts
+                    SET email_verified = TRUE,
+                        status = ?,
+                        updated_at = ?
+                    WHERE email_normalized = ?
+                    """)) {
+                statement.setString(1, STATUS_ACTIVE);
+                statement.setTimestamp(2, Timestamp.from(updatedAt));
+                statement.setString(3, normalizedEmail);
+                updated = statement.executeUpdate();
+            }
+            if (updated == 0) {
+                return Optional.empty();
+            }
+            return findActiveUserByEmail(connection, normalizedEmail);
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not activate user email", exception);
+        }
+    }
+
+    @Override
+    public Optional<UserView> syncExternalProfile(String email, String provider, String providerSubject, String fullName,
+                                                  String preferredUsername, String firstName, String lastName,
+                                                  String pictureUrl, boolean emailVerified) {
         String normalizedEmail = normalizeEmail(email);
         try (Connection connection = dataSource.getConnection()) {
             int updated;
@@ -300,7 +432,6 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                         email_verified = ?,
                         updated_at = ?
                     WHERE email_normalized = ?
-                      AND status = 'ACTIVE'
                     """)) {
                 statement.setString(1, trimToEmpty(fullName));
                 statement.setString(2, provider);
@@ -317,7 +448,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             if (updated == 0) {
                 return Optional.empty();
             }
-            return findActiveUserByEmail(connection, normalizedEmail);
+            return findUserByEmail(connection, normalizedEmail);
         } catch (SQLException exception) {
             throw new RepositoryException("Could not synchronize external profile", exception);
         }
@@ -337,7 +468,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             statement.setString(1, tenantId);
             statement.setString(2, legalName);
             statement.setString(3, tradeName);
-            statement.setString(4, "ACTIVE");
+            statement.setString(4, STATUS_ACTIVE);
             statement.setString(5, companyProfile.cnpj());
             statement.setString(6, companyProfile.cnaeCode());
             statement.setString(7, companyProfile.cnaeDescription());
@@ -358,7 +489,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                 tenantId,
                 legalName,
                 tradeName,
-                "ACTIVE",
+                STATUS_ACTIVE,
                 companyProfile.cnpj(),
                 companyProfile.cnaeCode(),
                 companyProfile.cnaeDescription(),
@@ -372,20 +503,9 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
         );
     }
 
-    private void insertUser(
-            Connection connection,
-            String userId,
-            String tenantId,
-            String email,
-            String normalizedEmail,
-            String fullName,
-            String firstName,
-            String lastName,
-            String passwordHash,
-            String provider,
-            String providerSubject,
-            String status
-    ) throws SQLException {
+    private void insertUser(Connection connection, String userId, String tenantId, String email, String normalizedEmail,
+                            String fullName, String firstName, String lastName, String passwordHash, String provider,
+                            String providerSubject, String status) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO user_accounts
                 (id, tenant_id, email, email_normalized, full_name, first_name, last_name,
@@ -403,7 +523,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             statement.setString(9, provider);
             statement.setString(10, providerSubject);
             statement.setString(11, email);
-            statement.setBoolean(12, true);
+            statement.setBoolean(12, STATUS_ACTIVE.equals(status));
             statement.setString(13, status);
             statement.setTimestamp(14, Timestamp.from(Instant.now()));
             statement.executeUpdate();
@@ -447,12 +567,9 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
         }
     }
 
-    private Optional<AccountantAccessView> findActiveAccountantAccess(
-            Connection connection,
-            String tenantId,
-            String accountantUserId,
-            String accountantEmail
-    ) throws SQLException {
+    private Optional<AccountantAccessView> findActiveAccountantAccess(Connection connection, String tenantId,
+                                                                      String accountantUserId, String accountantEmail)
+            throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT id, tenant_id, accountant_user_id, read_only, status
                 FROM accountant_access
@@ -499,6 +616,20 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                 if (!resultSet.next()) {
                     throw new RepositoryException("User not found for tenant");
                 }
+            }
+        }
+    }
+
+    private String requireUserIdByEmail(Connection connection, String normalizedEmail) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT id FROM user_accounts WHERE email_normalized = ?
+                """)) {
+            statement.setString(1, normalizedEmail);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new RepositoryException("User not found");
+                }
+                return resultSet.getString("id");
             }
         }
     }
@@ -558,7 +689,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
         }
     }
 
-    private UserView toUserView(Connection connection, ResultSet resultSet, String tenantId, String userId) throws SQLException {
+    private UserView toUserView(Connection connection, ResultSet resultSet, String tenantId, String userId)
+            throws SQLException {
         return new UserView(
                 userId,
                 tenantId,

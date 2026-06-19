@@ -2,10 +2,13 @@ package com.example.interfaces.rest;
 
 import com.example.application.command.GrantAccountantAccessCommand;
 import com.example.application.command.RegisterTenantCommand;
+import com.example.application.command.ResendEmailVerificationCodeCommand;
 import com.example.application.command.SyncExternalProfileCommand;
+import com.example.application.command.VerifyEmailCodeCommand;
 import com.example.application.command.VerifyPasswordCommand;
 import com.example.application.exception.ConflictException;
 import com.example.application.exception.ForbiddenException;
+import com.example.application.exception.RateLimitException;
 import com.example.application.exception.ValidationException;
 import com.example.application.service.CompanyLookupService;
 import com.example.application.service.TenantAuthorizationService;
@@ -238,6 +241,46 @@ public class UserResource {
     }
 
     @POST
+    @Path("/internal/identity/email-verification/resend")
+    @Operation(summary = "Reenviar codigo de verificacao de e-mail", description = "Endpoint interno usado pelo auth-service para reenviar o codigo de verificacao.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = EmailVerificationRequest.class)))
+    public Response resendEmailVerificationCode(@HeaderParam("X-Internal-Token") String providedInternalToken,
+                                                EmailVerificationRequest request) {
+        try {
+            return Response.ok(userIdentityService.resendEmailVerificationCode(
+                    providedInternalToken,
+                    new ResendEmailVerificationCodeCommand(request.email())
+            )).build();
+        } catch (ForbiddenException exception) {
+            return Response.status(Response.Status.FORBIDDEN).entity(new RestError(exception.getMessage())).build();
+        } catch (RateLimitException exception) {
+            return Response.status(Response.Status.TOO_MANY_REQUESTS).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @POST
+    @Path("/internal/identity/email-verification/verify")
+    @Operation(summary = "Validar codigo de verificacao de e-mail", description = "Endpoint interno usado pelo auth-service para validar o codigo e ativar a conta.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = VerifyEmailCodeRequest.class)))
+    public Response verifyEmailCode(@HeaderParam("X-Internal-Token") String providedInternalToken,
+                                    VerifyEmailCodeRequest request) {
+        try {
+            return Response.ok(userIdentityService.verifyEmailCode(
+                    providedInternalToken,
+                    new VerifyEmailCodeCommand(request.email(), request.code())
+            )).build();
+        } catch (ForbiddenException exception) {
+            return Response.status(Response.Status.FORBIDDEN).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @POST
     @Path("/internal/identity/sync-profile")
     @Operation(summary = "Sincronizar perfil externo", description = "Endpoint interno usado pelo auth-service para persistir dados de perfil vindos de Keycloak/Google.")
     @SecurityRequirement(name = "internalToken")
@@ -323,6 +366,14 @@ public class UserResource {
 
     @Schema(name = "VerifyPasswordRequest", description = "Credenciais validadas internamente pelo auth-service.")
     public record VerifyPasswordRequest(String email, String password) {
+    }
+
+    @Schema(name = "EmailVerificationRequest", description = "E-mail usado para reenviar o codigo de verificacao.")
+    public record EmailVerificationRequest(String email) {
+    }
+
+    @Schema(name = "VerifyEmailCodeRequest", description = "Payload usado para validar o codigo de verificacao.")
+    public record VerifyEmailCodeRequest(String email, String code) {
     }
 
     @Schema(name = "SyncExternalProfileRequest", description = "Dados de perfil externo sincronizados pelo auth-service.")
