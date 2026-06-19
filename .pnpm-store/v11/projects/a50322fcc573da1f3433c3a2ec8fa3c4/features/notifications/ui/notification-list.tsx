@@ -1,0 +1,189 @@
+'use client'
+
+import { useTransition } from 'react'
+import {
+  Bell, ShoppingCart, DollarSign, FileText, BarChart3,
+  CheckCheck, Loader2, BellOff,
+} from 'lucide-react'
+import { Card, CardContent } from '@/shared/ui/card'
+import { Button } from '@/shared/ui/button'
+import { Badge } from '@/shared/ui/badge'
+import { markAsReadAction, clearReadAction } from '@/features/notifications/server/actions'
+import { formatMessage } from '@/shared/i18n/format'
+import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
+import type { NotificationMessage } from '@/shared/types'
+
+const LOCALE_MAP: Record<Locale, string> = { 'pt-BR': 'pt-BR', en: 'en-US', es: 'es-ES' }
+
+const TYPE_ICONS: Record<string, { icon: typeof Bell }> = {
+  NEW_SALE:                 { icon: ShoppingCart },
+  ML_PAYMENT_RELEASE:       { icon: DollarSign },
+  MONTHLY_CLOSING_SUMMARY:  { icon: FileText },
+  WEEKLY_ACCOUNTANT_REPORT: { icon: BarChart3 },
+}
+
+function relativeTime(date: string, dict: Dictionary, lang: Locale): string {
+  const diff = Date.now() - new Date(date).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1)  return dict.notifications.relativeTime.now
+  if (m < 60) return formatMessage(dict.notifications.relativeTime.minutesAgo, { count: m })
+  const h = Math.floor(m / 60)
+  if (h < 24) return formatMessage(dict.notifications.relativeTime.hoursAgo, { count: h })
+  const d = Math.floor(h / 24)
+  if (d < 7)  return formatMessage(d > 1 ? dict.notifications.relativeTime.daysAgo : dict.notifications.relativeTime.dayAgo, { count: d })
+  return new Date(date).toLocaleDateString(LOCALE_MAP[lang])
+}
+
+function NotificationItem({
+  n,
+  onMarkRead,
+  isPending,
+  dict,
+  lang,
+}: {
+  n: NotificationMessage
+  onMarkRead: (id: string) => void
+  isPending: boolean
+  dict: Dictionary
+  lang: Locale
+}) {
+  const typeLabels = dict.notifications.types as Record<string, string>
+  const iconMeta = TYPE_ICONS[n.type] ?? { icon: Bell }
+  const label = typeLabels[n.type] ?? n.type
+  const Icon = iconMeta.icon
+  const isUnread = n.status === 'UNREAD'
+
+  return (
+    <div className={`
+      group flex items-start gap-4 px-5 py-4 transition-colors
+      hover:bg-muted/40
+      ${isUnread ? 'bg-muted/35' : ''}
+    `}>
+      {/* Icon */}
+      <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background">
+        <Icon className="size-4 text-muted-foreground" />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm leading-snug ${isUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/80'}`}>
+            {n.title}
+          </span>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+            {label}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">{n.message}</p>
+        <p className="text-[11px] text-muted-foreground/50 pt-0.5">{relativeTime(n.createdAt, dict, lang)}</p>
+      </div>
+
+      {/* Right side */}
+      <div className="flex items-center gap-2 shrink-0 self-center">
+        {isUnread && (
+          <>
+            <button
+              onClick={() => onMarkRead(n.id)}
+              disabled={isPending}
+              className="whitespace-nowrap text-[11px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 disabled:opacity-30"
+            >
+              {dict.notifications.markRead}
+            </button>
+            <div className="size-2 rounded-full bg-foreground" />
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface Props {
+  unread: NotificationMessage[]
+  read: NotificationMessage[]
+  dict: Dictionary
+  lang: Locale
+}
+
+export function NotificationList({ unread, read, dict, lang }: Props) {
+  const [isPending, startTransition] = useTransition()
+
+  function handleMarkRead(id: string) {
+    startTransition(() => markAsReadAction(id))
+  }
+
+  function handleClearRead() {
+    startTransition(() => clearReadAction())
+  }
+
+  if (unread.length === 0 && read.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="size-16 rounded-2xl bg-muted flex items-center justify-center">
+            <BellOff className="size-7 text-muted-foreground/50" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold">{dict.notifications.empty.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dict.notifications.empty.hint}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Unread section */}
+      {unread.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              {formatMessage(dict.notifications.unreadSection, { count: unread.length })}
+            </span>
+          </div>
+          <Card className="overflow-hidden">
+            <CardContent className="p-0 divide-y divide-border/60">
+              {unread.map((n) => (
+                <NotificationItem key={n.id} n={n} onMarkRead={handleMarkRead} isPending={isPending} dict={dict} lang={lang} />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Read section */}
+      {read.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              {formatMessage(dict.notifications.previousSection, { count: read.length })}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearRead}
+              disabled={isPending}
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {isPending
+                ? <Loader2 className="size-3 animate-spin" />
+                : <CheckCheck className="size-3" />
+              }
+              {dict.notifications.archiveRead}
+            </Button>
+          </div>
+          <Card className="overflow-hidden opacity-80">
+            <CardContent className="p-0 divide-y divide-border/60">
+              {read.map((n) => (
+                <NotificationItem key={n.id} n={n} onMarkRead={handleMarkRead} isPending={isPending} dict={dict} lang={lang} />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}

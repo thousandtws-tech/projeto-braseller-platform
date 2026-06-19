@@ -50,6 +50,7 @@ public class ConnectorService {
     private final ConnectorSyncQueue connectorSyncQueue;
     private final ConnectorSyncJobRepository connectorSyncJobRepository;
     private final ReportEntryEventPublisher reportEntryEventPublisher;
+    private final ConnectorRealtimeService connectorRealtimeService;
 
     @Inject
     public ConnectorService(
@@ -57,12 +58,14 @@ public class ConnectorService {
             DomainEventPublisher domainEventPublisher,
             ConnectorSyncQueue connectorSyncQueue,
             ConnectorSyncJobRepository connectorSyncJobRepository,
-            ReportEntryEventPublisher reportEntryEventPublisher) {
+            ReportEntryEventPublisher reportEntryEventPublisher,
+            ConnectorRealtimeService connectorRealtimeService) {
         this.connectorRegistry = connectorRegistry;
         this.domainEventPublisher = domainEventPublisher;
         this.connectorSyncQueue = connectorSyncQueue;
         this.connectorSyncJobRepository = connectorSyncJobRepository;
         this.reportEntryEventPublisher = reportEntryEventPublisher;
+        this.connectorRealtimeService = connectorRealtimeService;
     }
 
     public List<ConnectorDescriptor> list() {
@@ -72,18 +75,24 @@ public class ConnectorService {
     }
 
     public ConnectorToken authenticate(String connectorName, String tenantId, Map<String, String> credentials) {
-        return connector(connectorName).authenticate(new ConnectorAuthenticationCommand(
+        String normalizedTenantId = requireText(tenantId, "tenantId");
+        ConnectorToken token = connector(connectorName).authenticate(new ConnectorAuthenticationCommand(
                 connectorName,
-                requireText(tenantId, "tenantId"),
+                normalizedTenantId,
                 credentials
         ));
+        connectorRealtimeService.connectorAuthenticated(normalizedTenantId, token);
+        return token;
     }
 
     public ConnectorToken refreshToken(String connectorName, String tenantId) {
-        return connector(connectorName).refreshToken(new ConnectorRefreshTokenCommand(
+        String normalizedTenantId = requireText(tenantId, "tenantId");
+        ConnectorToken token = connector(connectorName).refreshToken(new ConnectorRefreshTokenCommand(
                 connectorName,
-                requireText(tenantId, "tenantId")
+                normalizedTenantId
         ));
+        connectorRealtimeService.connectorTokenRefreshed(normalizedTenantId, token);
+        return token;
     }
 
     public List<StandardOrder> getOrders(String connectorName, String tenantId, LocalDate from, LocalDate to, OrderStatus status, Integer limit) {

@@ -2,6 +2,7 @@ package com.example.infrastructure.persistence;
 
 import com.example.application.event.SyncAllRequestedEvent;
 import com.example.application.port.out.ConnectorSyncJobRepository;
+import com.example.application.service.ConnectorRealtimeService;
 import com.example.domain.enums.SyncJobStatus;
 import com.example.domain.model.connector.SyncJob;
 import com.example.domain.model.connector.SyncResult;
@@ -24,26 +25,44 @@ public class JdbcConnectorSyncJobRepository implements ConnectorSyncJobRepositor
     @Inject
     DataSource dataSource;
 
+    @Inject
+    JdbcConnectorRealtimeEventRepository realtimeEventRepository;
+
     @Override
     public SyncJob createQueued(SyncAllRequestedEvent event) {
         try (Connection connection = dataSource.getConnection()) {
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO connector_sync_jobs
-                    (id, tenant_id, connector_name, since_instant, status,
-                     recipient_email, requested_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """)) {
-                statement.setString(1, event.eventId());
-                statement.setString(2, event.tenantId());
-                statement.setString(3, event.connectorName());
-                statement.setTimestamp(4, Timestamp.from(event.since()));
-                statement.setString(5, SyncJobStatus.QUEUED.name());
-                statement.setString(6, event.recipientEmail());
-                statement.setTimestamp(7, Timestamp.from(event.requestedAt()));
-                statement.executeUpdate();
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO connector_sync_jobs
+                        (id, tenant_id, connector_name, since_instant, status,
+                         recipient_email, requested_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """)) {
+                    statement.setString(1, event.eventId());
+                    statement.setString(2, event.tenantId());
+                    statement.setString(3, event.connectorName());
+                    statement.setTimestamp(4, Timestamp.from(event.since()));
+                    statement.setString(5, SyncJobStatus.QUEUED.name());
+                    statement.setString(6, event.recipientEmail());
+                    statement.setTimestamp(7, Timestamp.from(event.requestedAt()));
+                    statement.executeUpdate();
+                }
+                SyncJob job = find(connection, event.tenantId(), event.eventId())
+                        .orElseThrow(() -> new RepositoryException("Could not find queued sync job", null));
+                realtimeEventRepository.append(
+                        connection,
+                        job.tenantId(),
+                        ConnectorRealtimeService.SYNC_JOB_QUEUED,
+                        job.jobId(),
+                        job
+                );
+                connection.commit();
+                return job;
+            } catch (SQLException | RuntimeException exception) {
+                rollback(connection);
+                throw exception;
             }
-            return find(connection, event.tenantId(), event.eventId())
-                    .orElseThrow(() -> new RepositoryException("Could not find queued sync job", null));
         } catch (SQLException exception) {
             throw new RepositoryException("Could not create connector sync job", exception);
         }
@@ -56,25 +75,44 @@ public class JdbcConnectorSyncJobRepository implements ConnectorSyncJobRepositor
 
     @Override
     public boolean tryMarkProcessing(String jobId) {
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     UPDATE connector_sync_jobs
-                     SET status = ?,
-                         started_at = ?,
-                         error_message = NULL
-                     WHERE id = ?
-                       AND (status = ?
-                         OR (status = ? AND started_at < ?))
-                     """)) {
-            Timestamp now = Timestamp.from(Instant.now());
-            Timestamp staleBefore = Timestamp.from(Instant.now().minusSeconds(STALE_PROCESSING_TIMEOUT_SECONDS));
-            statement.setString(1, SyncJobStatus.PROCESSING.name());
-            statement.setTimestamp(2, now);
-            statement.setString(3, jobId);
-            statement.setString(4, SyncJobStatus.QUEUED.name());
-            statement.setString(5, SyncJobStatus.PROCESSING.name());
-            statement.setTimestamp(6, staleBefore);
-            return statement.executeUpdate() == 1;
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE connector_sync_jobs
+                    SET status = ?,
+                        started_at = ?,
+                        error_message = NULL
+                    WHERE id = ?
+                      AND (status = ?
+                        OR (status = ? AND started_at < ?))
+                    """)) {
+                Timestamp now = Timestamp.from(Instant.now());
+                Timestamp staleBefore = Timestamp.from(Instant.now().minusSeconds(STALE_PROCESSING_TIMEOUT_SECONDS));
+                statement.setString(1, SyncJobStatus.PROCESSING.name());
+                statement.setTimestamp(2, now);
+                statement.setString(3, jobId);
+                statement.setString(4, SyncJobStatus.QUEUED.name());
+                statement.setString(5, SyncJobStatus.PROCESSING.name());
+                statement.setTimestamp(6, staleBefore);
+                if (statement.executeUpdate() != 1) {
+                    connection.rollback();
+                    return false;
+                }
+                SyncJob job = findById(connection, jobId)
+                        .orElseThrow(() -> new RepositoryException("Could not find processing sync job", null));
+                realtimeEventRepository.append(
+                        connection,
+                        job.tenantId(),
+                        ConnectorRealtimeService.SYNC_JOB_PROCESSING,
+                        job.jobId(),
+                        job
+                );
+                connection.commit();
+                return true;
+            } catch (SQLException | RuntimeException exception) {
+                rollback(connection);
+                throw exception;
+            }
         } catch (SQLException exception) {
             throw new RepositoryException("Could not mark connector sync job as processing", exception);
         }
@@ -83,26 +121,41 @@ public class JdbcConnectorSyncJobRepository implements ConnectorSyncJobRepositor
     @Override
     public SyncJob markCompleted(String jobId, SyncResult result) {
         try (Connection connection = dataSource.getConnection()) {
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    UPDATE connector_sync_jobs
-                    SET status = ?,
-                        finished_at = ?,
-                        error_message = NULL,
-                        orders_synced = ?,
-                        payments_synced = ?,
-                        fees_synced = ?
-                    WHERE id = ?
-                    """)) {
-                statement.setString(1, SyncJobStatus.COMPLETED.name());
-                statement.setTimestamp(2, Timestamp.from(Instant.now()));
-                statement.setInt(3, result.ordersSynced());
-                statement.setInt(4, result.paymentsSynced());
-                statement.setInt(5, result.feesSynced());
-                statement.setString(6, jobId);
-                statement.executeUpdate();
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE connector_sync_jobs
+                        SET status = ?,
+                            finished_at = ?,
+                            error_message = NULL,
+                            orders_synced = ?,
+                            payments_synced = ?,
+                            fees_synced = ?
+                        WHERE id = ?
+                        """)) {
+                    statement.setString(1, SyncJobStatus.COMPLETED.name());
+                    statement.setTimestamp(2, Timestamp.from(Instant.now()));
+                    statement.setInt(3, result.ordersSynced());
+                    statement.setInt(4, result.paymentsSynced());
+                    statement.setInt(5, result.feesSynced());
+                    statement.setString(6, jobId);
+                    statement.executeUpdate();
+                }
+                SyncJob job = findById(connection, jobId)
+                        .orElseThrow(() -> new RepositoryException("Could not find completed sync job", null));
+                realtimeEventRepository.append(
+                        connection,
+                        job.tenantId(),
+                        ConnectorRealtimeService.SYNC_JOB_COMPLETED,
+                        job.jobId(),
+                        job
+                );
+                connection.commit();
+                return job;
+            } catch (SQLException | RuntimeException exception) {
+                rollback(connection);
+                throw exception;
             }
-            return findById(connection, jobId)
-                    .orElseThrow(() -> new RepositoryException("Could not find completed sync job", null));
         } catch (SQLException exception) {
             throw new RepositoryException("Could not mark connector sync job as completed", exception);
         }
@@ -111,21 +164,36 @@ public class JdbcConnectorSyncJobRepository implements ConnectorSyncJobRepositor
     @Override
     public SyncJob markFailed(String jobId, String errorMessage) {
         try (Connection connection = dataSource.getConnection()) {
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    UPDATE connector_sync_jobs
-                    SET status = ?,
-                        finished_at = ?,
-                        error_message = ?
-                    WHERE id = ?
-                    """)) {
-                statement.setString(1, SyncJobStatus.FAILED.name());
-                statement.setTimestamp(2, Timestamp.from(Instant.now()));
-                statement.setString(3, truncate(errorMessage, 600));
-                statement.setString(4, jobId);
-                statement.executeUpdate();
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE connector_sync_jobs
+                        SET status = ?,
+                            finished_at = ?,
+                            error_message = ?
+                        WHERE id = ?
+                        """)) {
+                    statement.setString(1, SyncJobStatus.FAILED.name());
+                    statement.setTimestamp(2, Timestamp.from(Instant.now()));
+                    statement.setString(3, truncate(errorMessage, 600));
+                    statement.setString(4, jobId);
+                    statement.executeUpdate();
+                }
+                SyncJob job = findById(connection, jobId)
+                        .orElseThrow(() -> new RepositoryException("Could not find failed sync job", null));
+                realtimeEventRepository.append(
+                        connection,
+                        job.tenantId(),
+                        ConnectorRealtimeService.SYNC_JOB_FAILED,
+                        job.jobId(),
+                        job
+                );
+                connection.commit();
+                return job;
+            } catch (SQLException | RuntimeException exception) {
+                rollback(connection);
+                throw exception;
             }
-            return findById(connection, jobId)
-                    .orElseThrow(() -> new RepositoryException("Could not find failed sync job", null));
         } catch (SQLException exception) {
             throw new RepositoryException("Could not mark connector sync job as failed", exception);
         }
@@ -207,5 +275,13 @@ public class JdbcConnectorSyncJobRepository implements ConnectorSyncJobRepositor
             return value;
         }
         return value.substring(0, maxLength);
+    }
+
+    private void rollback(Connection connection) {
+        try {
+            connection.rollback();
+        } catch (SQLException ignored) {
+            // The original persistence exception is more useful to the caller.
+        }
     }
 }

@@ -34,6 +34,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -265,6 +266,30 @@ class ExampleResourceTest {
                 .body("job_id", is(jobId))
                 .body("status", is("QUEUED"))
                 .body("connector_name", is("sandbox"));
+
+        given()
+                .header("Authorization", "Bearer " + token())
+                .queryParam("cursor", 0)
+                .queryParam("limit", 1000)
+                .when().get("/core/connectors/events/replay")
+                .then()
+                .statusCode(200)
+                .body("find { it.aggregate_id == '" + jobId + "' }.event_type",
+                        is("connector.sync-job.queued.v1"))
+                .body("find { it.aggregate_id == '" + jobId + "' }.payload.status",
+                        is("QUEUED"));
+    }
+
+    @Test
+    void issuesShortLivedRealtimeTicket() {
+        given()
+                .header("Authorization", "Bearer " + token())
+                .when().post("/core/connectors/realtime-ticket")
+                .then()
+                .statusCode(200)
+                .body("ticket", containsString("."))
+                .body("streamId", notNullValue())
+                .body("expiresAt", containsString("-"));
     }
 
     @Test
