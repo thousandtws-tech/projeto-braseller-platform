@@ -156,6 +156,39 @@ public class UserIdentityService {
                 .map(this::toVerification);
     }
 
+    public Optional<UserView> findIdentityByEmail(String internalToken, String email) {
+        if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
+            throw new ForbiddenException("invalid_internal_token");
+        }
+        if (isBlank(email)) {
+            throw new ValidationException("email is required");
+        }
+
+        return userIdentityRepository.findUserByEmail(email.trim());
+    }
+
+    public Optional<UserView> markEmailVerified(String internalToken, String email) {
+        if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
+            throw new ForbiddenException("invalid_internal_token");
+        }
+        if (isBlank(email)) {
+            throw new ValidationException("email is required");
+        }
+
+        return userIdentityRepository.markEmailVerifiedByEmail(email.trim());
+    }
+
+    public Optional<UserView> resetPassword(String internalToken, String email, String newPassword) {
+        if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
+            throw new ForbiddenException("invalid_internal_token");
+        }
+        if (isBlank(email) || isWeakPassword(newPassword)) {
+            throw new ValidationException("email and a password with at least 8 characters are required");
+        }
+
+        return userIdentityRepository.updatePasswordByEmail(email.trim(), passwordHasher.hash(newPassword));
+    }
+
     public Optional<UserView> syncExternalProfile(String internalToken, SyncExternalProfileCommand command) {
         if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
             throw new ForbiddenException("invalid_internal_token");

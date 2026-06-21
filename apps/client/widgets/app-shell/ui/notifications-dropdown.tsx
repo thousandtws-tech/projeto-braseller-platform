@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import {
+  AlertTriangle,
   BarChart3,
   Bell,
   BellOff,
@@ -58,6 +59,11 @@ const TYPE_META: Record<
     icon: FileText,
     iconColor: 'text-sky-600',
     bgColor: 'bg-sky-50',
+  },
+  API_INTEGRATION_ALERT: {
+    icon: AlertTriangle,
+    iconColor: 'text-red-600',
+    bgColor: 'bg-red-50',
   },
 }
 

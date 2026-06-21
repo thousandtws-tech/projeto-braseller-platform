@@ -1,8 +1,10 @@
 package com.example.application.service;
 
+import com.example.application.command.ApiIntegrationAlertCommand;
 import com.example.application.command.MonthlyClosingNotificationCommand;
 import com.example.application.command.MlPaymentReleaseNotificationCommand;
 import com.example.application.command.NewSaleNotificationCommand;
+import com.example.application.command.AuthEmailCommand;
 import com.example.application.command.UpdateNotificationPreferenceCommand;
 import com.example.application.command.WeeklyAccountantReportCommand;
 import com.example.application.exception.ValidationException;
@@ -147,6 +149,52 @@ public class NotificationService {
         return Optional.of(createAndDeliver(tenantId, recipient, NotificationType.WEEKLY_ACCOUNTANT_REPORT, title, message, preference));
     }
 
+    public void sendAuthEmail(AuthEmailCommand command) {
+        String recipientEmail = requireText(command.recipientEmail(), "recipientEmail");
+        String subject = requireText(command.subject(), "subject");
+        String message = requireText(command.message(), "message");
+        NotificationMessage notification = new NotificationMessage(
+                UUID.randomUUID().toString(),
+                "auth",
+                NotificationType.AUTH_EMAIL,
+                subject,
+                message,
+                recipientEmail,
+                NotificationChannel.EMAIL,
+                NotificationStatus.UNREAD,
+                null,
+                Instant.now(),
+                null
+        );
+        emailSender.send(notification);
+    }
+
+    public Optional<NotificationMessage> recordApiIntegrationAlert(ApiIntegrationAlertCommand command) {
+        String tenantId = requireText(command.tenantId(), "tenantId");
+        NotificationPreference preference = repository.getPreference(tenantId);
+
+        String recipient = firstNonBlank(command.recipientEmail(), preference.recipientEmail());
+        String integrationName = requireText(command.integrationName(), "integrationName");
+        String severity = defaultText(command.severity(), "WARNING");
+        String failureType = defaultText(command.failureType(), "UNKNOWN");
+
+        String title = "Falha " + severity.toLowerCase(Locale.ROOT) + " na integracao " + integrationName;
+        StringBuilder message = new StringBuilder();
+        message.append("Tipo de falha: ").append(failureType);
+        if (command.endpoint() != null && !command.endpoint().isBlank()) {
+            message.append(" em ").append(command.endpoint());
+        }
+        if (command.impact() != null && !command.impact().isBlank()) {
+            message.append(". Impacto: ").append(command.impact());
+        }
+        if (command.actionTaken() != null && !command.actionTaken().isBlank()) {
+            message.append(". Acao: ").append(command.actionTaken());
+        }
+        message.append(".");
+
+        return Optional.of(createAndDeliver(tenantId, recipient, NotificationType.API_INTEGRATION_ALERT, title, message.toString(), preference, severity));
+    }
+
     private NotificationMessage createAndDeliver(
             String tenantId,
             String recipientEmail,
@@ -154,6 +202,17 @@ public class NotificationService {
             String title,
             String message,
             NotificationPreference preference) {
+        return createAndDeliver(tenantId, recipientEmail, type, title, message, preference, null);
+    }
+
+    private NotificationMessage createAndDeliver(
+            String tenantId,
+            String recipientEmail,
+            NotificationType type,
+            String title,
+            String message,
+            NotificationPreference preference,
+            String severity) {
         NotificationMessage notification = repository.save(new NotificationMessage(
                 UUID.randomUUID().toString(),
                 tenantId,
@@ -164,7 +223,8 @@ public class NotificationService {
                 NotificationChannel.IN_APP,
                 NotificationStatus.UNREAD,
                 null,
-                Instant.now()
+                Instant.now(),
+                severity
         ));
 
         deliverByEmail(notification, preference);

@@ -50,6 +50,7 @@ export function Header({ notifications, user, dict, lang }: HeaderProps) {
     [`/${lang}/dre`]: dict.nav.dre,
     [`/${lang}/balanco`]: dict.nav.balanco,
     [`/${lang}/conectores`]: dict.nav.conectores,
+    [`/${lang}/monitoramento-apis`]: dict.nav.monitoramentoApis,
     [`/${lang}/notificacoes`]: dict.nav.notificacoes,
     [`/${lang}/contador`]: dict.nav.contador,
     [`/${lang}/configuracoes`]: dict.nav.configuracoes,

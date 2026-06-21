@@ -55,25 +55,42 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
     public Optional<AuthIdentity> findIdentityByEmail(String email) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT id, tenant_id, user_id, email, full_name, roles, status
+                     SELECT id, tenant_id, user_id, email, full_name, roles, status, provider, provider_subject,
+                            preferred_username, first_name, last_name, picture_url, email_verified,
+                            accountant_tenant_ids
                      FROM auth_identities
                      WHERE email_normalized = ?
                        AND status = 'ACTIVE'
+                       AND email_verified = TRUE
                      """)) {
             statement.setString(1, normalizeEmail(email));
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     return Optional.empty();
                 }
-                return Optional.of(new AuthIdentity(
-                        resultSet.getString("id"),
-                        resultSet.getString("tenant_id"),
-                        resultSet.getString("user_id"),
-                        resultSet.getString("email"),
-                        resultSet.getString("full_name"),
-                        splitRoles(resultSet.getString("roles")),
-                        resultSet.getString("status")
-                ));
+                return Optional.of(toAuthIdentity(resultSet));
+            }
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not find auth identity by email", exception);
+        }
+    }
+
+    @Override
+    public Optional<AuthIdentity> findAnyIdentityByEmail(String email) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT id, tenant_id, user_id, email, full_name, roles, status, provider, provider_subject,
+                            preferred_username, first_name, last_name, picture_url, email_verified,
+                            accountant_tenant_ids
+                     FROM auth_identities
+                     WHERE email_normalized = ?
+                     """)) {
+            statement.setString(1, normalizeEmail(email));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(toAuthIdentity(resultSet));
             }
         } catch (SQLException exception) {
             throw new RepositoryException("Could not find auth identity by email", exception);
@@ -111,6 +128,13 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
                     status = ?,
                     password_hash = ?,
                     provider = ?,
+                    provider_subject = ?,
+                    preferred_username = ?,
+                    first_name = ?,
+                    last_name = ?,
+                    picture_url = ?,
+                    email_verified = ?,
+                    accountant_tenant_ids = ?,
                     updated_at = ?
                 WHERE email_normalized = ?
                 """)) {
@@ -121,9 +145,16 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
             statement.setString(5, String.join(",", identity.roles()));
             statement.setString(6, identity.status());
             statement.setString(7, "external:user-service");
-            statement.setString(8, "USER_SERVICE");
-            statement.setTimestamp(9, Timestamp.from(Instant.now()));
-            statement.setString(10, normalizedEmail);
+            statement.setString(8, blankToDefault(identity.provider(), "USER_SERVICE"));
+            statement.setString(9, identity.providerSubject());
+            statement.setString(10, identity.preferredUsername());
+            statement.setString(11, identity.firstName());
+            statement.setString(12, identity.lastName());
+            statement.setString(13, identity.pictureUrl());
+            statement.setBoolean(14, identity.emailVerified());
+            statement.setString(15, String.join(",", identity.accountantTenantIds()));
+            statement.setTimestamp(16, Timestamp.from(Instant.now()));
+            statement.setString(17, normalizedEmail);
             return statement.executeUpdate();
         }
     }
@@ -131,8 +162,10 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
     private void insertExternalIdentity(Connection connection, String identityId, AuthIdentity identity, String normalizedEmail) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO auth_identities
-                (id, tenant_id, user_id, email, email_normalized, full_name, password_hash, roles, status, provider, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, tenant_id, user_id, email, email_normalized, full_name, password_hash, roles, status,
+                 provider, provider_subject, preferred_username, first_name, last_name, picture_url,
+                 email_verified, accountant_tenant_ids, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, identityId);
             statement.setString(2, identity.tenantId());
@@ -143,21 +176,55 @@ public class JdbcAuthIdentityRepository implements AuthIdentityRepository {
             statement.setString(7, "external:user-service");
             statement.setString(8, String.join(",", identity.roles()));
             statement.setString(9, identity.status());
-            statement.setString(10, "USER_SERVICE");
-            statement.setTimestamp(11, Timestamp.from(Instant.now()));
+            statement.setString(10, blankToDefault(identity.provider(), "USER_SERVICE"));
+            statement.setString(11, identity.providerSubject());
+            statement.setString(12, identity.preferredUsername());
+            statement.setString(13, identity.firstName());
+            statement.setString(14, identity.lastName());
+            statement.setString(15, identity.pictureUrl());
+            statement.setBoolean(16, identity.emailVerified());
+            statement.setString(17, String.join(",", identity.accountantTenantIds()));
+            statement.setTimestamp(18, Timestamp.from(Instant.now()));
             statement.executeUpdate();
         }
+    }
+
+    private AuthIdentity toAuthIdentity(ResultSet resultSet) throws SQLException {
+        return new AuthIdentity(
+                resultSet.getString("id"),
+                resultSet.getString("tenant_id"),
+                resultSet.getString("user_id"),
+                resultSet.getString("email"),
+                resultSet.getString("full_name"),
+                splitList(resultSet.getString("roles")),
+                resultSet.getString("status"),
+                resultSet.getString("provider"),
+                resultSet.getString("provider_subject"),
+                resultSet.getString("preferred_username"),
+                resultSet.getString("first_name"),
+                resultSet.getString("last_name"),
+                resultSet.getString("picture_url"),
+                resultSet.getBoolean("email_verified"),
+                splitList(resultSet.getString("accountant_tenant_ids"))
+        );
     }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private List<String> splitRoles(String roles) {
-        return Arrays.stream(roles.split(","))
+    private List<String> splitList(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
                 .map(String::trim)
-                .filter(role -> !role.isEmpty())
+                .filter(item -> !item.isEmpty())
                 .sorted()
                 .toList();
+    }
+
+    private String blankToDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

@@ -356,6 +356,44 @@ export interface ConnectorStatus {
   totalOrders?: number
 }
 
+export interface IntegrationHealthSummary {
+  integration_name: string
+  current_status: 'UP' | 'DEGRADED' | 'DOWN'
+  last_check_at?: string
+  last_success_at?: string
+  last_failure_at?: string
+  last_failure_type?: ApiFailureType
+  avg_response_time_ms?: number
+  requests_24h: number
+  failures_24h: number
+  availability_pct_24h?: number
+}
+
+export type ApiFailureType =
+  | 'AUTH_FAILURE'
+  | 'TOKEN_EXPIRED'
+  | 'RATE_LIMIT'
+  | 'TIMEOUT'
+  | 'UNAVAILABLE'
+  | 'PAYLOAD_CHANGE'
+  | 'UNKNOWN'
+
+export interface IntegrationEventLog {
+  id: string
+  integration_name: string
+  occurred_at: string
+  endpoint: string
+  operation?: string
+  response_time_ms?: number
+  http_status?: number
+  outcome: 'SUCCESS' | 'FAILURE'
+  failure_type?: ApiFailureType
+  severity: 'INFO' | 'WARNING' | 'CRITICAL'
+  impact?: string
+  action_taken?: string
+  error_message?: string
+}
+
 export interface SyncJob {
   job_id: string
   tenant_id: string
@@ -400,7 +438,7 @@ export interface CoreOrder {
 export interface NotificationMessage {
   id: string
   tenantId?: string
-  type: 'NEW_SALE' | 'ML_PAYMENT_RELEASE' | 'MONTHLY_CLOSING_SUMMARY' | 'WEEKLY_ACCOUNTANT_REPORT'
+  type: 'NEW_SALE' | 'ML_PAYMENT_RELEASE' | 'MONTHLY_CLOSING_SUMMARY' | 'WEEKLY_ACCOUNTANT_REPORT' | 'API_INTEGRATION_ALERT'
   title: string
   message: string
   recipientEmail?: string
@@ -408,6 +446,7 @@ export interface NotificationMessage {
   status: 'UNREAD' | 'READ'
   readAt?: string
   createdAt: string
+  severity?: 'INFO' | 'WARNING' | 'CRITICAL'
 }
 
 export interface NotificationPreferences {

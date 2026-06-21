@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { LoginForm } from '@/features/auth'
 import { getDictionary } from '@/shared/i18n/get-dictionary'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
@@ -7,7 +7,7 @@ import type { Locale } from '@/shared/i18n/config'
 
 interface Props {
   params: Promise<{ lang: Locale }>
-  searchParams: Promise<{ expired?: string; error?: string }>
+  searchParams: Promise<{ expired?: string; error?: string; verified?: string; reset?: string }>
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function LoginPage({ params, searchParams }: Props) {
   const { lang } = await params
-  const { expired, error } = await searchParams
+  const { expired, error, verified, reset } = await searchParams
   const dict = await getDictionary(lang)
   const oauthError = googleAuthErrorMessage(error, dict.auth.login.errors)
 
@@ -52,7 +52,21 @@ export default async function LoginPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      <LoginForm dict={dict} />
+      {verified === '1' && (
+        <div className="animate-element flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3.5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <span>E-mail verificado com sucesso. Entre para continuar.</span>
+        </div>
+      )}
+
+      {reset === '1' && (
+        <div className="animate-element flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-3.5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <span>Senha redefinida com sucesso. Entre com sua nova senha.</span>
+        </div>
+      )}
+
+      <LoginForm dict={dict} lang={lang} />
 
       <p className="animate-element animate-delay-900 text-center text-sm text-muted-foreground">
         {dict.auth.login.noAccount}{' '}

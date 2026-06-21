@@ -1,9 +1,11 @@
 package com.example.infrastructure.messaging;
 
+import com.example.application.event.ApiIntegrationAlertEvent;
 import com.example.application.event.NewSaleEvent;
 import com.example.application.event.ReportEntryUpsertRequestedEvent;
 import com.example.application.event.SyncAllRequestedEvent;
 import com.example.application.service.ConnectorService;
+import com.example.infrastructure.client.ApiIntegrationAlertRequest;
 import com.example.infrastructure.client.NewSaleNotificationRequest;
 import com.example.infrastructure.client.NotificationRestClient;
 import com.example.infrastructure.client.ReportEntryIngestRequest;
@@ -78,6 +80,10 @@ public class CoreOutboxDispatcher {
                     ReportEntryUpsertRequestedEvent event = objectMapper.readValue(outboxEvent.payload(), ReportEntryUpsertRequestedEvent.class);
                     ingestReportEntry(event);
                 }
+                case "notification.api-integration-alert.v1" -> {
+                    ApiIntegrationAlertEvent event = objectMapper.readValue(outboxEvent.payload(), ApiIntegrationAlertEvent.class);
+                    notifyApiIntegrationAlert(event);
+                }
                 default -> throw new IllegalArgumentException("unsupported_outbox_event_type:" + outboxEvent.eventType());
             }
             outboxEventRepository.markPublished(outboxEvent.id());
@@ -130,6 +136,25 @@ public class CoreOutboxDispatcher {
         );
         try (Response response = reportingRestClient.ingest(internalToken, request)) {
             requireSuccess(response, "reporting-service");
+        }
+    }
+
+    private void notifyApiIntegrationAlert(ApiIntegrationAlertEvent event) {
+        ApiIntegrationAlertRequest request = new ApiIntegrationAlertRequest(
+                event.eventId(),
+                event.eventType(),
+                event.occurredAt(),
+                event.tenantId(),
+                event.recipientEmail(),
+                event.integrationName(),
+                event.endpoint(),
+                event.failureType(),
+                event.severity(),
+                event.impact(),
+                event.actionTaken()
+        );
+        try (Response response = notificationRestClient.apiIntegrationAlert(internalToken, request)) {
+            requireSuccess(response, "notification-service");
         }
     }
 

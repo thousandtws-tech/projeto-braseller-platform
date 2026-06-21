@@ -41,14 +41,16 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             connection.setAutoCommit(false);
             try {
                 insertTenant(connection, tenantId, legalName, tradeName, companyProfile);
-                insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, null, null, passwordHash, "PASSWORD", null, "ACTIVE");
+                insertUser(connection, userId, tenantId, email, normalizedEmail, adminName, null, null, passwordHash,
+                        "PASSWORD", null, "PENDING_EMAIL_VERIFICATION", false);
                 insertRole(connection, tenantId, userId, UserRole.ADMIN);
                 insertRole(connection, tenantId, userId, UserRole.VENDEDOR);
                 connection.commit();
                 return new RegisteredTenant(
                         toTenantView(tenantId, legalName, tradeName, companyProfile),
-                        new UserView(userId, tenantId, email, adminName, email, null, null, null, true,
-                                "PASSWORD", null, "ACTIVE", List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()), List.of())
+                        new UserView(userId, tenantId, email, adminName, email, null, null, null, false,
+                                "PASSWORD", null, "PENDING_EMAIL_VERIFICATION",
+                                List.of(UserRole.ADMIN.name(), UserRole.VENDEDOR.name()), List.of())
                 );
             } catch (SQLException exception) {
                 connection.rollback();
@@ -85,7 +87,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                 requireUser(connection, tenantId, grantedByUserId);
                 if (!userExists(connection, accountantUserId)) {
                     insertUser(connection, accountantUserId, tenantId, accountantEmail, normalizedEmail,
-                            accountantFullName, firstName, lastName, passwordHash, provider, providerSubject, status);
+                            accountantFullName, firstName, lastName, passwordHash, provider, providerSubject, status,
+                            "ACTIVE".equals(status));
                 }
                 ensureRole(connection, tenantId, accountantUserId, UserRole.CONTADOR);
 
@@ -244,10 +247,12 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                             email_verified, provider, provider_subject, password_hash, status
                      FROM user_accounts
                      WHERE email_normalized = ?
+                       AND email_verified = TRUE
                      """)) {
             statement.setString(1, normalizeEmail(email));
             try (ResultSet resultSet = statement.executeQuery()) {
-                if (!resultSet.next() || !"ACTIVE".equals(resultSet.getString("status"))) {
+                if (!resultSet.next() || !"ACTIVE".equals(resultSet.getString("status"))
+                        || !resultSet.getBoolean("email_verified")) {
                     return Optional.empty();
                 }
                 String tenantId = resultSet.getString("tenant_id");
@@ -270,6 +275,58 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             }
         } catch (SQLException exception) {
             throw new RepositoryException("Could not verify identity", exception);
+        }
+    }
+
+    @Override
+    public Optional<UserView> markEmailVerifiedByEmail(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        try (Connection connection = dataSource.getConnection()) {
+            int updated;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE user_accounts
+                    SET email_verified = TRUE,
+                        status = 'ACTIVE',
+                        updated_at = ?
+                    WHERE email_normalized = ?
+                    """)) {
+                statement.setTimestamp(1, Timestamp.from(Instant.now()));
+                statement.setString(2, normalizedEmail);
+                updated = statement.executeUpdate();
+            }
+            if (updated == 0) {
+                return Optional.empty();
+            }
+            return findUserByEmail(connection, normalizedEmail);
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not mark email as verified", exception);
+        }
+    }
+
+    @Override
+    public Optional<UserView> updatePasswordByEmail(String email, String passwordHash) {
+        String normalizedEmail = normalizeEmail(email);
+        try (Connection connection = dataSource.getConnection()) {
+            int updated;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE user_accounts
+                    SET password_hash = ?,
+                        updated_at = ?
+                    WHERE email_normalized = ?
+                      AND status = 'ACTIVE'
+                      AND email_verified = TRUE
+                    """)) {
+                statement.setString(1, passwordHash);
+                statement.setTimestamp(2, Timestamp.from(Instant.now()));
+                statement.setString(3, normalizedEmail);
+                updated = statement.executeUpdate();
+            }
+            if (updated == 0) {
+                return Optional.empty();
+            }
+            return findUserByEmail(connection, normalizedEmail);
+        } catch (SQLException exception) {
+            throw new RepositoryException("Could not reset user password", exception);
         }
     }
 
@@ -297,10 +354,10 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                         first_name = COALESCE(NULLIF(?, ''), first_name),
                         last_name = COALESCE(NULLIF(?, ''), last_name),
                         picture_url = COALESCE(NULLIF(?, ''), picture_url),
-                        email_verified = ?,
+                        email_verified = CASE WHEN ? THEN TRUE ELSE email_verified END,
+                        status = CASE WHEN ? THEN 'ACTIVE' ELSE status END,
                         updated_at = ?
                     WHERE email_normalized = ?
-                      AND status = 'ACTIVE'
                     """)) {
                 statement.setString(1, trimToEmpty(fullName));
                 statement.setString(2, provider);
@@ -310,14 +367,15 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
                 statement.setString(6, trimToEmpty(lastName));
                 statement.setString(7, trimToEmpty(pictureUrl));
                 statement.setBoolean(8, emailVerified);
-                statement.setTimestamp(9, Timestamp.from(Instant.now()));
-                statement.setString(10, normalizedEmail);
+                statement.setBoolean(9, emailVerified);
+                statement.setTimestamp(10, Timestamp.from(Instant.now()));
+                statement.setString(11, normalizedEmail);
                 updated = statement.executeUpdate();
             }
             if (updated == 0) {
                 return Optional.empty();
             }
-            return findActiveUserByEmail(connection, normalizedEmail);
+            return findUserByEmail(connection, normalizedEmail);
         } catch (SQLException exception) {
             throw new RepositoryException("Could not synchronize external profile", exception);
         }
@@ -384,7 +442,8 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             String passwordHash,
             String provider,
             String providerSubject,
-            String status
+            String status,
+            boolean emailVerified
     ) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO user_accounts
@@ -403,7 +462,7 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             statement.setString(9, provider);
             statement.setString(10, providerSubject);
             statement.setString(11, email);
-            statement.setBoolean(12, true);
+            statement.setBoolean(12, emailVerified);
             statement.setString(13, status);
             statement.setTimestamp(14, Timestamp.from(Instant.now()));
             statement.executeUpdate();

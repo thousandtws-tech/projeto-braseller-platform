@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 
 @QuarkusTest
@@ -23,10 +22,10 @@ class ExampleResourceTest {
     }
 
     @Test
-    void registersLogsInRefreshesAndLogsOutWithKeycloak() {
+    void registersRequiresEmailVerificationThenLogsInRefreshesAndLogsOutWithKeycloak() {
         String email = "auth-" + System.nanoTime() + "@brasaller.test";
 
-        String refreshToken = given()
+        given()
                 .contentType("application/json")
                 .body("""
                         {
@@ -38,18 +37,37 @@ class ExampleResourceTest {
                         """.formatted(email))
                 .when().post("/auth/register")
                 .then()
-                .statusCode(200)
-                .body("tokenType", is("Bearer"))
-                .body("refreshToken", startsWith("kc-refresh-"))
+                .statusCode(202)
                 .body("email", is(email))
-                .body("profile.provider", is("KEYCLOAK"))
-                .body("profile.email", is(email))
-                .body("profile.fullName", is("Auth Owner"))
-                .body("profile.subject", notNullValue())
-                .body("roles.size()", is(2))
-                .extract().path("refreshToken");
+                .body("status", is("PENDING_EMAIL_VERIFICATION"));
 
         given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/login")
+                .then()
+                .statusCode(401)
+                .body("message", is("email_not_verified"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "code": "123456"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/email-verification/verify")
+                .then()
+                .statusCode(200)
+                .body("message", is("email_verified"));
+
+        String refreshToken = given()
                 .contentType("application/json")
                 .body("""
                         {
@@ -65,7 +83,8 @@ class ExampleResourceTest {
                 .body("email", is(email))
                 .body("profile.provider", is("KEYCLOAK"))
                 .body("profile.email", is(email))
-                .body("profile.fullName", is("Auth Owner"));
+                .body("profile.fullName", is("Auth Owner"))
+                .extract().path("refreshToken");
 
         String renewedRefreshToken = given()
                 .contentType("application/json")
@@ -93,6 +112,103 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(200)
                 .body("revoked", is(true));
+    }
+
+    @Test
+    void passwordResetUsesSingleUseCode() {
+        String email = "reset-" + System.nanoTime() + "@brasaller.test";
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "tenantName": "Tenant Reset Test",
+                          "fullName": "Reset Owner",
+                          "email": "%s",
+                          "password": "ChangeMe123!"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/register")
+                .then()
+                .statusCode(202);
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "code": "123456"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/email-verification/verify")
+                .then()
+                .statusCode(200);
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/password-reset/request")
+                .then()
+                .statusCode(202)
+                .body("message", is("Se o e-mail existir, enviaremos instrucoes para redefinir a senha."));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "code": "123456"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/password-reset/validate")
+                .then()
+                .statusCode(200)
+                .body("valid", is(true));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "code": "123456",
+                          "newPassword": "NewChange123!"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/password-reset/reset")
+                .then()
+                .statusCode(200)
+                .body("message", is("password_reset"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "code": "123456",
+                          "newPassword": "Another123!"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/password-reset/reset")
+                .then()
+                .statusCode(400)
+                .body("message", is("invalid_or_expired_code"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s",
+                          "password": "NewChange123!"
+                        }
+                        """.formatted(email))
+                .when().post("/auth/login")
+                .then()
+                .statusCode(200)
+                .body("email", is(email));
     }
 
     @Test

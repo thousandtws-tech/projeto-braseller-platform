@@ -56,6 +56,10 @@ public interface UserIdentityRepository {
 
     Optional<StoredUserCredentials> findActiveCredentialsByEmail(String email);
 
+    Optional<UserView> markEmailVerifiedByEmail(String email);
+
+    Optional<UserView> updatePasswordByEmail(String email, String passwordHash);
+
     Optional<UserView> syncExternalProfile(String email, String provider, String providerSubject, String fullName,
                                            String preferredUsername, String firstName, String lastName,
                                            String pictureUrl, boolean emailVerified);

@@ -5,15 +5,17 @@ import { LockKeyhole, Plus } from 'lucide-react'
 import { Card, CardContent } from '@/shared/ui/card'
 import { ReadOnlyLock } from '@/shared/ui/read-only-lock'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 import { AddMarketplaceDialog } from './add-marketplace-dialog'
 
 interface Props {
   existingConnectors: string[]
   readOnly?: boolean
   dict: Dictionary
+  lang: Locale
 }
 
-export function AddMarketplaceCard({ existingConnectors, readOnly = false, dict }: Props) {
+export function AddMarketplaceCard({ existingConnectors, readOnly = false, dict, lang }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -46,6 +48,7 @@ export function AddMarketplaceCard({ existingConnectors, readOnly = false, dict 
         onOpenChange={setOpen}
         existingConnectors={existingConnectors}
         dict={dict}
+        lang={lang}
       />
     </>
   )

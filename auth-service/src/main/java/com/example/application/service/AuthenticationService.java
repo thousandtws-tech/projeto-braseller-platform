@@ -20,6 +20,7 @@ import com.example.domain.model.AuthTokenSet;
 import com.example.domain.model.IssuedTokens;
 import com.example.domain.model.KeycloakIdentity;
 import com.example.domain.model.KeycloakTokenResponse;
+import com.example.domain.model.RegistrationAccepted;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -38,10 +39,13 @@ public class AuthenticationService {
     @Inject
     KeycloakOAuthClient keycloakOAuthClient;
 
+    @Inject
+    AuthChallengeService authChallengeService;
+
     @ConfigProperty(name = "auth.keycloak.require-email-verified")
     boolean requireKeycloakEmailVerified;
 
-    public AuthTokenSet register(RegisterCommand command) {
+    public RegistrationAccepted register(RegisterCommand command) {
         if (isBlank(command.tenantName()) || isBlank(command.fullName()) || isBlank(command.email())
                 || isWeakPassword(command.password())) {
             throw new ValidationException(
@@ -50,9 +54,9 @@ public class AuthenticationService {
 
         AuthIdentity identity = authIdentityRepository.synchronize(userIdentityGateway.registerTenant(command));
         keycloakOAuthClient.createPasswordUser(identity, command.password());
-        KeycloakTokenResponse tokenResponse = keycloakOAuthClient.passwordGrant(identity.email(), command.password());
-        KeycloakIdentity keycloakIdentity = keycloakOAuthClient.userInfo(tokenResponse.accessToken());
-        return finishKeycloakSession(identity, keycloakIdentity, tokenResponse);
+        authChallengeService.sendRegistrationVerification(identity);
+        return new RegistrationAccepted(identity.email(), "PENDING_EMAIL_VERIFICATION",
+                "Cadastro criado. Verifique seu e-mail para ativar a conta.");
     }
 
     public AuthTokenSet login(LoginCommand command) {
@@ -63,8 +67,9 @@ public class AuthenticationService {
         KeycloakTokenResponse tokenResponse = keycloakOAuthClient.passwordGrant(command.email(), command.password());
         KeycloakIdentity keycloakIdentity = keycloakOAuthClient.userInfo(tokenResponse.accessToken());
 
-        AuthIdentity identity = authIdentityRepository.findIdentityByEmail(keycloakIdentity.email())
+        AuthIdentity identity = authIdentityRepository.findAnyIdentityByEmail(keycloakIdentity.email())
                 .orElseGet(() -> provisionIdentityFromUserService(keycloakIdentity));
+        requireLoginAllowed(identity);
 
         return finishKeycloakSession(identity, keycloakIdentity, tokenResponse);
     }
@@ -93,8 +98,14 @@ public class AuthenticationService {
             throw new AuthenticationException("keycloak_email_not_verified");
         }
 
-        AuthIdentity identity = authIdentityRepository.findIdentityByEmail(keycloakIdentity.email())
+        AuthIdentity identity = authIdentityRepository.findAnyIdentityByEmail(keycloakIdentity.email())
                 .orElseGet(() -> registerKeycloakIdentity(keycloakIdentity, tenantName));
+        if (keycloakIdentity.emailVerified() && needsEmailVerification(identity)) {
+            identity = userIdentityGateway.markEmailVerified(identity.email())
+                    .map(authIdentityRepository::synchronize)
+                    .orElse(identity);
+        }
+        requireLoginAllowed(identity);
         return finishKeycloakSession(identity, keycloakIdentity, tokenResponse);
     }
 
@@ -119,7 +130,13 @@ public class AuthenticationService {
                 null,
                 null,
                 null));
-        return authIdentityRepository.synchronize(identity);
+        AuthIdentity synchronizedIdentity = authIdentityRepository.synchronize(identity);
+        if (keycloakIdentity.emailVerified()) {
+            return userIdentityGateway.markEmailVerified(synchronizedIdentity.email())
+                    .map(authIdentityRepository::synchronize)
+                    .orElse(synchronizedIdentity);
+        }
+        return synchronizedIdentity;
     }
 
     public AuthTokenSet refresh(RefreshTokenCommand command) {
@@ -151,6 +168,7 @@ public class AuthenticationService {
     private AuthTokenSet finishKeycloakSession(AuthIdentity identity, KeycloakIdentity keycloakIdentity,
             KeycloakTokenResponse tokenResponse) {
         AuthIdentity synchronizedIdentity = synchronizeKeycloakProfile(identity, keycloakIdentity);
+        requireLoginAllowed(synchronizedIdentity);
         authIdentityRepository.linkProviderSubject(synchronizedIdentity.email(), "KEYCLOAK",
                 keycloakIdentity.subject());
         keycloakOAuthClient.synchronizeUser(synchronizedIdentity, keycloakIdentity.subject());
@@ -203,6 +221,23 @@ public class AuthenticationService {
                 keycloakIdentity.emailVerified()))
                 .map(authIdentityRepository::synchronize)
                 .orElse(fallback);
+    }
+
+    private void requireLoginAllowed(AuthIdentity identity) {
+        if (identity == null) {
+            throw new AuthenticationException("invalid_credentials");
+        }
+        if ("BLOCKED".equals(identity.status())) {
+            throw new AuthenticationException("account_blocked");
+        }
+        if (!"ACTIVE".equals(identity.status()) || !identity.emailVerified()) {
+            throw new AuthenticationException("email_not_verified");
+        }
+    }
+
+    private boolean needsEmailVerification(AuthIdentity identity) {
+        return identity != null
+                && (!identity.emailVerified() || "PENDING_EMAIL_VERIFICATION".equals(identity.status()));
     }
 
     private boolean isBlank(String value) {

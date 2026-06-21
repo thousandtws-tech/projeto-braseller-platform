@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
 import { Check, Monitor, Moon, Sun } from 'lucide-react'
 
@@ -24,14 +24,23 @@ const OPTIONS = [
   { value: 'system', icon: Monitor },
 ] as const
 
+function subscribeMounted(onStoreChange: () => void) {
+  const timeoutId = window.setTimeout(onStoreChange, 0)
+  return () => window.clearTimeout(timeoutId)
+}
+
+function getMountedSnapshot() {
+  return true
+}
+
+function getServerMountedSnapshot() {
+  return false
+}
+
 export function ThemeToggle({ dict }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(subscribeMounted, getMountedSnapshot, getServerMountedSnapshot)
   const t = dict.header.theme
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   return (
     <DropdownMenu>

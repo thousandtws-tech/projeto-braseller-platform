@@ -238,6 +238,66 @@ public class UserResource {
     }
 
     @POST
+    @Path("/internal/identity/by-email")
+    @Operation(summary = "Buscar identidade por e-mail", description = "Endpoint interno usado pelo auth-service em fluxos de validacao e recuperacao.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = IdentityEmailRequest.class)))
+    public Response findIdentityByEmail(@HeaderParam("X-Internal-Token") String providedInternalToken,
+                                        IdentityEmailRequest request) {
+        try {
+            return userIdentityService.findIdentityByEmail(providedInternalToken, request.email())
+                    .map(this::ok)
+                    .orElseGet(() -> Response.status(Response.Status.NOT_FOUND)
+                            .entity(new RestError("user_not_found"))
+                            .build());
+        } catch (ForbiddenException exception) {
+            return Response.status(Response.Status.FORBIDDEN).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @POST
+    @Path("/internal/identity/mark-email-verified")
+    @Operation(summary = "Marcar e-mail como verificado", description = "Endpoint interno usado pelo auth-service apos validacao de codigo.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = IdentityEmailRequest.class)))
+    public Response markEmailVerified(@HeaderParam("X-Internal-Token") String providedInternalToken,
+                                      IdentityEmailRequest request) {
+        try {
+            return userIdentityService.markEmailVerified(providedInternalToken, request.email())
+                    .map(this::ok)
+                    .orElseGet(() -> Response.status(Response.Status.NOT_FOUND)
+                            .entity(new RestError("user_not_found"))
+                            .build());
+        } catch (ForbiddenException exception) {
+            return Response.status(Response.Status.FORBIDDEN).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @POST
+    @Path("/internal/identity/reset-password")
+    @Operation(summary = "Redefinir senha internamente", description = "Endpoint interno usado pelo auth-service depois de validar codigo de recuperacao.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ResetPasswordRequest.class)))
+    public Response resetPassword(@HeaderParam("X-Internal-Token") String providedInternalToken,
+                                  ResetPasswordRequest request) {
+        try {
+            return userIdentityService.resetPassword(providedInternalToken, request.email(), request.newPassword())
+                    .map(this::ok)
+                    .orElseGet(() -> Response.status(Response.Status.NOT_FOUND)
+                            .entity(new RestError("user_not_found"))
+                            .build());
+        } catch (ForbiddenException exception) {
+            return Response.status(Response.Status.FORBIDDEN).entity(new RestError(exception.getMessage())).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @POST
     @Path("/internal/identity/sync-profile")
     @Operation(summary = "Sincronizar perfil externo", description = "Endpoint interno usado pelo auth-service para persistir dados de perfil vindos de Keycloak/Google.")
     @SecurityRequirement(name = "internalToken")
@@ -323,6 +383,14 @@ public class UserResource {
 
     @Schema(name = "VerifyPasswordRequest", description = "Credenciais validadas internamente pelo auth-service.")
     public record VerifyPasswordRequest(String email, String password) {
+    }
+
+    @Schema(name = "IdentityEmailRequest", description = "E-mail de identidade usado em endpoints internos.")
+    public record IdentityEmailRequest(String email) {
+    }
+
+    @Schema(name = "ResetPasswordRequest", description = "Nova senha validada pelo auth-service apos desafio de recuperacao.")
+    public record ResetPasswordRequest(String email, String newPassword) {
     }
 
     @Schema(name = "SyncExternalProfileRequest", description = "Dados de perfil externo sincronizados pelo auth-service.")

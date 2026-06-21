@@ -22,6 +22,7 @@ import {
   BriefcaseBusiness,
   Scale,
   Search,
+  Activity,
 } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
@@ -51,6 +52,7 @@ export function Sidebar({ user, dict, lang }: SidebarProps) {
     { href: 'dre', label: dict.nav.dre, icon: BarChart3 },
     { href: 'balanco', label: dict.nav.balanco, icon: Scale },
     { href: 'conectores', label: dict.nav.conectores, icon: Store },
+    { href: 'monitoramento-apis', label: dict.nav.monitoramentoApis, icon: Activity },
   ]
 
   const items = isBpoOperator(user.roles)

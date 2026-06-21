@@ -61,8 +61,9 @@ class ExampleResourceTest {
                 .body("adminUser.email", is(email))
                 .body("adminUser.fullName", is("Owner Test"))
                 .body("adminUser.preferredUsername", is(email))
-                .body("adminUser.emailVerified", is(true))
+                .body("adminUser.emailVerified", is(false))
                 .body("adminUser.provider", is("PASSWORD"))
+                .body("adminUser.status", is("PENDING_EMAIL_VERIFICATION"))
                 .body("adminUser.roles.size()", is(2));
     }
 
@@ -97,6 +98,20 @@ class ExampleResourceTest {
                 .then()
                 .statusCode(403)
                 .body("message", is("invalid_internal_token"));
+
+        given()
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .contentType("application/json")
+                .body("""
+                        {
+                          "email": "%s"
+                        }
+                        """.formatted(email))
+                .when().post("/users/internal/identity/mark-email-verified")
+                .then()
+                .statusCode(200)
+                .body("emailVerified", is(true))
+                .body("status", is("ACTIVE"));
 
         given()
                 .header("X-Internal-Token", "dev-internal-token-change-me")

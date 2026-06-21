@@ -266,6 +266,7 @@ locals {
 
       GATEWAY_DOWNSTREAM_CONNECT_TIMEOUT_MS = tostring(var.gateway_downstream_connect_timeout_ms)
       GATEWAY_DOWNSTREAM_READ_TIMEOUT_MS    = tostring(var.gateway_downstream_read_timeout_ms)
+      MERCADO_LIVRE_FRONTEND_CALLBACK_URL   = var.mercado_livre_frontend_callback_url
       SWAGGER_UI_ENABLED                    = "true"
     }
   }

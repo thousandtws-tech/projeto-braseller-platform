@@ -3,16 +3,26 @@ package com.example.interfaces.rest;
 import com.example.application.command.LoginCommand;
 import com.example.application.command.RefreshTokenCommand;
 import com.example.application.command.RegisterCommand;
+import com.example.application.command.RequestEmailVerificationCommand;
+import com.example.application.command.RequestPasswordResetCommand;
+import com.example.application.command.ResetPasswordCommand;
+import com.example.application.command.ValidatePasswordResetCommand;
+import com.example.application.command.VerifyEmailCommand;
 import com.example.application.exception.AuthenticationException;
 import com.example.application.exception.FeatureNotConfiguredException;
 import com.example.application.exception.IdentityGatewayException;
 import com.example.application.exception.ValidationException;
+import com.example.application.service.AuthChallengeService;
 import com.example.application.service.AuthenticationService;
 import com.example.application.service.KeycloakOAuthService;
+import com.example.domain.model.AuthChallengeAccepted;
 import com.example.domain.model.AuthTokenSet;
+import com.example.domain.model.CodeValidationResult;
+import com.example.domain.model.RegistrationAccepted;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -37,6 +47,9 @@ public class AuthResource {
     @Inject
     KeycloakOAuthService keycloakOAuthService;
 
+    @Inject
+    AuthChallengeService authChallengeService;
+
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     @Operation(summary = "Status do auth-service", description = "Verifica se o auth-service esta respondendo.")
@@ -47,11 +60,11 @@ public class AuthResource {
 
     @POST
     @Path("/register")
-    @Operation(summary = "Cadastrar vendedor", description = "Cria tenant/usuario no user-service, cria o usuario no Keycloak e emite JWT da plataforma com refresh token Keycloak.")
+    @Operation(summary = "Cadastrar vendedor", description = "Cria tenant/usuario pendente, cria o usuario no Keycloak e envia codigo de verificacao de e-mail.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RegisterRequest.class)))
     @APIResponses({
-            @APIResponse(responseCode = "200", description = "Cadastro realizado e tokens emitidos.",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = AuthTokenSet.class))),
+            @APIResponse(responseCode = "202", description = "Cadastro criado e aguardando verificacao de e-mail.",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RegistrationAccepted.class))),
             @APIResponse(responseCode = "400", description = "Payload invalido.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
             @APIResponse(responseCode = "409", description = "E-mail/tenant em conflito.",
@@ -61,7 +74,7 @@ public class AuthResource {
     })
     public Response register(RegisterRequest request) {
         try {
-            return Response.ok(authenticationService.register(new RegisterCommand(
+            return Response.status(Response.Status.ACCEPTED).entity(authenticationService.register(new RegisterCommand(
                     request.tenantName(),
                     request.fullName(),
                     request.email(),
@@ -83,6 +96,89 @@ public class AuthResource {
             return badRequest(exception.getMessage());
         } catch (FeatureNotConfiguredException exception) {
             return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
+        } catch (AuthenticationException exception) {
+            return Response.status(Response.Status.BAD_GATEWAY).entity(new RestError(exception.getMessage())).build();
+        } catch (IdentityGatewayException exception) {
+            return identityGatewayFailure(exception);
+        }
+    }
+
+    @POST
+    @Path("/email-verification/request")
+    @Operation(summary = "Solicitar codigo de verificacao de e-mail", description = "Envia codigo de verificacao quando o e-mail existe e esta pendente. A resposta e generica.")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = EmailRequest.class)))
+    public Response requestEmailVerification(@HeaderParam("X-Forwarded-For") String forwardedFor,
+                                             EmailRequest request) {
+        try {
+            AuthChallengeAccepted accepted = authChallengeService.requestEmailVerification(
+                    new RequestEmailVerificationCommand(request.email(), clientIp(forwardedFor)));
+            return Response.accepted(accepted).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        } catch (IdentityGatewayException exception) {
+            return identityGatewayFailure(exception);
+        }
+    }
+
+    @POST
+    @Path("/email-verification/verify")
+    @Operation(summary = "Validar codigo de verificacao de e-mail", description = "Consome codigo valido, marca usuario como ativo/verificado e sincroniza Keycloak.")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = CodeRequest.class)))
+    public Response verifyEmail(CodeRequest request) {
+        try {
+            authChallengeService.verifyEmail(new VerifyEmailCommand(request.email(), request.code()));
+            return Response.ok(new SimpleMessage("email_verified")).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        } catch (AuthenticationException exception) {
+            return Response.status(Response.Status.BAD_GATEWAY).entity(new RestError(exception.getMessage())).build();
+        } catch (IdentityGatewayException exception) {
+            return identityGatewayFailure(exception);
+        }
+    }
+
+    @POST
+    @Path("/password-reset/request")
+    @Operation(summary = "Solicitar recuperacao de senha", description = "Envia codigo de redefinicao quando o e-mail existe e esta ativo. A resposta e generica.")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = EmailRequest.class)))
+    public Response requestPasswordReset(@HeaderParam("X-Forwarded-For") String forwardedFor,
+                                         EmailRequest request) {
+        try {
+            AuthChallengeAccepted accepted = authChallengeService.requestPasswordReset(
+                    new RequestPasswordResetCommand(request.email(), clientIp(forwardedFor)));
+            return Response.accepted(accepted).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        } catch (IdentityGatewayException exception) {
+            return identityGatewayFailure(exception);
+        }
+    }
+
+    @POST
+    @Path("/password-reset/validate")
+    @Operation(summary = "Validar codigo de recuperacao", description = "Confirma se o codigo de recuperacao ainda e valido sem consumi-lo.")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = CodeRequest.class)))
+    public Response validatePasswordReset(CodeRequest request) {
+        try {
+            CodeValidationResult result = authChallengeService.validatePasswordReset(
+                    new ValidatePasswordResetCommand(request.email(), request.code()));
+            return Response.ok(result).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
+        }
+    }
+
+    @POST
+    @Path("/password-reset/reset")
+    @Operation(summary = "Redefinir senha", description = "Consome codigo valido e redefine senha local/Keycloak.")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ResetPasswordRequest.class)))
+    public Response resetPassword(ResetPasswordRequest request) {
+        try {
+            authChallengeService.resetPassword(
+                    new ResetPasswordCommand(request.email(), request.code(), request.newPassword()));
+            return Response.ok(new SimpleMessage("password_reset")).build();
+        } catch (ValidationException exception) {
+            return badRequest(exception.getMessage());
         } catch (AuthenticationException exception) {
             return Response.status(Response.Status.BAD_GATEWAY).entity(new RestError(exception.getMessage())).build();
         } catch (IdentityGatewayException exception) {
@@ -224,6 +320,13 @@ public class AuthResource {
         return badRequest(exception.getMessage());
     }
 
+    private String clientIp(String forwardedFor) {
+        if (forwardedFor == null || forwardedFor.isBlank()) {
+            return null;
+        }
+        return forwardedFor.split(",", 2)[0].trim();
+    }
+
     @Schema(name = "AuthRegisterRequest", description = "Dados para criar tenant e usuario administrador inicial.")
     public record RegisterRequest(
             String tenantName,
@@ -247,6 +350,22 @@ public class AuthResource {
 
     @Schema(name = "AuthLoginRequest", description = "Credenciais de e-mail/senha autenticadas no Keycloak.")
     public record LoginRequest(String email, String password) {
+    }
+
+    @Schema(name = "AuthEmailRequest", description = "E-mail usado em fluxos de verificacao e recuperacao.")
+    public record EmailRequest(String email) {
+    }
+
+    @Schema(name = "AuthCodeRequest", description = "E-mail e codigo de uso unico.")
+    public record CodeRequest(String email, String code) {
+    }
+
+    @Schema(name = "AuthResetPasswordRequest", description = "Codigo de recuperacao e nova senha.")
+    public record ResetPasswordRequest(String email, String code, String newPassword) {
+    }
+
+    @Schema(name = "AuthSimpleMessage", description = "Resposta simples de sucesso.")
+    public record SimpleMessage(String message) {
     }
 
     @Schema(name = "AuthRefreshRequest", description = "Refresh token emitido pelo Keycloak e retornado pelo auth-service.")

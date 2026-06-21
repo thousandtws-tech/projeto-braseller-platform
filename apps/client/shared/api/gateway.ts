@@ -6,6 +6,8 @@ import type {
   ConnectorStatus,
   CoreConnector,
   CoreOrder,
+  IntegrationHealthSummary,
+  IntegrationEventLog,
   SyncJob,
   NotificationMessage,
   NotificationPreferences,
@@ -723,6 +725,27 @@ export async function getConnectors(token: string): Promise<ConnectorStatus[]> {
   } catch {
     return []
   }
+}
+
+export async function getIntegrationsHealth(token: string): Promise<IntegrationHealthSummary[]> {
+  try {
+    return await apiFetch<IntegrationHealthSummary[]>(
+      '/api/core/integrations/health',
+      { cache: 'no-store' },
+      token
+    )
+  } catch { return [] }
+}
+
+export async function getIntegrationLogs(token: string, integrationName: string, severity?: string): Promise<IntegrationEventLog[]> {
+  const qs = severity ? `?severity=${encodeURIComponent(severity)}` : ''
+  try {
+    return await apiFetch<IntegrationEventLog[]>(
+      `/api/core/integrations/${encodeURIComponent(integrationName)}/logs${qs}`,
+      { cache: 'no-store' },
+      token
+    )
+  } catch { return [] }
 }
 
 export async function syncConnector(token: string, connectorName: string, since?: string): Promise<string> {

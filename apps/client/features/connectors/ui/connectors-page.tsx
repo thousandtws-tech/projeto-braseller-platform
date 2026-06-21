@@ -90,7 +90,7 @@ export default async function ConectoresPage({ params, searchParams }: Props) {
         {connectors.map((connector) => (
           <ConnectorCard key={connector.name} connector={connector} readOnly={readOnly} dict={dict} lang={lang} />
         ))}
-        <AddMarketplaceCard existingConnectors={connectors.map((c) => c.name)} readOnly={readOnly} dict={dict} />
+        <AddMarketplaceCard existingConnectors={connectors.map((c) => c.name)} readOnly={readOnly} dict={dict} lang={lang} />
       </div>
 
       {/* Tabela de conectores ativos */}

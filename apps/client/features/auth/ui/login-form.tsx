@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useActionState, useState } from 'react'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { loginAction } from '@/features/auth/server/actions'
@@ -8,12 +9,14 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { GlassInputWrapper } from '@/shared/ui/glass-input-wrapper'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
+import type { Locale } from '@/shared/i18n/config'
 
 interface Props {
   dict: Dictionary
+  lang: Locale
 }
 
-export function LoginForm({ dict }: Props) {
+export function LoginForm({ dict, lang }: Props) {
   const [state, formAction, isPending] = useActionState(loginAction, null)
   const [showPassword, setShowPassword] = useState(false)
   const form = dict.auth.login.form
@@ -47,13 +50,12 @@ export function LoginForm({ dict }: Props) {
       <div className="animate-element animate-delay-400 space-y-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">{form.password}</Label>
-          <a
-            href="#"
-            tabIndex={-1}
+          <Link
+            href={`/${lang}/forgot-password`}
             className="text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             {form.forgotPassword}
-          </a>
+          </Link>
         </div>
         <GlassInputWrapper>
           <div className="relative">
@@ -97,7 +99,7 @@ export function LoginForm({ dict }: Props) {
         <span className="absolute bg-background px-2 text-xs text-muted-foreground uppercase">{form.orContinueWith}</span>
       </div>
 
-      <a
+      <Link
         href="/api/auth/google/authorize"
         aria-disabled={isPending}
         className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-3 text-sm font-medium transition-colors hover:bg-accent aria-disabled:pointer-events-none aria-disabled:opacity-50"
@@ -109,7 +111,7 @@ export function LoginForm({ dict }: Props) {
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
         </svg>
         Google
-      </a>
+      </Link>
     </form>
   )
 }

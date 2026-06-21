@@ -12,5 +12,6 @@ public record NotificationMessage(
         NotificationChannel channel,
         NotificationStatus status,
         Instant readAt,
-        Instant createdAt) {
+        Instant createdAt,
+        String severity) {
 }
