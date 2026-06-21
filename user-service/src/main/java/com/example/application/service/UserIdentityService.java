@@ -21,16 +21,22 @@ import com.example.domain.model.UserView;
 import com.example.infrastructure.keycloak.KeycloakAdminClient;
 import com.example.infrastructure.keycloak.KeycloakIntegrationException;
 import com.example.infrastructure.persistence.RepositoryException;
+import io.quarkus.cache.CacheInvalidate;
+import io.quarkus.cache.CacheInvalidateAll;
+import io.quarkus.cache.CacheResult;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 @ApplicationScoped
 public class UserIdentityService {
-    private static final String DEFAULT_TEMPORARY_PASSWORD = "ChangeMe123!";
+
+    private static final Logger LOG = Logger.getLogger(UserIdentityService.class.getName());
 
     @Inject
     UserIdentityRepository userIdentityRepository;
@@ -44,6 +50,7 @@ public class UserIdentityService {
     @Inject
     KeycloakAdminClient keycloakAdminClient;
 
+    @CacheInvalidate(cacheName = "user-members")
     public RegisteredTenant registerTenant(RegisterTenantCommand command) {
         if (isBlank(command.legalName()) || isBlank(command.adminName()) || isBlank(command.email()) || isWeakPassword(command.password())) {
             throw new ValidationException("legalName, adminName, email and a password with at least 8 characters are required");
@@ -74,7 +81,9 @@ public class UserIdentityService {
         }
     }
 
+    @CacheInvalidate(cacheName = "user-members")
     public AccountantAccessView grantAccountantAccess(GrantAccountantAccessCommand command) {
+        LOG.info("Granting accountant access to " + command.email());
         if (isBlank(command.email()) || isBlank(command.firstName()) || isBlank(command.lastName())
                 || isBlank(command.grantedByUserId())) {
             throw new ValidationException("email, firstName, lastName and grantedByUserId are required");
@@ -129,7 +138,9 @@ public class UserIdentityService {
         }
     }
 
+    @CacheResult(cacheName = "user-members")
     public List<UserView> listTenantMembers(String tenantId) {
+        LOG.fine("Listing members for tenant " + tenantId);
         return userIdentityRepository.listTenantUsers(tenantId);
     }
 
@@ -167,6 +178,7 @@ public class UserIdentityService {
         return userIdentityRepository.findUserByEmail(email.trim());
     }
 
+    @CacheInvalidateAll(cacheName = "user-members")
     public Optional<UserView> markEmailVerified(String internalToken, String email) {
         if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
             throw new ForbiddenException("invalid_internal_token");
@@ -189,6 +201,7 @@ public class UserIdentityService {
         return userIdentityRepository.updatePasswordByEmail(email.trim(), passwordHasher.hash(newPassword));
     }
 
+    @CacheInvalidateAll(cacheName = "user-members")
     public Optional<UserView> syncExternalProfile(String internalToken, SyncExternalProfileCommand command) {
         if (!internalServiceAuthorizer.isAuthorized(internalToken)) {
             throw new ForbiddenException("invalid_internal_token");

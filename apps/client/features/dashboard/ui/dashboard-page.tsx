@@ -67,6 +67,13 @@ export default async function DashboardPage({ params }: PageProps) {
   const dict = await getDictionary(lang)
   const period = getCurrentPeriod(lang)
 
+  // Prefetch data for all sections to avoid waterfall
+  const [summary, dashboardData, entries] = tenantId ? await Promise.all([
+    getReportsSummary(token, tenantId, { from: period.from, to: period.to }),
+    getDashboard(token, tenantId),
+    getReportEntries(token, tenantId)
+  ]) : [null, null, []]
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-6 py-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -82,27 +89,19 @@ export default async function DashboardPage({ params }: PageProps) {
         <PeriodSelector dict={dict} period={period} />
       </div>
 
-      <Suspense fallback={<KpiSkeleton />}>
-        <KpiSection
-          token={token}
-          tenantId={tenantId}
-          period={period}
-          dict={dict}
-        />
-      </Suspense>
+      <KpiCards summary={summary} dict={dict} />
 
-      <Suspense fallback={<ChartSkeleton />}>
-        <ChartsSection token={token} tenantId={tenantId} dict={dict} />
-      </Suspense>
+      <ChartsSection 
+        dashboardData={dashboardData} 
+        entries={entries} 
+        dict={dict} 
+      />
 
-      <Suspense fallback={<OrdersSkeleton />}>
-        <RecentOrdersSection
-          token={token}
-          tenantId={tenantId}
-          dict={dict}
-          lang={lang}
-        />
-      </Suspense>
+      <RecentOrdersTable 
+        orders={dashboardData?.recentOrders ?? []} 
+        dict={dict} 
+        lang={lang} 
+      />
     </div>
   )
 }
@@ -123,27 +122,6 @@ function PeriodSelector({
       buttonClassName="h-10 w-44 rounded-xl border-slate-200 bg-white text-sm capitalize shadow-sm hover:bg-slate-50"
     />
   )
-}
-
-async function KpiSection({
-  token,
-  tenantId,
-  period,
-  dict,
-}: {
-  token: string
-  tenantId?: string
-  period: { from: string; to: string }
-  dict: Dictionary
-}) {
-  const summary = tenantId
-    ? await getReportsSummary(token, tenantId, {
-        from: period.from,
-        to: period.to,
-      })
-    : null
-
-  return <KpiCards summary={summary} dict={dict} />
 }
 
 function KpiCards({
@@ -216,18 +194,15 @@ function KpiCards({
 }
 
 async function ChartsSection({
-  token,
-  tenantId,
+  dashboardData,
+  entries,
   dict,
 }: {
-  token: string
-  tenantId?: string
+  dashboardData: DashboardView | null
+  entries: ReportEntry[]
   dict: Dictionary
 }) {
-  const [data, entries] = await Promise.all([
-    getDashboard(token, tenantId),
-    getReportEntries(token, tenantId),
-  ])
+  if (!dashboardData) return null
 
   const byPlatform: Record<string, number> = {}
 
@@ -245,11 +220,11 @@ async function ChartsSection({
       percentage: totalGross > 0 ? Math.round((amount / totalGross) * 100) : 0,
     }))
 
-  const breakdown = realBreakdown.length > 0 ? realBreakdown : data.platformBreakdown
+  const breakdown = realBreakdown.length > 0 ? realBreakdown : dashboardData.platformBreakdown
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <RevenueChart data={data} dict={dict} />
+      <RevenueChart data={dashboardData} dict={dict} />
       <PlatformBreakdown breakdown={breakdown} dict={dict} />
     </div>
   )
@@ -380,22 +355,6 @@ function PlatformBreakdown({
       </CardContent>
     </Card>
   )
-}
-
-async function RecentOrdersSection({
-  token,
-  tenantId,
-  dict,
-  lang,
-}: {
-  token: string
-  tenantId?: string
-  dict: Dictionary
-  lang: Locale
-}) {
-  const data = await getDashboard(token, tenantId)
-
-  return <RecentOrdersTable orders={data.recentOrders} dict={dict} lang={lang} />
 }
 
 function RecentOrdersTable({

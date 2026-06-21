@@ -15,15 +15,19 @@ import com.example.domain.model.ReportEntry;
 import com.example.domain.model.ReportEntryPage;
 import com.example.domain.model.ReportEntryStatus;
 import com.example.domain.model.ReportFilter;
+import io.quarkus.cache.CacheInvalidateAll;
+import io.quarkus.cache.CacheResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.logging.Logger;
 
 @ApplicationScoped
 public class ReportingService {
+    private static final Logger LOG = Logger.getLogger(ReportingService.class.getName());
     private static final BigDecimal ZERO = new BigDecimal("0.00");
 
     private final ReportEntryRepository repository;
@@ -35,7 +39,10 @@ public class ReportingService {
         this.fiscalAccountingRepository = fiscalAccountingRepository;
     }
 
+    @CacheInvalidateAll(cacheName = "reporting-dashboard")
+    @CacheInvalidateAll(cacheName = "reporting-summary")
     public ReportEntry upsert(UpsertReportEntryCommand command) {
+        LOG.info("Upserting report entry for tenant " + command.tenantId());
         UpsertReportEntryCommand normalized = normalize(command);
         if (fiscalAccountingRepository.isPeriodClosed(normalized.tenantId(), normalized.saleDate())) {
             throw new AccountingPeriodClosedException("accounting_period_closed");
@@ -43,7 +50,9 @@ public class ReportingService {
         return repository.upsert(normalized);
     }
 
+    @CacheResult(cacheName = "reporting-dashboard")
     public DashboardView dashboard(String tenantId, ReportFilter filter) {
+        LOG.fine("Calculating dashboard for tenant " + tenantId);
         return new DashboardView(
                 summary(tenantId, filter),
                 entries(tenantId, filter),
@@ -53,7 +62,9 @@ public class ReportingService {
         );
     }
 
+    @CacheResult(cacheName = "reporting-summary")
     public FinancialSummary summary(String tenantId, ReportFilter filter) {
+        LOG.fine("Summarizing financial data for tenant " + tenantId);
         return repository.summarize(requireText(tenantId, "tenantId"), filter);
     }
 

@@ -141,7 +141,23 @@ public class JdbcUserIdentityRepository implements UserIdentityRepository {
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     String userId = resultSet.getString("id");
-                    users.add(toUserView(connection, resultSet, tenantId, userId));
+                    String email = resultSet.getString("email");
+                    users.add(new UserView(
+                            userId,
+                            tenantId,
+                            email,
+                            resultSet.getString("full_name"),
+                            resultSet.getString("preferred_username"),
+                            resultSet.getString("first_name"),
+                            resultSet.getString("last_name"),
+                            resultSet.getString("picture_url"),
+                            resultSet.getBoolean("email_verified"),
+                            resultSet.getString("provider"),
+                            resultSet.getString("provider_subject"),
+                            resultSet.getString("status"),
+                            listRoles(connection, tenantId, userId),
+                            listAccountantTenantIds(userId, email)
+                    ));
                 }
             }
             return users;
