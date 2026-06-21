@@ -18,6 +18,8 @@ import com.example.domain.model.connector.PaymentInfo;
 import com.example.domain.model.connector.StandardOrder;
 import com.example.domain.model.connector.StandardOrderItem;
 import com.example.domain.model.connector.SyncResult;
+import com.example.infrastructure.monitoring.ApiCallContext;
+import com.example.infrastructure.monitoring.ApiCallRecorder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -47,6 +49,9 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
 
     @Inject
     JdbcShopeeTokenRepository tokenRepository;
+
+    @Inject
+    ApiCallRecorder apiCallRecorder;
 
     @ConfigProperty(name = "shopee.oauth.partner-id", defaultValue = "0")
     long partnerId;
@@ -86,7 +91,9 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
         body.put("partner_id", partnerId);
         body.put("code", code);
         body.put("shop_id", shopId);
-        JsonNode response = apiClient.postPublic("/api/v2/auth/token/get", partnerId, partnerKeyValue(), body);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(command.tenantId(), NAME, "/api/v2/auth/token/get", "exchange_code"),
+                () -> apiClient.postPublic("/api/v2/auth/token/get", partnerId, partnerKeyValue(), body));
 
         ShopeeConnectorToken token = tokenFromResponse(command.tenantId(), String.valueOf(shopId), response);
         tokenRepository.save(token);
@@ -121,7 +128,10 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
             query.append("&order_status=").append(statusValue(applied.status()));
         }
 
-        JsonNode response = apiClient.get(path + "?" + query, partnerId, partnerKeyValue(), shopId, token.accessToken());
+        String getOrdersPath = path;
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, getOrdersPath, "get_orders"),
+                () -> apiClient.get(getOrdersPath + "?" + query, partnerId, partnerKeyValue(), shopId, token.accessToken()));
         JsonNode orderList = response.path("response").path("order_list");
         if (orderList.isMissingNode() || !orderList.isArray() || orderList.isEmpty()) {
             return List.of();
@@ -132,13 +142,13 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
             String sn = text(entry, "order_sn");
             if (!sn.isBlank()) orderIds.add(sn);
         }
-        return fetchOrderDetails(token, orderIds);
+        return fetchOrderDetails(tenantId, token, orderIds);
     }
 
     @Override
     public StandardOrder getOrderDetail(String tenantId, String orderId) {
         ShopeeConnectorToken token = validToken(tenantId);
-        List<StandardOrder> orders = fetchOrderDetails(token, List.of(requireText(orderId, "order_id_required")));
+        List<StandardOrder> orders = fetchOrderDetails(tenantId, token, List.of(requireText(orderId, "order_id_required")));
         if (orders.isEmpty()) {
             throw new ConnectorValidationException("shopee_order_not_found");
         }
@@ -148,7 +158,7 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
     @Override
     public List<PaymentInfo> getPayments(String tenantId, String orderId) {
         ShopeeConnectorToken token = validToken(tenantId);
-        JsonNode escrow = escrowDetail(token, requireText(orderId, "order_id_required"));
+        JsonNode escrow = escrowDetail(tenantId, token, requireText(orderId, "order_id_required"));
         JsonNode resp = escrow.path("response");
         BigDecimal escrowAmount = decimal(resp, "escrow_amount");
         BigDecimal originalPrice = itemsTotal(resp);
@@ -167,7 +177,7 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
     @Override
     public List<FeeInfo> getFees(String tenantId, String orderId) {
         ShopeeConnectorToken token = validToken(tenantId);
-        JsonNode escrow = escrowDetail(token, requireText(orderId, "order_id_required"));
+        JsonNode escrow = escrowDetail(tenantId, token, requireText(orderId, "order_id_required"));
         JsonNode resp = escrow.path("response");
         List<FeeInfo> fees = new ArrayList<>();
         BigDecimal commission = feeFromResponse(resp, "commission_fee");
@@ -220,24 +230,26 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.DISCONNECTED, "shopee_oauth_not_configured", Instant.now());
         }
         return tokenRepository.find(tenantId)
-                .map(this::statusForToken)
+                .map(token -> statusForToken(tenantId, token))
                 .orElseGet(() -> new ConnectorStatus(NAME, ConnectorConnectionStatus.DISCONNECTED, "shopee_not_authenticated", Instant.now()));
     }
 
-    private ConnectorStatus statusForToken(ShopeeConnectorToken token) {
+    private ConnectorStatus statusForToken(String tenantId, ShopeeConnectorToken token) {
         if (token.expiresAt().isBefore(Instant.now())) {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.EXPIRED, "shopee_token_expired", Instant.now());
         }
         try {
             long shopId = parseLong(token.shopId(), "shopee_shop_id_invalid");
-            apiClient.get("/api/v2/shop/get_shop_info", partnerId, partnerKeyValue(), shopId, token.accessToken());
+            apiCallRecorder.record(
+                    ApiCallContext.of(tenantId, NAME, "/api/v2/shop/get_shop_info", "get_status"),
+                    () -> apiClient.get("/api/v2/shop/get_shop_info", partnerId, partnerKeyValue(), shopId, token.accessToken()));
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.ACTIVE, "shopee_connector_active", Instant.now());
         } catch (ConnectorValidationException e) {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.UNAVAILABLE, e.getMessage(), Instant.now());
         }
     }
 
-    private List<StandardOrder> fetchOrderDetails(ShopeeConnectorToken token, List<String> orderIds) {
+    private List<StandardOrder> fetchOrderDetails(String tenantId, ShopeeConnectorToken token, List<String> orderIds) {
         List<StandardOrder> result = new ArrayList<>();
         long shopId = parseLong(token.shopId(), "shopee_shop_id_invalid");
         for (int i = 0; i < orderIds.size(); i += MAX_ORDER_DETAIL_BATCH) {
@@ -245,7 +257,9 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
             String sns = String.join(",", batch);
             String path = "/api/v2/order/get_order_detail?order_sn_list=" + sns
                     + "&response_optional_fields=buyer_user_id,buyer_username,item_list,payment_method,total_amount";
-            JsonNode response = apiClient.get(path, partnerId, partnerKeyValue(), shopId, token.accessToken());
+            JsonNode response = apiCallRecorder.record(
+                    ApiCallContext.of(tenantId, NAME, "/api/v2/order/get_order_detail", "get_order_detail"),
+                    () -> apiClient.get(path, partnerId, partnerKeyValue(), shopId, token.accessToken()));
             for (JsonNode order : response.path("response").path("order_list")) {
                 result.add(toStandardOrder(order));
             }
@@ -253,10 +267,12 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
         return result;
     }
 
-    private JsonNode escrowDetail(ShopeeConnectorToken token, String orderId) {
+    private JsonNode escrowDetail(String tenantId, ShopeeConnectorToken token, String orderId) {
         long shopId = parseLong(token.shopId(), "shopee_shop_id_invalid");
         String path = "/api/v2/payment/get_escrow_detail?order_sn=" + orderId;
-        return apiClient.get(path, partnerId, partnerKeyValue(), shopId, token.accessToken());
+        return apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/api/v2/payment/get_escrow_detail", "get_escrow_detail"),
+                () -> apiClient.get(path, partnerId, partnerKeyValue(), shopId, token.accessToken()));
     }
 
     private StandardOrder toStandardOrder(JsonNode order) {
@@ -369,7 +385,9 @@ public class ShopeeMarketplaceConnector implements MarketplaceConnector {
         body.put("partner_id", partnerId);
         body.put("refresh_token", refreshToken);
         body.put("shop_id", shopIdLong);
-        JsonNode response = apiClient.postPublic("/api/v2/auth/access_token/get", partnerId, partnerKeyValue(), body);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/api/v2/auth/access_token/get", "refresh_token"),
+                () -> apiClient.postPublic("/api/v2/auth/access_token/get", partnerId, partnerKeyValue(), body));
         ShopeeConnectorToken token = tokenFromResponse(tenantId, shopId, response);
         tokenRepository.save(token);
         return token;

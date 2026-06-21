@@ -4,11 +4,15 @@ import com.example.application.exception.ForbiddenException;
 import com.example.application.exception.ValidationException;
 import com.example.application.port.out.ClicksignWebhookEventRepository;
 import com.example.domain.model.ClicksignWebhookEvent;
+import com.example.infrastructure.client.ApiIntegrationEventRequest;
+import com.example.infrastructure.client.CoreIntegrationsRestClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.jboss.logging.Logger;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -23,11 +27,22 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class ClicksignWebhookService {
+    private static final Logger LOG = Logger.getLogger(ClicksignWebhookService.class);
+    private static final String INTEGRATION_NAME = "clicksign";
+    private static final String SYSTEM_TENANT_ID = "__system__";
+
     private final ObjectMapper objectMapper;
     private final ClicksignWebhookEventRepository repository;
 
     @ConfigProperty(name = "reporting.clicksign.webhook-secret")
     String webhookSecret;
+
+    @Inject
+    @RestClient
+    CoreIntegrationsRestClient coreIntegrationsRestClient;
+
+    @ConfigProperty(name = "reporting.internal-token")
+    String internalToken;
 
     @Inject
     public ClicksignWebhookService(ObjectMapper objectMapper, ClicksignWebhookEventRepository repository) {
@@ -81,11 +96,35 @@ public class ClicksignWebhookService {
             return;
         }
         if (contentHmac == null || contentHmac.isBlank()) {
+            recordAuthFailure("clicksign_hmac_required");
             throw new ForbiddenException("clicksign_hmac_required");
         }
         String expected = "sha256=" + hmacSha256(payload, webhookSecret.trim());
         if (!constantTimeEquals(expected, contentHmac.trim())) {
+            recordAuthFailure("clicksign_hmac_invalid");
             throw new ForbiddenException("clicksign_hmac_invalid");
+        }
+    }
+
+    private void recordAuthFailure(String errorMessage) {
+        try (jakarta.ws.rs.core.Response response = coreIntegrationsRestClient.recordEvent(internalToken, new ApiIntegrationEventRequest(
+                SYSTEM_TENANT_ID,
+                INTEGRATION_NAME,
+                "/webhooks/clicksign",
+                "verify_signature",
+                Instant.now(),
+                null,
+                null,
+                "FAILURE",
+                "AUTH_FAILURE",
+                "CRITICAL",
+                "Webhook do Clicksign rejeitado por assinatura HMAC invalida ou ausente",
+                "manual_review_required",
+                errorMessage
+        ))) {
+            response.bufferEntity();
+        } catch (RuntimeException exception) {
+            LOG.warnf(exception, "Failed to record api integration event for %s", INTEGRATION_NAME);
         }
     }
 

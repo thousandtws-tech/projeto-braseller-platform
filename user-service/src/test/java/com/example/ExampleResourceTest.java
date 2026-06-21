@@ -104,6 +104,20 @@ class ExampleResourceTest {
                 .contentType("application/json")
                 .body("""
                         {
+                          "email": "%s"
+                        }
+                        """.formatted(email))
+                .when().post("/users/internal/identity/mark-email-verified")
+                .then()
+                .statusCode(200)
+                .body("emailVerified", is(true))
+                .body("status", is("ACTIVE"));
+
+        given()
+                .header("X-Internal-Token", "dev-internal-token-change-me")
+                .contentType("application/json")
+                .body("""
+                        {
                           "email": "%s",
                           "password": "ChangeMe123!"
                         }

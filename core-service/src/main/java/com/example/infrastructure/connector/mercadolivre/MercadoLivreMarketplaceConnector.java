@@ -5,6 +5,8 @@ import com.example.application.command.ConnectorRefreshTokenCommand;
 import com.example.application.exception.ConnectorValidationException;
 import com.example.application.port.out.MarketplaceConnector;
 import com.example.domain.enums.PaymentMethod;
+import com.example.infrastructure.monitoring.ApiCallContext;
+import com.example.infrastructure.monitoring.ApiCallRecorder;
 import com.example.domain.model.connector.ConnectorConnectionStatus;
 import com.example.domain.model.connector.ConnectorDescriptor;
 import com.example.domain.model.connector.ConnectorStatus;
@@ -48,6 +50,9 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
 
     @Inject
     JdbcMercadoLivreTokenRepository tokenRepository;
+
+    @Inject
+    ApiCallRecorder apiCallRecorder;
 
     @ConfigProperty(name = "mercadolivre.oauth.client-id", defaultValue = "")
     Optional<String> clientId;
@@ -95,7 +100,9 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
         if (callbackUri.isBlank()) {
             throw new ConnectorValidationException("mercado_livre_redirect_uri_required");
         }
-        JsonNode response = apiClient.exchangeCode(configValue(clientId), configValue(clientSecret), callbackUri, code);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(command.tenantId(), NAME, "/oauth/token", "exchange_code"),
+                () -> apiClient.exchangeCode(configValue(clientId), configValue(clientSecret), callbackUri, code));
         MercadoLivreConnectorToken token = tokenFromResponse(command.tenantId(), null, response);
         tokenRepository.save(token);
         return toConnectorToken(token);
@@ -127,7 +134,9 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
         if (appliedFilters.to() != null) {
             queryParameters.put("order.date_created.to", endOfDayUtc(appliedFilters.to()));
         }
-        JsonNode response = apiClient.get("/orders/search", token.accessToken(), queryParameters);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/orders/search", "get_orders"),
+                () -> apiClient.get("/orders/search", token.accessToken(), queryParameters));
         List<StandardOrder> orders = new ArrayList<>();
         for (JsonNode order : response.path("results")) {
             orders.add(toStandardOrder(order));
@@ -138,20 +147,29 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
     @Override
     public StandardOrder getOrderDetail(String tenantId, String orderId) {
         MercadoLivreConnectorToken token = validToken(tenantId);
-        JsonNode order = apiClient.get("/orders/" + requireText(orderId, "order_id_required"), token.accessToken());
+        String path = "/orders/" + requireText(orderId, "order_id_required");
+        JsonNode order = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, path, "get_order_detail"),
+                () -> apiClient.get(path, token.accessToken()));
         return toStandardOrder(order);
     }
 
     @Override
     public List<PaymentInfo> getPayments(String tenantId, String orderId) {
         MercadoLivreConnectorToken token = validToken(tenantId);
-        JsonNode order = apiClient.get("/orders/" + requireText(orderId, "order_id_required"), token.accessToken());
+        String orderPath = "/orders/" + requireText(orderId, "order_id_required");
+        JsonNode order = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, orderPath, "get_order_for_payments"),
+                () -> apiClient.get(orderPath, token.accessToken()));
         List<PaymentInfo> payments = new ArrayList<>();
         for (JsonNode payment : order.path("payments")) {
             String paymentId = text(payment, "id");
             JsonNode paymentDetails = payment;
             if (!paymentId.isBlank()) {
-                paymentDetails = apiClient.get("/payments/" + paymentId, token.accessToken());
+                String paymentPath = "/payments/" + paymentId;
+                paymentDetails = apiCallRecorder.record(
+                        ApiCallContext.of(tenantId, NAME, paymentPath, "get_payment_detail"),
+                        () -> apiClient.get(paymentPath, token.accessToken()));
             }
             payments.add(toPaymentInfo(text(order, "id"), paymentDetails));
         }
@@ -161,7 +179,10 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
     @Override
     public List<FeeInfo> getFees(String tenantId, String orderId) {
         MercadoLivreConnectorToken token = validToken(tenantId);
-        JsonNode order = apiClient.get("/orders/" + requireText(orderId, "order_id_required"), token.accessToken());
+        String feesPath = "/orders/" + requireText(orderId, "order_id_required");
+        JsonNode order = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, feesPath, "get_order_for_fees"),
+                () -> apiClient.get(feesPath, token.accessToken()));
         List<FeeInfo> fees = new ArrayList<>();
         BigDecimal saleFee = saleFee(order);
         BigDecimal shippingCost = shippingCost(order);
@@ -188,16 +209,19 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.DISCONNECTED, "mercado_livre_oauth_not_configured", Instant.now());
         }
         return tokenRepository.find(tenantId)
-                .map(this::statusForToken)
+                .map(token -> statusForToken(tenantId, token))
                 .orElseGet(() -> new ConnectorStatus(NAME, ConnectorConnectionStatus.DISCONNECTED, "mercado_livre_not_authenticated", Instant.now()));
     }
 
-    private ConnectorStatus statusForToken(MercadoLivreConnectorToken token) {
+    private ConnectorStatus statusForToken(String tenantId, MercadoLivreConnectorToken token) {
         if (token.expiresAt().isBefore(Instant.now())) {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.EXPIRED, "mercado_livre_token_expired", Instant.now());
         }
         try {
-            apiClient.get("/users/" + token.sellerId(), token.accessToken());
+            String path = "/users/" + token.sellerId();
+            apiCallRecorder.record(
+                    ApiCallContext.of(tenantId, NAME, path, "get_status"),
+                    () -> apiClient.get(path, token.accessToken()));
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.ACTIVE, "mercado_livre_connector_active", Instant.now());
         } catch (ConnectorValidationException exception) {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.UNAVAILABLE, exception.getMessage(), Instant.now());
@@ -218,7 +242,9 @@ public class MercadoLivreMarketplaceConnector implements MarketplaceConnector {
     }
 
     private MercadoLivreConnectorToken refresh(String tenantId, String knownSellerId, String refreshToken) {
-        JsonNode response = apiClient.refreshToken(configValue(clientId), configValue(clientSecret), refreshToken);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/oauth/token", "refresh_token"),
+                () -> apiClient.refreshToken(configValue(clientId), configValue(clientSecret), refreshToken));
         MercadoLivreConnectorToken token = tokenFromResponse(tenantId, knownSellerId, response);
         tokenRepository.save(token);
         return token;

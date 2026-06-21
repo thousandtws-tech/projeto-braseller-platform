@@ -9,5 +9,7 @@ public interface AuthIdentityRepository {
 
     Optional<AuthIdentity> findIdentityByEmail(String email);
 
+    Optional<AuthIdentity> findAnyIdentityByEmail(String email);
+
     void linkProviderSubject(String email, String provider, String subject);
 }

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
+import static org.hamcrest.CoreMatchers.allOf;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItems;
@@ -48,6 +49,22 @@ class ExampleResourceTest {
                 .body("path", is("/auth/login"))
                 .body("authorization", is("Bearer test-token"))
                 .body("body", containsString("seller@example.com"));
+    }
+
+    @Test
+    void redirectsMercadoLivreOAuthCallbackToFrontendCallbackPage() {
+        given()
+                .redirects().follow(false)
+                .when().get("/integrations/mercado-livre/callback?code=TG-123&state=pt-BR")
+                .then()
+                .statusCode(303)
+                .header("Location", allOf(
+                        containsString("http://localhost:3000/pt-BR/conectores/callback"),
+                        containsString("connector=mercado-livre"),
+                        containsString("code=TG-123"),
+                        containsString("state=pt-BR")
+                ))
+                .header("Cache-Control", containsString("no-store"));
     }
 
     @Test

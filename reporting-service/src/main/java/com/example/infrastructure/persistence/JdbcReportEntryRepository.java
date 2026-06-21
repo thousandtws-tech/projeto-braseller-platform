@@ -183,9 +183,7 @@ public class JdbcReportEntryRepository implements ReportEntryRepository {
         String sql = """
                 SELECT tenant_id, platform, order_id, receivable_value, release_date
                 FROM report_entries
-                """ + where + """
-                ORDER BY release_date ASC, platform ASC, order_id ASC
-                """;
+                """ + where + " ORDER BY release_date ASC, platform ASC, order_id ASC";
 
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {

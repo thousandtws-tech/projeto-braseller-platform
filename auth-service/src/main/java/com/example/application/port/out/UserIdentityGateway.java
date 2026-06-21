@@ -18,4 +18,10 @@ public interface UserIdentityGateway {
     AuthIdentity verifyEmailCode(String email, String code);
 
     Optional<AuthIdentity> syncExternalProfile(SyncExternalProfileCommand command);
+
+    Optional<AuthIdentity> findByEmail(String email);
+
+    Optional<AuthIdentity> markEmailVerified(String email);
+
+    Optional<AuthIdentity> resetPassword(String email, String newPassword);
 }

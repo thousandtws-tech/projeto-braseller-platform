@@ -17,6 +17,8 @@ import com.example.domain.model.connector.OrderStatus;
 import com.example.domain.model.connector.PaymentInfo;
 import com.example.domain.model.connector.StandardOrder;
 import com.example.domain.model.connector.SyncResult;
+import com.example.infrastructure.monitoring.ApiCallContext;
+import com.example.infrastructure.monitoring.ApiCallRecorder;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -47,6 +49,9 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
 
     @Inject
     JdbcAmazonTokenRepository tokenRepository;
+
+    @Inject
+    ApiCallRecorder apiCallRecorder;
 
     @ConfigProperty(name = "amazon.oauth.client-id", defaultValue = "")
     Optional<String> clientId;
@@ -91,13 +96,19 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
 
         if (refreshToken == null || refreshToken.isBlank()) {
             String code = requireText(credentials.get("spapi_oauth_code"), "amazon_oauth_code_required");
-            JsonNode response = apiClient.exchangeCode(clientIdValue(), clientSecretValue(), code);
+            String finalCode = code;
+            JsonNode response = apiCallRecorder.record(
+                    ApiCallContext.of(command.tenantId(), NAME, "/auth/o2/token", "exchange_code"),
+                    () -> apiClient.exchangeCode(clientIdValue(), clientSecretValue(), finalCode));
             refreshToken = requireText(text(response, "refresh_token"), "amazon_refresh_token_missing");
         }
         sellerId = requireText(sellerId != null ? sellerId : "", "amazon_seller_id_required");
 
         // Get initial access token
-        JsonNode lwaResponse = apiClient.refreshToken(clientIdValue(), clientSecretValue(), refreshToken);
+        String finalRefreshToken = refreshToken;
+        JsonNode lwaResponse = apiCallRecorder.record(
+                ApiCallContext.of(command.tenantId(), NAME, "/auth/o2/token", "refresh_token"),
+                () -> apiClient.refreshToken(clientIdValue(), clientSecretValue(), finalRefreshToken));
         String accessToken = requireText(text(lwaResponse, "access_token"), "amazon_access_token_missing");
         long expiresIn = lwaResponse.path("expires_in").asLong(LWA_TOKEN_TTL_SECONDS);
 
@@ -132,8 +143,10 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
             params.put("OrderStatuses", statusValue(applied.status()));
         }
 
-        JsonNode response = apiClient.get("/orders/v0/orders", token.accessToken(),
-                awsAccessKeyValue(), awsSecretKeyValue(), params);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/orders/v0/orders", "get_orders"),
+                () -> apiClient.get("/orders/v0/orders", token.accessToken(),
+                        awsAccessKeyValue(), awsSecretKeyValue(), params));
         List<StandardOrder> orders = new ArrayList<>();
         for (JsonNode order : response.path("payload").path("Orders")) {
             orders.add(toStandardOrder(order));
@@ -144,16 +157,20 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
     @Override
     public StandardOrder getOrderDetail(String tenantId, String orderId) {
         AmazonConnectorToken token = validToken(tenantId);
-        JsonNode response = apiClient.get("/orders/v0/orders/" + requireText(orderId, "order_id_required"),
-                token.accessToken(), awsAccessKeyValue(), awsSecretKeyValue(), Map.of());
+        String path = "/orders/v0/orders/" + requireText(orderId, "order_id_required");
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/orders/v0/orders/{orderId}", "get_order_detail"),
+                () -> apiClient.get(path, token.accessToken(), awsAccessKeyValue(), awsSecretKeyValue(), Map.of()));
         return toStandardOrder(response.path("payload"));
     }
 
     @Override
     public List<PaymentInfo> getPayments(String tenantId, String orderId) {
         AmazonConnectorToken token = validToken(tenantId);
-        JsonNode response = apiClient.get("/finances/v0/financialEvents/orders/" + requireText(orderId, "order_id_required"),
-                token.accessToken(), awsAccessKeyValue(), awsSecretKeyValue(), Map.of());
+        String path = "/finances/v0/financialEvents/orders/" + requireText(orderId, "order_id_required");
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/finances/v0/financialEvents/orders/{orderId}", "get_payments"),
+                () -> apiClient.get(path, token.accessToken(), awsAccessKeyValue(), awsSecretKeyValue(), Map.of()));
         List<PaymentInfo> payments = new ArrayList<>();
         for (JsonNode event : response.path("payload").path("FinancialEvents").path("ShipmentEventList")) {
             BigDecimal gross = chargeTotal(event, "Principal");
@@ -175,8 +192,10 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
     @Override
     public List<FeeInfo> getFees(String tenantId, String orderId) {
         AmazonConnectorToken token = validToken(tenantId);
-        JsonNode response = apiClient.get("/finances/v0/financialEvents/orders/" + requireText(orderId, "order_id_required"),
-                token.accessToken(), awsAccessKeyValue(), awsSecretKeyValue(), Map.of());
+        String path = "/finances/v0/financialEvents/orders/" + requireText(orderId, "order_id_required");
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/finances/v0/financialEvents/orders/{orderId}", "get_fees"),
+                () -> apiClient.get(path, token.accessToken(), awsAccessKeyValue(), awsSecretKeyValue(), Map.of()));
         List<FeeInfo> fees = new ArrayList<>();
         for (JsonNode event : response.path("payload").path("FinancialEvents").path("ShipmentEventList")) {
             for (JsonNode feeEvent : event.path("ShipmentFeeList")) {
@@ -221,17 +240,19 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.DISCONNECTED, "amazon_oauth_not_configured", Instant.now());
         }
         return tokenRepository.find(tenantId)
-                .map(this::statusForToken)
+                .map(token -> statusForToken(tenantId, token))
                 .orElseGet(() -> new ConnectorStatus(NAME, ConnectorConnectionStatus.DISCONNECTED, "amazon_not_authenticated", Instant.now()));
     }
 
-    private ConnectorStatus statusForToken(AmazonConnectorToken token) {
+    private ConnectorStatus statusForToken(String tenantId, AmazonConnectorToken token) {
         if (token.expiresAt().isBefore(Instant.now())) {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.EXPIRED, "amazon_token_expired", Instant.now());
         }
         try {
-            apiClient.get("/sellers/v1/marketplaceParticipations", token.accessToken(),
-                    awsAccessKeyValue(), awsSecretKeyValue(), Map.of());
+            apiCallRecorder.record(
+                    ApiCallContext.of(tenantId, NAME, "/sellers/v1/marketplaceParticipations", "get_status"),
+                    () -> apiClient.get("/sellers/v1/marketplaceParticipations", token.accessToken(),
+                            awsAccessKeyValue(), awsSecretKeyValue(), Map.of()));
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.ACTIVE, "amazon_connector_active", Instant.now());
         } catch (ConnectorValidationException e) {
             return new ConnectorStatus(NAME, ConnectorConnectionStatus.UNAVAILABLE, e.getMessage(), Instant.now());
@@ -249,7 +270,9 @@ public class AmazonMarketplaceConnector implements MarketplaceConnector {
     }
 
     private AmazonConnectorToken refreshLwa(String tenantId, String sellerId, String refreshToken) {
-        JsonNode response = apiClient.refreshToken(clientIdValue(), clientSecretValue(), refreshToken);
+        JsonNode response = apiCallRecorder.record(
+                ApiCallContext.of(tenantId, NAME, "/auth/o2/token", "refresh_token"),
+                () -> apiClient.refreshToken(clientIdValue(), clientSecretValue(), refreshToken));
         String accessToken = requireText(text(response, "access_token"), "amazon_access_token_missing");
         long expiresIn = response.path("expires_in").asLong(LWA_TOKEN_TTL_SECONDS);
         AmazonConnectorToken token = new AmazonConnectorToken(

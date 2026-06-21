@@ -449,6 +449,12 @@ variable "mercadolivre_redirect_uri" {
   default     = ""
 }
 
+variable "mercado_livre_frontend_callback_url" {
+  description = "Frontend URL that receives Mercado Livre OAuth callbacks after the gateway bridge."
+  type        = string
+  default     = "http://localhost:3000/pt-BR/conectores/callback"
+}
+
 variable "mercadolivre_connect_timeout_ms" {
   description = "Mercado Livre API connect timeout."
   type        = number

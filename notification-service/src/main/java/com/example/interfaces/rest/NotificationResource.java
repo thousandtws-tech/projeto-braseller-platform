@@ -1,8 +1,10 @@
 package com.example.interfaces.rest;
 
+import com.example.application.command.ApiIntegrationAlertCommand;
 import com.example.application.command.MonthlyClosingNotificationCommand;
 import com.example.application.command.MlPaymentReleaseNotificationCommand;
 import com.example.application.command.NewSaleNotificationCommand;
+import com.example.application.command.AuthEmailCommand;
 import com.example.application.command.UpdateNotificationPreferenceCommand;
 import com.example.application.command.WeeklyAccountantReportCommand;
 import com.example.application.command.EmailVerificationNotificationCommand;
@@ -234,6 +236,44 @@ public class NotificationResource {
         )));
     }
 
+    @POST
+    @Path("/events/auth-email")
+    @Operation(summary = "Enviar e-mail transacional de autenticacao", description = "Envia e-mail interno para verificacao de conta ou recuperacao de senha.")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = AuthEmailRequest.class)))
+    public Response authEmail(@HeaderParam("X-Internal-Token") String internalToken, AuthEmailRequest request) {
+        internalServiceAuthorizer.requireInternal(internalToken);
+        notificationService.sendAuthEmail(new AuthEmailCommand(
+                request.recipientEmail(),
+                request.subject(),
+                request.message(),
+                request.purpose()
+        ));
+        return Response.accepted(new SkippedResponse("sent")).build();
+    }
+
+    @POST
+    @Path("/events/api-integration-alert")
+    @Operation(summary = "Alertar falha de integracao", description = "Cria alerta quando uma integracao externa apresenta falha critica (Clausula 2.4).")
+    @SecurityRequirement(name = "internalToken")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ApiIntegrationAlertRequest.class)))
+    public Response apiIntegrationAlert(@HeaderParam("X-Internal-Token") String internalToken, ApiIntegrationAlertRequest request) {
+        internalServiceAuthorizer.requireInternal(internalToken);
+        return optionalResponse(notificationService.recordApiIntegrationAlert(new ApiIntegrationAlertCommand(
+                request.eventId(),
+                request.eventType(),
+                request.occurredAt(),
+                request.tenantId(),
+                request.recipientEmail(),
+                request.integrationName(),
+                request.endpoint(),
+                request.failureType(),
+                request.severity(),
+                request.impact(),
+                request.actionTaken()
+        )));
+    }
+
     private Response optionalResponse(Optional<NotificationMessage> notification) {
         return notification
                 .map(value -> Response.status(Response.Status.CREATED).entity(value).build())
@@ -288,6 +328,25 @@ public class NotificationResource {
             LocalDate weekEnd,
             int totalSales,
             BigDecimal grossRevenue) {
+    }
+
+    @Schema(name = "AuthEmailRequest")
+    public record AuthEmailRequest(String recipientEmail, String subject, String message, String purpose) {
+    }
+
+    @Schema(name = "ApiIntegrationAlertRequest")
+    public record ApiIntegrationAlertRequest(
+            String eventId,
+            String eventType,
+            java.time.Instant occurredAt,
+            String tenantId,
+            String recipientEmail,
+            String integrationName,
+            String endpoint,
+            String failureType,
+            String severity,
+            String impact,
+            String actionTaken) {
     }
 
     public record SkippedResponse(String reason) {

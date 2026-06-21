@@ -1,6 +1,7 @@
 'use server'
 
 import { getToken, getSession } from '@/entities/session/server/session'
+import { revalidatePath } from 'next/cache'
 
 const GATEWAY_URL = process.env.GATEWAY_URL 
 
@@ -50,6 +51,7 @@ export async function grantAccountantAction(
       return { success: false, error: body.message ?? 'Não foi possível conceder o acesso.' }
     }
 
+    revalidatePath('/contador')
     return { success: true, message: `Acesso concedido para ${firstName} ${lastName} (${email}).` }
   } catch {
     return { success: false, error: 'Serviço temporariamente indisponível.' }

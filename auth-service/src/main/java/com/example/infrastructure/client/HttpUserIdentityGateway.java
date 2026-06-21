@@ -204,6 +204,86 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
         return Optional.of(toAuthIdentity(read(response.body(), UserResponse.class)));
     }
 
+    @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "findByEmailFallback")
+    public Optional<AuthIdentity> findByEmail(String email) {
+        HttpResponse<String> response = send("/users/internal/identity/by-email", new IdentityEmailRequest(email), true);
+        if (response.statusCode() == 404) {
+            return Optional.empty();
+        }
+        if (response.statusCode() != 200) {
+            throw userServiceError("Could not find identity", response.statusCode(), response.body());
+        }
+
+        UserResponse user = read(response.body(), UserResponse.class);
+        return Optional.of(toAuthIdentity(user));
+    }
+
+    @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "markEmailVerifiedFallback")
+    public Optional<AuthIdentity> markEmailVerified(String email) {
+        HttpResponse<String> response = send("/users/internal/identity/mark-email-verified",
+                new IdentityEmailRequest(email), true);
+        if (response.statusCode() == 404) {
+            return Optional.empty();
+        }
+        if (response.statusCode() != 200) {
+            throw userServiceError("Could not verify email", response.statusCode(), response.body());
+        }
+
+        UserResponse user = read(response.body(), UserResponse.class);
+        return Optional.of(toAuthIdentity(user));
+    }
+
+    @Override
+    @Retry(
+            maxRetries = 2, delay = 400, delayUnit = ChronoUnit.MILLIS,
+            jitter = 200, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {TransientIdentityGatewayException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 10, failureRatio = 0.5,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 3,
+            failOn = {TransientIdentityGatewayException.class}
+    )
+    @Fallback(fallbackMethod = "resetPasswordFallback")
+    public Optional<AuthIdentity> resetPassword(String email, String newPassword) {
+        HttpResponse<String> response = send("/users/internal/identity/reset-password",
+                new ResetPasswordRequest(email, newPassword), true);
+        if (response.statusCode() == 404) {
+            return Optional.empty();
+        }
+        if (response.statusCode() != 200) {
+            throw userServiceError("Could not reset password", response.statusCode(), response.body());
+        }
+
+        UserResponse user = read(response.body(), UserResponse.class);
+        return Optional.of(toAuthIdentity(user));
+    }
+
     private AuthIdentity registerTenantFallback(RegisterCommand command) {
         throw new IdentityGatewayException(503, "user_service_unavailable");
     }
@@ -221,6 +301,18 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     }
 
     private Optional<AuthIdentity> syncExternalProfileFallback(SyncExternalProfileCommand command) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private Optional<AuthIdentity> findByEmailFallback(String email) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private Optional<AuthIdentity> markEmailVerifiedFallback(String email) {
+        throw new IdentityGatewayException(503, "user_service_unavailable");
+    }
+
+    private Optional<AuthIdentity> resetPasswordFallback(String email, String newPassword) {
         throw new IdentityGatewayException(503, "user_service_unavailable");
     }
 
@@ -350,6 +442,12 @@ public class HttpUserIdentityGateway implements UserIdentityGateway {
     public record UserProfileSyncRequest(String email, String provider, String providerSubject, String fullName,
                                          String preferredUsername, String firstName, String lastName, String pictureUrl,
                                          boolean emailVerified) {
+    }
+
+    public record IdentityEmailRequest(String email) {
+    }
+
+    public record ResetPasswordRequest(String email, String newPassword) {
     }
 
     public record RegisteredTenantResponse(TenantResponse tenant, UserResponse adminUser) {

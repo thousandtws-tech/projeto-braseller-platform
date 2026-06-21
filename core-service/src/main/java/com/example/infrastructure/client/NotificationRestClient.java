@@ -27,4 +27,20 @@ public interface NotificationRestClient {
     Response newSale(
             @HeaderParam("X-Internal-Token") String internalToken,
             NewSaleNotificationRequest request);
+
+    @POST
+    @Path("/notifications/events/api-integration-alert")
+    @Retry(
+            maxRetries = 2, delay = 500, delayUnit = ChronoUnit.MILLIS,
+            jitter = 250, jitterDelayUnit = ChronoUnit.MILLIS,
+            retryOn = {ProcessingException.class}
+    )
+    @CircuitBreaker(
+            requestVolumeThreshold = 5, failureRatio = 0.6,
+            delay = 30, delayUnit = ChronoUnit.SECONDS,
+            successThreshold = 2
+    )
+    Response apiIntegrationAlert(
+            @HeaderParam("X-Internal-Token") String internalToken,
+            ApiIntegrationAlertRequest request);
 }

@@ -275,7 +275,7 @@ public class JdbcNotificationRepository implements NotificationRepository, NewSa
     public List<NotificationMessage> list(String tenantId, int limit) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT id, tenant_id, type, title, message, recipient_email, channel, status, read_at, created_at
+                     SELECT id, tenant_id, type, title, message, recipient_email, channel, status, read_at, created_at, severity
                      FROM notifications
                      WHERE tenant_id = ? AND status <> 'ARCHIVED'
                      ORDER BY created_at DESC
@@ -432,7 +432,7 @@ public class JdbcNotificationRepository implements NotificationRepository, NewSa
 
     private Optional<NotificationMessage> findNotification(Connection connection, String tenantId, String notificationId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT id, tenant_id, type, title, message, recipient_email, channel, status, read_at, created_at
+                SELECT id, tenant_id, type, title, message, recipient_email, channel, status, read_at, created_at, severity
                 FROM notifications
                 WHERE tenant_id = ? AND id = ?
                 """)) {
@@ -459,7 +459,8 @@ public class JdbcNotificationRepository implements NotificationRepository, NewSa
                 NotificationChannel.valueOf(resultSet.getString("channel")),
                 NotificationStatus.valueOf(resultSet.getString("status")),
                 readAt == null ? null : readAt.toInstant(),
-                resultSet.getTimestamp("created_at").toInstant()
+                resultSet.getTimestamp("created_at").toInstant(),
+                resultSet.getString("severity")
         );
     }
 

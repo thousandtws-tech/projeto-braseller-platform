@@ -7,5 +7,5 @@ interface Props {
 
 export default async function RootPage({ params }: Props) {
   const { lang } = await params
-  redirect(`/${lang}/dashboard`)
+  redirect(`/${lang}/inicio`)
 }
