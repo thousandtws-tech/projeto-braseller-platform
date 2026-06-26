@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { AlertCircle, Check, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { registerAction } from '@/features/auth/server/actions'
+import { appToast } from '@/shared/lib/toast'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
@@ -12,6 +13,12 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState('')
   const passwordLongEnough = password.length >= 8
+
+  useEffect(() => {
+    if (state?.error) {
+      appToast.error(state.error)
+    }
+  }, [state])
 
   return (
     <form action={formAction} className="flex flex-col gap-5">

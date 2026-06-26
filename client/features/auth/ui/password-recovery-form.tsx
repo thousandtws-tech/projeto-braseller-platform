@@ -1,14 +1,25 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import { CheckCircle2, Loader2, Mail } from 'lucide-react'
 import { requestPasswordRecoveryAction } from '@/features/auth/server/actions'
+import { appToast } from '@/shared/lib/toast'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 
 export function PasswordRecoveryForm() {
   const [state, formAction, isPending] = useActionState(requestPasswordRecoveryAction, null)
+
+  useEffect(() => {
+    if (state?.success) {
+      appToast.success('Enviamos as instruções de recuperação para o e-mail informado, caso ele esteja cadastrado.')
+    }
+
+    if (state?.error) {
+      appToast.error(state.error)
+    }
+  }, [state])
 
   if (state?.success) {
     return (

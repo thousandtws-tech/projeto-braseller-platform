@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { AlertCircle, Eye, EyeOff, Loader2, LockKeyhole } from 'lucide-react'
 import { loginAction } from '@/features/auth/server/actions'
+import { appToast } from '@/shared/lib/toast'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
@@ -18,6 +19,12 @@ export function LoginForm({ initialEmail = '' }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState(initialEmail)
   const params = useParams<{ lang: string }>()
+
+  useEffect(() => {
+    if (state?.error) {
+      appToast.error(state.error)
+    }
+  }, [state])
 
   return (
     <form action={formAction} className="flex flex-col gap-5">

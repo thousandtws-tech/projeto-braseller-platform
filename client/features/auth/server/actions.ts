@@ -111,11 +111,11 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
       accessToken = data.accessToken ?? data.access_token ?? null
 
       if (!accessToken) {
-        return { error: 'Resposta invalida do servidor de autenticacao.' }
+        return { error: 'Resposta inválida do servidor de autenticação.' }
       }
     }
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }
   }
 
   if (redirectTo) {
@@ -123,7 +123,7 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
   }
 
   if (!accessToken) {
-    return { error: 'Nao foi possivel concluir o login agora. Tente novamente.' }
+    return { error: 'Não foi possível concluir o login agora. Tente novamente.' }
   }
 
   const store = await cookies()
@@ -149,7 +149,7 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
     return { error: 'Preencha todos os campos.' }
   }
   if (password.length < 8) {
-    return { error: 'A senha deve ter no minimo 8 caracteres.' }
+    return { error: 'A senha deve ter no mínimo 8 caracteres.' }
   }
 
   let redirectTo: string | null = null
@@ -171,7 +171,7 @@ export async function registerAction(prevState: AuthState, formData: FormData): 
     const targetEmail = typeof data.email === 'string' && data.email.trim().length > 0 ? data.email : email
     redirectTo = await localePath(`/verify-code?email=${encodeURIComponent(targetEmail)}&registered=1`)
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }
   }
 
   if (redirectTo) {
@@ -187,7 +187,7 @@ export async function verifyEmailCodeAction(prevState: VerifyEmailState, formDat
   const code = (formData.get('code') as string | null)?.trim() ?? ''
 
   if (!email || !code) {
-    return { error: 'Informe o e-mail e o codigo recebido.' }
+    return { error: 'Informe o e-mail e o código recebido.' }
   }
 
   let redirectTo: string | null = null
@@ -207,14 +207,14 @@ export async function verifyEmailCodeAction(prevState: VerifyEmailState, formDat
 
     redirectTo = await localePath(`/login?verified=1&email=${encodeURIComponent(email)}`)
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }
   }
 
   if (redirectTo) {
     redirect(redirectTo)
   }
 
-  return { error: 'Nao foi possivel concluir a verificacao agora.' }
+  return { error: 'Não foi possível concluir a verificação agora.' }
 }
 
 export async function resendEmailVerificationCodeAction(
@@ -225,7 +225,7 @@ export async function resendEmailVerificationCodeAction(
   const email = (formData.get('email') as string | null)?.trim() ?? ''
 
   if (!email) {
-    return { error: 'Informe o e-mail para reenviar o codigo.' }
+    return { error: 'Informe o e-mail para reenviar o código.' }
   }
 
   try {
@@ -241,9 +241,9 @@ export async function resendEmailVerificationCodeAction(
       return { error: mapResendVerificationError(readErrorMessage(body, 'resend_failed')) }
     }
 
-    return { success: 'Enviamos um novo codigo para o seu e-mail.' }
+    return { success: 'Enviamos um novo código para o seu e-mail.' }
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }
   }
 }
 
@@ -265,12 +265,12 @@ export async function requestPasswordRecoveryAction(
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      return { error: body.message ?? 'Nao foi possivel iniciar a recuperacao agora.' }
+      return { error: body.message ?? 'Não foi possível iniciar a recuperação agora.' }
     }
 
     return { success: true }
   } catch {
-    return { error: 'Servico temporariamente indisponivel. Tente novamente em instantes.' }
+    return { error: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }
   }
 }
 
@@ -278,7 +278,7 @@ export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLo
   const digits = cnpj.replace(/\D/g, '')
 
   if (digits.length !== 14) {
-    return { error: 'Informe um CNPJ com 14 digitos.' }
+    return { error: 'Informe um CNPJ com 14 dígitos.' }
   }
 
   try {
@@ -289,17 +289,17 @@ export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLo
     })
 
     if (res.status === 404) {
-      return { error: 'CNPJ nao encontrado na Receita Federal.' }
+      return { error: 'CNPJ não encontrado na Receita Federal.' }
     }
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      return { error: body.message ?? 'Nao foi possivel consultar o CNPJ agora.' }
+      return { error: body.message ?? 'Não foi possível consultar o CNPJ agora.' }
     }
 
     return { data: await res.json() as CompanyLookup }
   } catch {
-    return { error: 'Servico de consulta CNPJ temporariamente indisponivel.' }
+    return { error: 'Serviço de consulta CNPJ temporariamente indisponível.' }
   }
 }
 

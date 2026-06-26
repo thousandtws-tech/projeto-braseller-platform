@@ -375,7 +375,6 @@ function createNavigation(dict: Dictionary): NavigationGroup[] {
       icon: Settings,
       items: [
         { href: 'configuracoes', label: dict.nav.configuracoes, icon: Settings },
-        { href: 'plano', label: dict.nav.plano, icon: CreditCard },
       ],
     },
   ]
