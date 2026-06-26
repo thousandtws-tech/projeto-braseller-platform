@@ -665,6 +665,8 @@ const PLATFORM_DISPLAY: Record<string, string> = {
   amazon:        'Amazon',
   magalu:        'Magalu',
   bling:         'Bling',
+  'pluggy-open-finance': 'Open Finance',
+  pluggy:        'Open Finance',
   sandbox:       'Ambiente de Teste',
 }
 

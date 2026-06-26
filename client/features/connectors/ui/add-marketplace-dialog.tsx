@@ -35,12 +35,14 @@ import type { Locale } from '@/shared/i18n/config'
 
 import { MarketplaceLogo, normalizeMarketplaceName } from './marketplace-brand'
 import { OAuthSubmitButton } from './oauth-submit-button'
+import { PluggyConnectButton } from './pluggy-connect-button'
 
 interface Marketplace {
   name: string
   displayName: string
-  connectionType: 'OAuth' | 'API'
+  connectionType: 'OAuth' | 'API' | 'Open Finance'
   oauth?: boolean
+  pluggy?: boolean
   fields: {
     name: string
     label: string
@@ -78,29 +80,11 @@ function getMarketplaces(dict: Dictionary): Marketplace[] {
       ],
     },
     {
-      name: 'magalu',
-      displayName: 'Magalu',
-      connectionType: 'API',
-      fields: [
-        { name: 'client_id', ...dict.connectors.fields.clientId },
-        { name: 'client_secret', ...dict.connectors.fields.clientSecret, type: 'password' },
-      ],
-    },
-    {
-      name: 'bling',
-      displayName: 'Bling',
-      connectionType: 'API',
-      fields: [
-        { name: 'api_key', ...dict.connectors.fields.blingApiKey, type: 'password' },
-      ],
-    },
-    {
-      name: 'olist',
-      displayName: 'Olist',
-      connectionType: 'API',
-      fields: [
-        { name: 'api_key', ...dict.connectors.fields.olistApiKey, type: 'password' },
-      ],
+      name: 'pluggy-open-finance',
+      displayName: 'Open Finance',
+      connectionType: 'Open Finance',
+      pluggy: true,
+      fields: [],
     },
   ]
 }
@@ -158,7 +142,9 @@ export function AddMarketplaceDialog({
                   })}
                 </DialogTitle>
                 <DialogDescription className="mt-1">
-                  {selected.oauth
+                  {selected.pluggy
+                    ? 'Conecte contas bancárias via Pluggy Connect com consentimento Open Finance.'
+                    : selected.oauth
                     ? dict.connectors.dialog.oauthDescription
                     : dict.connectors.addMarketplaceDialog.credentialDescription}
                 </DialogDescription>
@@ -214,6 +200,8 @@ export function AddMarketplaceDialog({
               </div>
             )}
           </div>
+        ) : selected.pluggy ? (
+          <PluggyConnectButton onCancel={() => handleOpenChange(false)} />
         ) : selected.oauth ? (
           <OAuthConnection
             marketplace={selected}

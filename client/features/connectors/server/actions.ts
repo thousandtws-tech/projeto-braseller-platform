@@ -29,6 +29,10 @@ type AuthenticateState =
   | { success: false; error: string }
   | null
 
+export type PluggyConnectTokenState =
+  | { success: true; accessToken: string; includeSandbox: boolean }
+  | { success: false; error: string }
+
 export async function startMercadoLivreOAuthAction(formData: FormData): Promise<never> {
   const langValue = formData.get('lang')
   const lang = typeof langValue === 'string' && isLocale(langValue) ? langValue : null
@@ -115,6 +119,49 @@ export async function authenticateAction(
     // Re-lança NEXT_REDIRECT para não engolir o redirect()
     if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
     return { success: false, error: 'Não foi possível autenticar o conector.' }
+  }
+}
+
+export async function createPluggyConnectTokenAction(): Promise<PluggyConnectTokenState> {
+  const token = await getToken()
+  if (!token) return handleExpired()
+
+  try {
+    const res = await fetch(`${GATEWAY_URL}/api/core/open-finance/pluggy/connect-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({}),
+      cache: 'no-store',
+    })
+
+    if (res.status === 401) return handleExpired()
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as Record<string, unknown>
+      return {
+        success: false,
+        error: typeof body.message === 'string'
+          ? body.message
+          : 'Não foi possível iniciar o Open Finance agora.',
+      }
+    }
+
+    const data = await res.json() as { accessToken?: string }
+    if (!data.accessToken) {
+      return { success: false, error: 'Resposta inválida ao iniciar o Open Finance.' }
+    }
+
+    return {
+      success: true,
+      accessToken: data.accessToken,
+      includeSandbox: process.env.PLUGGY_CONNECT_INCLUDE_SANDBOX !== 'false',
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
+    return { success: false, error: 'Não foi possível conectar com o Open Finance.' }
   }
 }
 

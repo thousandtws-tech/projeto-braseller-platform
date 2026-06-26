@@ -529,7 +529,7 @@ const dictionary: Dictionary = {
     },
     addMarketplaceCard: {
       title: 'Agregar Marketplace',
-      subtitle: 'Shopee, Magalu, Bling...',
+      subtitle: 'Mercado Livre, Shopee, Amazon, Open Finance...',
     },
     addMarketplaceDialog: {
       chooseTitle: 'Agregar Marketplace',
