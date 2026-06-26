@@ -38,11 +38,14 @@ az acr login --name acrbrasallerprod
 Substitua `<service>` pelo nome do serviço (ex: `reporting-service`).
 
 ### Passo 1 — Build da imagem Docker
+
+Use `SWAGGER_UI_ENABLED=true` para o `gateway-api`, pois ele é a borda pública de documentação. Para os microservices internos, mantenha `false` em produção.
+
 ```powershell
 docker build `
   -f <service>/src/main/docker/Dockerfile.jvm `
   -t acrbrasallerprod.azurecr.io/<service>:prod `
-  --build-arg SWAGGER_UI_ENABLED=false `
+  --build-arg SWAGGER_UI_ENABLED=<true-para-gateway-api-ou-false-para-internos> `
   <service>
 ```
 
@@ -79,7 +82,7 @@ foreach ($svc in $services) {
     docker build `
         -f "$svc/src/main/docker/Dockerfile.jvm" `
         -t "$acr.azurecr.io/${svc}:$tag" `
-        --build-arg SWAGGER_UI_ENABLED=false `
+        --build-arg SWAGGER_UI_ENABLED=$(if ($svc -eq "gateway-api") { "true" } else { "false" }) `
         $svc
 
     docker push "$acr.azurecr.io/${svc}:$tag"
@@ -110,7 +113,8 @@ az acr login --name $acr
 
 foreach ($svc in $services) {
     $dockerfile = if ($svc -eq "gateway-api") { "gateway-api/src/main/docker/Dockerfile.jvm" } else { "$svc/src/main/docker/Dockerfile.jvm" }
-    docker build -f "../../$dockerfile" -t "$acr.azurecr.io/${svc}:prod" --build-arg SWAGGER_UI_ENABLED=false "../../$svc"
+    $swaggerEnabled = if ($svc -eq "gateway-api") { "true" } else { "false" }
+    docker build -f "../../$dockerfile" -t "$acr.azurecr.io/${svc}:prod" --build-arg SWAGGER_UI_ENABLED=$swaggerEnabled "../../$svc"
     docker push "$acr.azurecr.io/${svc}:prod"
 }
 

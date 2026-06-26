@@ -95,10 +95,10 @@ export function Sidebar({ user, dict, lang }: SidebarProps) {
           {collapsed ? null : (
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold tracking-[-0.025em] text-foreground">
-                Brasaller
+                Logo
               </p>
               <p className="truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Workspace
+                SubLine
               </p>
             </div>
           )}
