@@ -1,9 +1,18 @@
 import { notFound, redirect } from 'next/navigation'
 import { Header, Sidebar } from '@/widgets/app-shell'
-import { getSession, getToken } from '@/entities/session/server/session'
+import { getSessionFromToken, getToken } from '@/entities/session/server/session'
 import { getNotifications } from '@/shared/api/gateway'
 import { getDictionary } from '@/shared/i18n/get-dictionary'
 import { isLocale } from '@/shared/i18n/config'
+
+const NOTIFICATIONS_BOOT_TIMEOUT_MS = 1200
+
+function withTimeout<T>(promise: Promise<T>, fallback: T, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
+  ])
+}
 
 interface Props {
   children: React.ReactNode
@@ -13,12 +22,12 @@ interface Props {
 export default async function AppLayout({ children, params }: Props) {
   const { lang } = await params
   if (!isLocale(lang)) notFound()
-  const session = await getSession()
+  const token = (await getToken()) ?? ''
+  const session = getSessionFromToken(token)
   if (!session) redirect(`/${lang}/login`)
 
-  const token = (await getToken()) ?? ''
   const [notifications, dict] = await Promise.all([
-    getNotifications(token, session.tenantId),
+    withTimeout(getNotifications(token, session.tenantId), [], NOTIFICATIONS_BOOT_TIMEOUT_MS),
     getDictionary(lang),
   ])
 

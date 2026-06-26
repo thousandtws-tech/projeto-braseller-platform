@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Badge } from '@/shared/ui/badge'
 import { Skeleton } from '@/shared/ui/skeleton'
 import { DatePicker } from '@/shared/ui/date-picker'
-import { getToken, getSession } from '@/entities/session/server/session'
+import { getSessionFromToken, getToken } from '@/entities/session/server/session'
 import { getDashboard, getReportEntries, getReportsSummary, formatCurrency, formatDate } from '@/shared/api/gateway'
 import { getDictionary } from '@/shared/i18n/get-dictionary'
 import type { Dictionary } from '@/shared/i18n/get-dictionary'
@@ -45,10 +45,10 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function DashboardPage({ params }: PageProps) {
   const { lang } = await params
-  const token = (await getToken()) ?? ''
-  const session = await getSession()
+  const [dict, rawToken] = await Promise.all([getDictionary(lang), getToken()])
+  const token = rawToken ?? ''
+  const session = getSessionFromToken(rawToken)
   const tenantId = session?.tenantId
-  const dict = await getDictionary(lang)
   const period = getCurrentPeriod(lang)
 
   return (

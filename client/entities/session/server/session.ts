@@ -8,8 +8,7 @@ export async function getToken(): Promise<string | null> {
   return store.get(COOKIE_NAME)?.value ?? null
 }
 
-export async function getSession(): Promise<UserSession | null> {
-  const token = await getToken()
+export function getSessionFromToken(token: string | null | undefined): UserSession | null {
   if (!token) return null
 
   try {
@@ -43,4 +42,8 @@ export async function getSession(): Promise<UserSession | null> {
   } catch {
     return null
   }
+}
+
+export async function getSession(): Promise<UserSession | null> {
+  return getSessionFromToken(await getToken())
 }
