@@ -2,6 +2,7 @@ package com.example.interfaces.rest;
 
 import com.example.application.exception.ConnectorValidationException;
 import com.example.application.service.ConnectorService;
+import com.example.application.service.PluggyConnectService;
 import com.example.application.service.TenantAuthorizationService;
 import com.example.domain.model.TenantContext;
 import com.example.domain.model.connector.ConnectorDescriptor;
@@ -49,11 +50,42 @@ public class ConnectorResource {
     @Inject
     TenantAuthorizationService tenantAuthorizationService;
 
+    @Inject
+    PluggyConnectService pluggyConnectService;
+
     @GET
     @Operation(summary = "Listar conectores", description = "Lista conectores registrados sem expor implementacoes especificas ao Core.")
     @APIResponse(responseCode = "200", description = "Conectores registrados.")
     public List<ConnectorDescriptor> list() {
         return connectorService.list();
+    }
+
+    @POST
+    @Path("/open-finance/pluggy/connect-token")
+    @Operation(summary = "Criar Connect Token Pluggy", description = "Gera um token server-side para abrir o widget Pluggy Connect sem expor credenciais no navegador.")
+    @SecurityRequirement(name = "bearerAuth")
+    public Map<String, String> createPluggyConnectToken(
+            @HeaderParam("Authorization") String authorizationHeader,
+            PluggyConnectTokenRequest request) {
+        TenantContext context = tenantAuthorizationService.requireWritable(authorizationHeader);
+        String accessToken = pluggyConnectService.createConnectToken(
+                context.tenantId(),
+                request == null ? null : request.clientUserId());
+        return Map.of("accessToken", accessToken);
+    }
+
+    @POST
+    @Path("/open-finance/pluggy/webhooks")
+    @Operation(summary = "Receber webhook Pluggy", description = "Confirma eventos da Pluggy rapidamente; processamento pesado deve ser assíncrono.")
+    public Response pluggyWebhook(Map<String, Object> event) {
+        String eventName = event == null ? null : String.valueOf(event.get("event"));
+        String eventId = event == null ? null : String.valueOf(event.get("eventId"));
+        return Response.ok(Map.of(
+                "received", true,
+                "event", eventName == null ? "unknown" : eventName,
+                "eventId", eventId == null ? "unknown" : eventId,
+                "receivedAt", Instant.now().toString()
+        )).build();
     }
 
     @POST
@@ -187,6 +219,9 @@ public class ConnectorResource {
     }
 
     public record AuthenticateRequest(Map<String, String> credentials) {
+    }
+
+    public record PluggyConnectTokenRequest(String clientUserId) {
     }
 
     public record SyncAllRequest(Instant since) {

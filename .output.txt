@@ -1,105 +1,836 @@
 Command finished with exit code 0.
 Command output:
-=== auth-service ===
-Name          Revision               State      Running
-------------  ---------------------  ---------  ---------
-auth-service  auth-service--0000010  Succeeded  Running
-=== user-service ===
-Name          Revision               State      Running
-------------  ---------------------  ---------  ---------
-user-service  user-service--0000007  Succeeded  Running
-=== notification-service ===
-Name                  Revision                       State      Running
---------------------  -----------------------------  ---------  ---------
-notification-service  notification-service--0000010  Succeeded  Running
-=== core-service ===
-Name          Revision               State      Running
-------------  ---------------------  ---------  ---------
-core-service  core-service--0000015  Succeeded  Running
-=== gateway-api ===
-Name         Revision              State      Running
------------  --------------------  ---------  ---------
-gateway-api  gateway-api--0000013  Succeeded  Running
-=== auth logs ===
-{"TimeStamp": "2026-06-26T18:52:47.81631", "Log": "Connecting to the container 'auth-service'..."}
-{"TimeStamp": "2026-06-26T18:52:47.8419", "Log": "Successfully Connected to container: 'auth-service' [Revision: 'auth-service--0000010', Replica: 'auth-service--0000010-5f497db748-mk2ct']"}
-{"TimeStamp": "2026-06-26T18:43:29.6116673+00:00", "Log": "- - [26/Jun/2026:18:43:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:43:30.1888832+00:00", "Log": "- - [26/Jun/2026:18:43:30 +0000] \\\"POST /auth/verify-email HTTP/1.1\\\" 404 53\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:43:39.6110561+00:00", "Log": "- - [26/Jun/2026:18:43:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:43:49.6112198+00:00", "Log": "- - [26/Jun/2026:18:43:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:43:54.0600086+00:00", "Log": "- - [26/Jun/2026:18:43:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:43:59.6112409+00:00", "Log": "- - [26/Jun/2026:18:43:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:08.2140414+00:00", "Log": "- - [26/Jun/2026:18:44:08 +0000] \\\"POST /auth/verify-email HTTP/1.1\\\" 404 53\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:09.6110417+00:00", "Log": "- - [26/Jun/2026:18:44:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:13.449609+00:00", "Log": "- - [26/Jun/2026:18:44:13 +0000] \\\"POST /auth/verify-email HTTP/1.1\\\" 404 53\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:19.6110879+00:00", "Log": "- - [26/Jun/2026:18:44:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:24.0598924+00:00", "Log": "- - [26/Jun/2026:18:44:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:29.6115494+00:00", "Log": "- - [26/Jun/2026:18:44:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:39.6111199+00:00", "Log": "- - [26/Jun/2026:18:44:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:41.0351935+00:00", "Log": "- - [26/Jun/2026:18:44:41 +0000] \\\"POST /auth/verify-email HTTP/1.1\\\" 404 53\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:49.6118103+00:00", "Log": "- - [26/Jun/2026:18:44:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:54.0599366+00:00", "Log": "- - [26/Jun/2026:18:44:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:44:59.6114905+00:00", "Log": "- - [26/Jun/2026:18:44:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:09.6119015+00:00", "Log": "- - [26/Jun/2026:18:45:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:19.6119468+00:00", "Log": "- - [26/Jun/2026:18:45:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:24.0612906+00:00", "Log": "- - [26/Jun/2026:18:45:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:29.6108113+00:00", "Log": "- - [26/Jun/2026:18:45:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:36.2000846+00:00", "Log": "- - [26/Jun/2026:18:45:36 +0000] \\\"POST /auth/login HTTP/1.1\\\" 401 41\",\"threadName\":\"executor-thread-1\",\"threadId\":18,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:39.6118974+00:00", "Log": "- - [26/Jun/2026:18:45:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:49.6114421+00:00", "Log": "- - [26/Jun/2026:18:45:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:54.0599391+00:00", "Log": "- - [26/Jun/2026:18:45:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:58.4272006+00:00", "Log": "- - [26/Jun/2026:18:45:58 +0000] \\\"POST /auth/verify-email HTTP/1.1\\\" 404 53\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:45:59.6108759+00:00", "Log": "- - [26/Jun/2026:18:45:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:09.610993+00:00", "Log": "- - [26/Jun/2026:18:46:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:19.6108875+00:00", "Log": "- - [26/Jun/2026:18:46:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:24.0597377+00:00", "Log": "- - [26/Jun/2026:18:46:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:29.6109874+00:00", "Log": "- - [26/Jun/2026:18:46:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:39.6112558+00:00", "Log": "- - [26/Jun/2026:18:46:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:49.6116527+00:00", "Log": "- - [26/Jun/2026:18:46:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:54.059499+00:00", "Log": "- - [26/Jun/2026:18:46:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:46:59.6117659+00:00", "Log": "- - [26/Jun/2026:18:46:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:09.6109397+00:00", "Log": "- - [26/Jun/2026:18:47:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:19.6114997+00:00", "Log": "- - [26/Jun/2026:18:47:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:24.0594246+00:00", "Log": "- - [26/Jun/2026:18:47:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:29.6115989+00:00", "Log": "- - [26/Jun/2026:18:47:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:39.6115438+00:00", "Log": "- - [26/Jun/2026:18:47:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:49.6113868+00:00", "Log": "- - [26/Jun/2026:18:47:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:54.0596058+00:00", "Log": "- - [26/Jun/2026:18:47:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:47:59.6113729+00:00", "Log": "- - [26/Jun/2026:18:47:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:09.6113212+00:00", "Log": "- - [26/Jun/2026:18:48:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:19.6111297+00:00", "Log": "- - [26/Jun/2026:18:48:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:24.0600609+00:00", "Log": "- - [26/Jun/2026:18:48:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:29.6114405+00:00", "Log": "- - [26/Jun/2026:18:48:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:39.6110742+00:00", "Log": "- - [26/Jun/2026:18:48:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:49.6113339+00:00", "Log": "- - [26/Jun/2026:18:48:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:54.0589581+00:00", "Log": "- - [26/Jun/2026:18:48:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:48:59.6109696+00:00", "Log": "- - [26/Jun/2026:18:48:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:09.6106116+00:00", "Log": "- - [26/Jun/2026:18:49:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:19.6111239+00:00", "Log": "- - [26/Jun/2026:18:49:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:24.0592969+00:00", "Log": "- - [26/Jun/2026:18:49:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:29.6124963+00:00", "Log": "- - [26/Jun/2026:18:49:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:39.6117656+00:00", "Log": "- - [26/Jun/2026:18:49:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:49.6136083+00:00", "Log": "- - [26/Jun/2026:18:49:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:54.0596328+00:00", "Log": "- - [26/Jun/2026:18:49:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:49:59.6116806+00:00", "Log": "- - [26/Jun/2026:18:49:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:09.6115366+00:00", "Log": "- - [26/Jun/2026:18:50:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:19.6110677+00:00", "Log": "- - [26/Jun/2026:18:50:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:24.059878+00:00", "Log": "- - [26/Jun/2026:18:50:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:29.6114705+00:00", "Log": "- - [26/Jun/2026:18:50:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:39.6117894+00:00", "Log": "- - [26/Jun/2026:18:50:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:49.6115877+00:00", "Log": "- - [26/Jun/2026:18:50:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:54.0601457+00:00", "Log": "- - [26/Jun/2026:18:50:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:50:59.6108174+00:00", "Log": "- - [26/Jun/2026:18:50:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:09.6105792+00:00", "Log": "- - [26/Jun/2026:18:51:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:19.6113629+00:00", "Log": "- - [26/Jun/2026:18:51:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:24.0597937+00:00", "Log": "- - [26/Jun/2026:18:51:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:29.6113272+00:00", "Log": "- - [26/Jun/2026:18:51:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:39.6107682+00:00", "Log": "- - [26/Jun/2026:18:51:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:49.6112882+00:00", "Log": "- - [26/Jun/2026:18:51:49 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:54.0602535+00:00", "Log": "- - [26/Jun/2026:18:51:54 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:51:59.6110963+00:00", "Log": "- - [26/Jun/2026:18:51:59 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:52:09.6112143+00:00", "Log": "- - [26/Jun/2026:18:52:09 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:52:19.6138605+00:00", "Log": "- - [26/Jun/2026:18:52:19 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:52:24.0594042+00:00", "Log": "- - [26/Jun/2026:18:52:24 +0000] \\\"GET /q/health/live HTTP/1.1\\\" 200 45\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:52:29.6108943+00:00", "Log": "- - [26/Jun/2026:18:52:29 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-1\",\"threadId\":26,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
-{"TimeStamp": "2026-06-26T18:52:39.6108364+00:00", "Log": "- - [26/Jun/2026:18:52:39 +0000] \\\"GET /q/health/ready HTTP/1.1\\\" 200 220\",\"threadName\":\"vert.x-eventloop-thread-0\",\"threadId\":25,\"mdc\":{},\"ndc\":\"\",\"hostName\":\"auth-service--0000010-5f497db748-mk2ct\",\"processName\":\"/usr/lib/jvm/java-21-openjdk-21.0.11.0.10-2.el9.x86_64/bin/java\",\"processId\":1}"}
+TAG=pluggy-20260626160429
+Login Succeeded
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.jvm
+#1 transferring dockerfile: 1.38kB 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for registry.access.redhat.com/ubi9/openjdk-21-runtime:1.24
+#2 DONE 0.6s
+
+#3 [internal] load metadata for docker.io/library/maven:3.9-eclipse-temurin-21
+#3 DONE 1.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 122B 0.0s done
+#4 DONE 0.0s
+
+#5 [build 1/6] FROM docker.io/library/maven:3.9-eclipse-temurin-21@sha256:d7e7f57407437c014571f1ad5a9955f03fc3edcb1d964067ef351fa38e798665
+#5 DONE 0.0s
+
+#6 [build 2/6] WORKDIR /workspace
+#6 CACHED
+
+#7 [runtime 1/6] FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.24@sha256:b8be612ac873a91d2a9e05937453358e719b155dc0304c070ffe0e94cd6aa5e2
+#7 CACHED
+
+#8 [runtime 2/6] RUN microdnf install -y curl-minimal && microdnf clean all
+#8 ...
+
+#9 [internal] load build context
+#9 transferring context: 14.34kB 0.1s done
+#9 DONE 0.2s
+
+#10 [build 3/6] COPY pom.xml .
+#10 DONE 0.1s
+
+#11 [build 4/6] RUN mvn -B -ntp dependency:go-offline
+#11 ...
+
+#8 [runtime 2/6] RUN microdnf install -y curl-minimal && microdnf clean all
+#8 1.898 
+#8 1.898 (microdnf:7): librhsm-WARNING **: 19:04:42.431: Found 0 entitlement certificates
+#8 1.905 
+#8 1.905 (microdnf:7): librhsm-WARNING **: 19:04:42.438: Found 0 entitlement certificates
+#8 2.490 Downloading metadata...
+#8 3.103 Downloading metadata...
+#8 4.445 Downloading metadata...
+#8 4.843 Nothing to do.
+#8 4.874 
+#8 4.874 (microdnf:1): librhsm-WARNING **: 19:04:45.407: Found 0 entitlement certificates
+#8 4.877 
+#8 4.877 (microdnf:1): librhsm-WARNING **: 19:04:45.410: Found 0 entitlement certificates
+#8 4.889 Complete.
+#8 DONE 4.9s
+
+#11 [build 4/6] RUN mvn -B -ntp dependency:go-offline
+#11 5.197 [INFO] Scanning for projects...
+#11 22.48 [INFO] 
+#11 22.48 [INFO] ----------------------< com.example:core-service >----------------------
+#11 22.48 [INFO] Building core-service 1.0-SNAPSHOT
+#11 22.48 [INFO]   from pom.xml
+#11 22.48 [INFO] ------------------------------[ quarkus ]-------------------------------
+#11 22.50 [INFO] 
+#11 22.50 [INFO] --- dependency:3.7.0:go-offline (default-cli) @ core-service ---
+#11 66.38 [INFO] Resolved plugin: jetty-servlet-9.4.46.v20220331.jar
+#11 66.38 [INFO] Resolved plugin: maven-core-3.9.15.jar
+#11 66.38 [INFO] Resolved plugin: mojo-executor-2.4.0.jar
+#11 66.38 [INFO] Resolved plugin: jackson-dataformat-xml-2.21.2.jar
+#11 66.38 [INFO] Resolved plugin: quarkus-devtools-common-3.35.4.jar
+#11 66.38 [INFO] Resolved plugin: maven-failsafe-plugin-3.5.4.jar
+#11 66.38 [INFO] Resolved plugin: quarkus-devtools-base-codestarts-3.35.4.jar
+#11 66.38 [INFO] Resolved plugin: json-schema-validator-1.5.9.jar
+#11 66.38 [INFO] Resolved plugin: quarkus-hibernate-validator-spi-3.35.4.jar
+#11 66.38 [INFO] Resolved plugin: doxia-module-twiki-1.11.1.jar
+#11 66.38 [INFO] Resolved plugin: velocity-tools-2.0.jar
+#11 66.38 [INFO] Resolved plugin: smallrye-common-expression-2.17.0.jar
+#11 66.39 [INFO] Resolved plugin: jakarta.enterprise.lang-model-4.1.0.jar
+#11 66.39 [INFO] Resolved plugin: jspecify-1.0.0.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-gfm-tasklist-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: jboss-logging-3.6.3.Final.jar
+#11 66.39 [INFO] Resolved plugin: commons-codec-1.17.0.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-admonition-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-beanbag-maven-1.6.1.jar
+#11 66.39 [INFO] Resolved plugin: maven-core-3.2.5.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-footnotes-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-gfm-strikethrough-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-media-tags-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: doxia-module-xhtml-1.11.1.jar
+#11 66.39 [INFO] Resolved plugin: commons-io-2.22.0.jar
+#11 66.39 [INFO] Resolved plugin: qute-core-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-common-io-2.17.0.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-util-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-anchorlink-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: plexus-java-1.5.2.jar
+#11 66.39 [INFO] Resolved plugin: aether-api-1.0.0.v20140518.jar
+#11 66.39 [INFO] Resolved plugin: microprofile-config-api-3.1.jar
+#11 66.39 [INFO] Resolved plugin: jakarta.el-api-6.0.1.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-devtools-message-writer-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: autolink-0.6.0.jar
+#11 66.39 [INFO] Resolved plugin: stax2-api-4.2.2.jar
+#11 66.39 [INFO] Resolved plugin: maven-filtering-3.3.1.jar
+#11 66.39 [INFO] Resolved plugin: doxia-skin-model-1.11.1.jar
+#11 66.39 [INFO] Resolved plugin: dom4j-1.1.jar
+#11 66.39 [INFO] Resolved plugin: bsh-2.0b6.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-analytics-common-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: commons-io-2.16.1.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-config-common-3.17.2.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-youtrack-converter-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: nativeimage-23.1.2.jar
+#11 66.39 [INFO] Resolved plugin: jackson-core-2.21.2.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-common-net-2.17.0.jar
+#11 66.39 [INFO] Resolved plugin: surefire-extensions-api-3.5.4.jar
+#11 66.39 [INFO] Resolved plugin: httpclient-4.5.13.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-toc-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: org.eclipse.sisu.plexus-1.0.0.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-development-mode-spi-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: surefire-api-3.5.4.jar
+#11 66.39 [INFO] Resolved plugin: asm-9.8.jar
+#11 66.39 [INFO] Resolved plugin: jetty-http-9.4.46.v20220331.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-bootstrap-maven-resolver-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: maven-builder-support-3.9.15.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-jira-converter-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: cyclonedx-core-java-12.1.0.jar
+#11 66.39 [INFO] Resolved plugin: maven-reporting-api-3.1.1.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-classloader-commons-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: maven-plugin-api-3.2.5.jar
+#11 66.39 [INFO] Resolved plugin: sisu-guice-3.2.3-no_aop.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-attributes-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: commons-lang3-3.8.1.jar
+#11 66.39 [INFO] Resolved plugin: parsson-1.1.7.jar
+#11 66.39 [INFO] Resolved plugin: maven-aether-provider-3.2.5.jar
+#11 66.39 [INFO] Resolved plugin: aether-util-1.0.0.v20140518.jar
+#11 66.39 [INFO] Resolved plugin: packageurl-java-1.5.0.jar
+#11 66.39 [INFO] Resolved plugin: jetty-security-9.4.46.v20220331.jar
+#11 66.39 [INFO] Resolved plugin: junit-jupiter-engine-6.0.3.jar
+#11 66.39 [INFO] Resolved plugin: itu-1.14.0.jar
+#11 66.39 [INFO] Resolved plugin: httpclient-4.5.14.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-common-constraint-2.17.0.jar
+#11 66.39 [INFO] Resolved plugin: maven-enforcer-plugin-3.5.0.jar
+#11 66.39 [INFO] Resolved plugin: maven-common-artifact-filters-3.4.0.jar
+#11 66.39 [INFO] Resolved plugin: maven-xml-impl-4.0.0-alpha-7.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-devtools-codestarts-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: org.eclipse.sisu.plexus-0.3.5.jar
+#11 66.39 [INFO] Resolved plugin: maven-resolver-impl-1.9.27.jar
+#11 66.39 [INFO] Resolved plugin: doxia-core-1.11.1.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-ins-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: jansi-2.4.0.jar
+#11 66.39 [INFO] Resolved plugin: google-collections-1.0.jar
+#11 66.39 [INFO] Resolved plugin: maven-resolver-named-locks-1.9.27.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-beanbag-sisu-1.6.1.jar
+#11 66.39 [INFO] Resolved plugin: maven-model-builder-3.9.15.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-emoji-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: asm-tree-9.9.1.jar
+#11 66.39 [INFO] Resolved plugin: maven-resolver-api-1.4.1.jar
+#11 66.39 [INFO] Resolved plugin: maven-resolver-spi-1.9.27.jar
+#11 66.39 [INFO] Resolved plugin: doxia-integration-tools-1.11.1.jar
+#11 66.39 [INFO] Resolved plugin: org.eclipse.sisu.inject-1.0.0.jar
+#11 66.39 [INFO] Resolved plugin: maven-api-meta-4.0.0-alpha-7.jar
+#11 66.39 [INFO] Resolved plugin: guice-5.1.0-classes.jar
+#11 66.39 [INFO] Resolved plugin: maven-repository-metadata-3.2.5.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-ext-jekyll-front-matter-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: doxia-decoration-model-1.11.1.jar
+#11 66.39 [INFO] Resolved plugin: crac-1.5.0.jar
+#11 66.39 [INFO] Resolved plugin: flexmark-all-0.42.14.jar
+#11 66.39 [INFO] Resolved plugin: word-23.1.2.jar
+#11 66.39 [INFO] Resolved plugin: maven-shared-incremental-1.1.jar
+#11 66.39 [INFO] Resolved plugin: failureaccess-1.0.1.jar
+#11 66.39 [INFO] Resolved plugin: plexus-xml-4.0.2.jar
+#11 66.39 [INFO] Resolved plugin: maven-compiler-plugin-3.15.0.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-cyclonedx-generator-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: jetty-webapp-9.4.46.v20220331.jar
+#11 66.39 [INFO] Resolved plugin: jdk-classfile-backport-26.jar
+#11 66.39 [INFO] Resolved plugin: slf4j-jboss-logmanager-2.0.2.Final.jar
+#11 66.39 [INFO] Resolved plugin: smallrye-common-annotation-2.17.0.jar
+#11 66.39 [INFO] Resolved plugin: quarkus-bootstrap-runner-3.35.4.jar
+#11 66.39 [INFO] Resolved plugin: plexus-io-3.2.0.jar
+#11 66.39 [INFO] Resolved plugin: xbean-reflect-3.7.jar
+#11 66.39 [INFO] Resolved plugin: maven-resolver-provider-3.9.15.jar
+#11 66.39 [INFO] Resolved plugin: maven-reporting-exec-1.6.0.jar
+#11 66.39 [INFO] Resolved plugin: doxia-sink-api-1.11.1.jar
+#11 66.39 [INFO] Resolved plugin: plexus-xml-3.0.0.jar
+#11 66.40 [INFO] Resolved plugin: jetty-xml-9.4.46.v20220331.jar
+#11 66.40 [INFO] Resolved plugin: plexus-velocity-1.2.jar
+#11 66.40 [INFO] Resolved plugin: plexus-container-default-2.1.0.jar
+#11 66.40 [INFO] Resolved plugin: commons-codec-1.11.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-os-2.17.0.jar
+#11 66.40 [INFO] Resolved plugin: jackson-databind-2.21.2.jar
+#11 66.40 [INFO] Resolved plugin: snappy-0.4.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-class-change-agent-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-devtools-registry-client-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: plexus-build-api-0.0.7.jar
+#11 66.40 [INFO] Resolved plugin: maven-plugin-api-3.9.15.jar
+#11 66.40 [INFO] Resolved plugin: doxia-module-fml-1.11.1.jar
+#11 66.40 [INFO] Resolved plugin: freemarker-2.3.34.jar
+#11 66.40 [INFO] Resolved plugin: commons-digester-1.8.jar
+#11 66.40 [INFO] Resolved plugin: jetty-server-9.4.46.v20220331.jar
+#11 66.40 [INFO] Resolved plugin: maven-shared-utils-3.4.2.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-abbreviation-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: maven-archiver-3.5.2.jar
+#11 66.40 [INFO] Resolved plugin: enforcer-rules-3.5.0.jar
+#11 66.40 [INFO] Resolved plugin: commons-codec-1.21.0.jar
+#11 66.40 [INFO] Resolved plugin: junit-platform-commons-6.0.3.jar
+#11 66.40 [INFO] Resolved plugin: snakeyaml-2.6.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-definition-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: doxia-logging-api-1.11.1.jar
+#11 66.40 [INFO] Resolved plugin: plexus-xml-3.0.1.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-fs-util-1.3.0.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-version-2.17.0.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-maven-plugin-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: commons-logging-jboss-logging-2.0.0.Final.jar
+#11 66.40 [INFO] Resolved plugin: byte-buddy-agent-1.18.8.jar
+#11 66.40 [INFO] Resolved plugin: maven-surefire-plugin-3.5.4.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-yaml-front-matter-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: jboss-threads-3.9.2.jar
+#11 66.40 [INFO] Resolved plugin: maven-site-plugin-3.12.1.jar
+#11 66.40 [INFO] Resolved plugin: asm-9.9.1.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-superscript-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-cpu-2.17.0.jar
+#11 66.40 [INFO] Resolved plugin: commons-collections-3.2.2.jar
+#11 66.40 [INFO] Resolved plugin: surefire-shared-utils-3.5.4.jar
+#11 66.40 [INFO] Resolved plugin: doxia-module-markdown-1.11.1.jar
+#11 66.40 [INFO] Resolved plugin: jandex-gizmo2-3.5.3.jar
+#11 66.40 [INFO] Resolved plugin: junit-platform-engine-6.0.3.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-core-deployment-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: jackson-dataformat-yaml-2.21.2.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-xwiki-macros-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: commons-compress-1.20.jar
+#11 66.40 [INFO] Resolved plugin: jackson-datatype-jdk8-2.21.2.jar
+#11 66.40 [INFO] Resolved plugin: maven-resources-plugin-3.3.1.jar
+#11 66.40 [INFO] Resolved plugin: velocity-1.7.jar
+#11 66.40 [INFO] Resolved plugin: commons-compress-1.28.0.jar
+#11 66.40 [INFO] Resolved plugin: plexus-utils-3.5.1.jar
+#11 66.40 [INFO] Resolved plugin: plexus-compiler-api-2.16.2.jar
+#11 66.40 [INFO] Resolved plugin: surefire-extensions-spi-3.5.4.jar
+#11 66.40 [INFO] Resolved plugin: aopalliance-1.0.jar
+#11 66.40 [INFO] Resolved plugin: aether-spi-1.0.0.v20140518.jar
+#11 66.40 [INFO] Resolved plugin: plexus-interpolation-1.26.jar
+#11 66.40 [INFO] Resolved plugin: wildfly-common-2.0.1.jar
+#11 66.40 [INFO] Resolved plugin: readline-2.6.jar
+#11 66.40 [INFO] Resolved plugin: slf4j-api-2.0.17.jar
+#11 66.40 [INFO] Resolved plugin: jandex-3.5.3.jar
+#11 66.40 [INFO] Resolved plugin: jackson-annotations-2.21.jar
+#11 66.40 [INFO] Resolved plugin: maven-settings-builder-3.2.5.jar
+#11 66.40 [INFO] Resolved plugin: httpcore-4.4.14.jar
+#11 66.40 [INFO] Resolved plugin: commons-lang3-3.20.0.jar
+#11 66.40 [INFO] Resolved plugin: maven-settings-builder-3.9.15.jar
+#11 66.40 [INFO] Resolved plugin: commons-lang3-3.12.0.jar
+#11 66.40 [INFO] Resolved plugin: maven-artifact-3.9.15.jar
+#11 66.40 [INFO] Resolved plugin: maven-surefire-common-3.5.4.jar
+#11 66.40 [INFO] Resolved plugin: jakarta.json-api-2.1.3.jar
+#11 66.40 [INFO] Resolved plugin: maven-artifact-3.2.5.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-function-2.17.0.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-enumerated-reference-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: mutiny-3.1.1.jar
+#11 66.40 [INFO] Resolved plugin: plexus-component-annotations-2.1.1.jar
+#11 66.40 [INFO] Resolved plugin: javax.annotation-api-1.3.2.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-bootstrap-maven4-resolver-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: gizmo-1.10.1.jar
+#11 66.40 [INFO] Resolved plugin: opentest4j-1.3.0.jar
+#11 66.40 [INFO] Resolved plugin: commons-logging-1.2.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-escaped-character-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-core-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-beanbag-1.6.1.jar
+#11 66.40 [INFO] Resolved plugin: maven-embedder-3.9.15.jar
+#11 66.40 [INFO] Resolved plugin: junit-jupiter-6.0.3.jar
+#11 66.40 [INFO] Resolved plugin: plexus-cipher-1.4.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-ref-2.17.0.jar
+#11 66.40 [INFO] Resolved plugin: plexus-utils-3.4.2.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-aside-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-wikilink-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-classloader-2.17.0.jar
+#11 66.40 [INFO] Resolved plugin: surefire-logger-api-3.5.4.jar
+#11 66.40 [INFO] Resolved plugin: maven-resolver-api-1.9.27.jar
+#11 66.40 [INFO] Resolved plugin: org.eclipse.sisu.inject-0.3.5.jar
+#11 66.40 [INFO] Resolved plugin: maven-api-xml-4.0.0-alpha-7.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-project-core-extension-codestarts-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-ext-gfm-tables-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: plexus-compiler-manager-2.16.2.jar
+#11 66.40 [INFO] Resolved plugin: quarkus-bootstrap-app-model-3.35.4.jar
+#11 66.40 [INFO] Resolved plugin: commons-io-2.11.0.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-config-3.17.2.jar
+#11 66.40 [INFO] Resolved plugin: jetty-io-9.4.46.v20220331.jar
+#11 66.40 [INFO] Resolved plugin: cdi-api-1.2.jar
+#11 66.40 [INFO] Resolved plugin: commons-chain-1.1.jar
+#11 66.40 [INFO] Resolved plugin: plexus-utils-4.0.2.jar
+#11 66.40 [INFO] Resolved plugin: flexmark-html-parser-0.42.14.jar
+#11 66.40 [INFO] Resolved plugin: javax.inject-1.jar
+#11 66.40 [INFO] Resolved plugin: maven-shared-utils-3.3.4.jar
+#11 66.40 [INFO] Resolved plugin: javax.servlet-api-3.1.0.jar
+#11 66.40 [INFO] Resolved plugin: jetty-util-ajax-9.4.46.v20220331.jar
+#11 66.40 [INFO] Resolved plugin: smallrye-common-resource-2.17.0.jar
+#11 66.41 [INFO] Resolved plugin: junit-platform-launcher-6.0.3.jar
+#11 66.41 [INFO] Resolved plugin: maven-settings-3.2.5.jar
+#11 66.41 [INFO] Resolved plugin: gizmo2-2.1.1.jar
+#11 66.41 [INFO] Resolved plugin: jsoup-1.10.2.jar
+#11 66.41 [INFO] Resolved plugin: jboss-logmanager-3.2.2.Final.jar
+#11 66.41 [INFO] Resolved plugin: oro-2.0.8.jar
+#11 66.41 [INFO] Resolved plugin: plexus-classworlds-2.6.0.jar
+#11 66.41 [INFO] Resolved plugin: maven-model-3.9.15.jar
+#11 66.41 [INFO] Resolved plugin: plexus-component-annotations-2.1.0.jar
+#11 66.41 [INFO] Resolved plugin: xz-1.9.jar
+#11 66.41 [INFO] Resolved plugin: junit-jupiter-params-6.0.3.jar
+#11 66.41 [INFO] Resolved plugin: guava-33.5.0-jre.jar
+#11 66.41 [INFO] Resolved plugin: aether-impl-1.0.0.v20140518.jar
+#11 66.41 [INFO] Resolved plugin: commons-text-1.3.jar
+#11 66.41 [INFO] Resolved plugin: maven-model-helper-41.jar
+#11 66.41 [INFO] Resolved plugin: commons-lang-2.4.jar
+#11 66.41 [INFO] Resolved plugin: slf4j-api-1.7.36.jar
+#11 66.41 [INFO] Resolved plugin: aesh-2.8.2.jar
+#11 66.41 [INFO] Resolved plugin: maven-resolver-util-1.4.1.jar
+#11 66.41 [INFO] Resolved plugin: doxia-module-apt-1.11.1.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-gfm-issues-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: jetty-util-9.4.46.v20220331.jar
+#11 66.41 [INFO] Resolved plugin: plexus-utils-3.6.1.jar
+#11 66.41 [INFO] Resolved plugin: maven-model-builder-3.2.5.jar
+#11 66.41 [INFO] Resolved plugin: plexus-archiver-4.2.7.jar
+#11 66.41 [INFO] Resolved plugin: enforcer-api-3.5.0.jar
+#11 66.41 [INFO] Resolved plugin: commons-collections4-4.5.0.jar
+#11 66.41 [INFO] Resolved plugin: commons-io-2.6.jar
+#11 66.41 [INFO] Resolved plugin: quarkus-bootstrap-core-3.35.4.jar
+#11 66.41 [INFO] Resolved plugin: jakarta.interceptor-api-2.2.0.jar
+#11 66.41 [INFO] Resolved plugin: jakarta.enterprise.cdi-api-4.1.0.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-youtube-embedded-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: quarkus-builder-3.35.4.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-formatter-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: maven-model-3.2.5.jar
+#11 66.41 [INFO] Resolved plugin: httpcore-4.4.16.jar
+#11 66.41 [INFO] Resolved plugin: plexus-utils-4.0.1.jar
+#11 66.41 [INFO] Resolved plugin: jdom2-2.0.6.1.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-profile-pegdown-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: doxia-module-docbook-simple-1.11.1.jar
+#11 66.41 [INFO] Resolved plugin: junit-jupiter-api-6.0.3.jar
+#11 66.41 [INFO] Resolved plugin: guava-16.0.1.jar
+#11 66.41 [INFO] Resolved plugin: maven-settings-3.9.15.jar
+#11 66.41 [INFO] Resolved plugin: asm-analysis-9.9.1.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-typographic-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-autolink-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-jekyll-tag-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-gitlab-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: plexus-cipher-2.0.jar
+#11 66.41 [INFO] Resolved plugin: doxia-module-xdoc-1.11.1.jar
+#11 66.41 [INFO] Resolved plugin: plexus-sec-dispatcher-2.0.jar
+#11 66.41 [INFO] Resolved plugin: quarkus-value-registry-3.35.4.jar
+#11 66.41 [INFO] Resolved plugin: doxia-site-renderer-1.11.1.jar
+#11 66.41 [INFO] Resolved plugin: jakarta.annotation-api-3.0.0.jar
+#11 66.41 [INFO] Resolved plugin: commons-beanutils-1.7.0.jar
+#11 66.41 [INFO] Resolved plugin: plexus-compiler-javac-2.16.2.jar
+#11 66.41 [INFO] Resolved plugin: smallrye-common-process-2.17.0.jar
+#11 66.41 [INFO] Resolved plugin: commons-lang3-3.14.0.jar
+#11 66.41 [INFO] Resolved plugin: jakarta.inject-api-2.0.1.jar
+#11 66.41 [INFO] Resolved plugin: plexus-classworlds-2.5.2.jar
+#11 66.41 [INFO] Resolved plugin: quarkus-bootstrap-json-3.35.4.jar
+#11 66.41 [INFO] Resolved plugin: asm-commons-9.9.1.jar
+#11 66.41 [INFO] Resolved plugin: doxia-module-confluence-1.11.1.jar
+#11 66.41 [INFO] Resolved plugin: doxia-module-xhtml5-1.11.1.jar
+#11 66.41 [INFO] Resolved plugin: maven-repository-metadata-3.9.15.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-tables-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: asm-util-9.9.1.jar
+#11 66.41 [INFO] Resolved plugin: javax.annotation-api-1.2.jar
+#11 66.41 [INFO] Resolved plugin: maven-clean-plugin-3.2.0.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-macros-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: woodstox-core-7.1.1.jar
+#11 66.41 [INFO] Resolved plugin: plexus-sec-dispatcher-1.3.jar
+#11 66.41 [INFO] Resolved plugin: smallrye-config-core-3.17.2.jar
+#11 66.41 [INFO] Resolved plugin: jctools-core-4.0.5.jar
+#11 66.41 [INFO] Resolved plugin: maven-resolver-util-1.9.27.jar
+#11 66.41 [INFO] Resolved plugin: plexus-java-1.5.0.jar
+#11 66.41 [INFO] Resolved plugin: plexus-i18n-1.0-beta-10.jar
+#11 66.41 [INFO] Resolved plugin: apiguardian-api-1.1.2.jar
+#11 66.41 [INFO] Resolved plugin: qdox-2.2.0.jar
+#11 66.41 [INFO] Resolved plugin: java-properties-0.0.7.jar
+#11 66.41 [INFO] Resolved plugin: flexmark-ext-gfm-users-0.42.14.jar
+#11 66.41 [INFO] Resolved plugin: surefire-booter-3.5.4.jar
+#11 66.41 [INFO] Resolved plugin: commons-cli-1.11.0.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-jackson-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: jackson-datatype-jsr310-2.21.2.jar
+#11 66.41 [INFO] Resolved dependency: maven-core-3.9.15.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-swagger-ui-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-logging-json-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: smallrye-reactive-converter-mutiny-3.0.3.jar
+#11 66.41 [INFO] Resolved dependency: istack-commons-runtime-4.0.1.jar
+#11 66.41 [INFO] Resolved dependency: microprofile-fault-tolerance-api-4.1.2.jar
+#11 66.41 [INFO] Resolved dependency: maven-resolver-transport-wagon-1.9.27.jar
+#11 66.41 [INFO] Resolved dependency: jts-core-1.19.0.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-smallrye-openapi-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: jaxb-api-2.3.1.jar
+#11 66.41 [INFO] Resolved dependency: jackson-databind-2.17.1.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-hibernate-validator-spi-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: resteasy-reactive-vertx-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-transaction-annotations-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: kotlin-stdlib-jdk8-2.3.21.jar
+#11 66.41 [INFO] Resolved dependency: stork-api-2.7.9.jar
+#11 66.41 [INFO] Resolved dependency: jakarta.enterprise.lang-model-4.1.0.jar
+#11 66.41 [INFO] Resolved dependency: smallrye-common-expression-2.17.0.jar
+#11 66.41 [INFO] Resolved dependency: jspecify-1.0.0.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-rest-client-config-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: micrometer-observation-1.16.5.jar
+#11 66.41 [INFO] Resolved dependency: jboss-logging-3.6.3.Final.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-scheduler-api-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: netty-handler-proxy-4.1.133.Final.jar
+#11 66.41 [INFO] Resolved dependency: vertx-web-client-4.5.27.jar
+#11 66.41 [INFO] Resolved dependency: netty-codec-socks-4.1.133.Final.jar
+#11 66.41 [INFO] Resolved dependency: yasson-3.0.4.jar
+#11 66.41 [INFO] Resolved dependency: smallrye-beanbag-maven-1.6.1.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-tls-registry-spi-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-vertx-http-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: kotlin-stdlib-jdk7-2.3.21.jar
+#11 66.41 [INFO] Resolved dependency: commons-io-2.22.0.jar
+#11 66.41 [INFO] Resolved dependency: quarkus-rest-client-jackson-3.35.4.jar
+#11 66.41 [INFO] Resolved dependency: expressly-6.0.0.jar
+#11 66.41 [INFO] Resolved dependency: smallrye-common-io-2.17.0.jar
+#11 66.41 [INFO] Resolved dependency: flyway-database-postgresql-12.0.0.jar
+#11 66.41 [INFO] Resolved dependency: infinispan-commons-16.0.9.jar
+#11 66.42 [INFO] Resolved dependency: jakarta.el-api-6.0.1.jar
+#11 66.42 [INFO] Resolved dependency: microprofile-config-api-3.1.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-context-propagation-storage-2.3.0.jar
+#11 66.42 [INFO] Resolved dependency: micrometer-commons-1.16.5.jar
+#11 66.42 [INFO] Resolved dependency: javax.activation-api-1.2.0.jar
+#11 66.42 [INFO] Resolved dependency: wagon-http-3.5.3.jar
+#11 66.42 [INFO] Resolved dependency: simpleclient_common-0.16.0.jar
+#11 66.42 [INFO] Resolved dependency: vertx-bridge-common-4.5.27.jar
+#11 66.42 [INFO] Resolved dependency: jgroups-5.5.2.Final.jar
+#11 66.42 [INFO] Resolved dependency: flyway-core-12.0.0.jar
+#11 66.42 [INFO] Resolved dependency: opentelemetry-instrumentation-api-2.26.1.jar
+#11 66.42 [INFO] Resolved dependency: netty-transport-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: rest-assured-common-6.0.0.jar
+#11 66.42 [INFO] Resolved dependency: jakarta.transaction-api-2.0.1.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-config-common-3.17.2.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-rest-jackson-common-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: opentelemetry-api-1.60.1.jar
+#11 66.42 [INFO] Resolved dependency: nativeimage-23.1.2.jar
+#11 66.42 [INFO] Resolved dependency: jackson-core-2.21.2.jar
+#11 66.42 [INFO] Resolved dependency: protostream-types-6.0.6.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-rest-common-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-common-net-2.17.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-datasource-common-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: httpclient-4.5.13.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-health-provided-checks-4.3.0.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-fault-tolerance-apiimpl-6.11.1.jar
+#11 66.42 [INFO] Resolved dependency: org.eclipse.sisu.plexus-1.0.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-development-mode-spi-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: jackson-databind-3.0.2.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-rest-client-jaxrs-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: groovy-xml-5.0.3.jar
+#11 66.42 [INFO] Resolved dependency: resteasy-reactive-jackson-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-micrometer-registry-prometheus-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: cron-utils-9.2.1.jar
+#11 66.42 [INFO] Resolved dependency: caffeine-3.2.3.jar
+#11 66.42 [INFO] Resolved dependency: vertx-mutiny-generator-3.21.6.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-flyway-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-context-propagation-jta-2.3.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-bootstrap-maven-resolver-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: groovy-5.0.3.jar
+#11 66.42 [INFO] Resolved dependency: maven-builder-support-3.9.15.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-classloader-commons-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-bootstrap-gradle-resolver-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: parsson-1.1.7.jar
+#11 66.42 [INFO] Resolved dependency: netty-codec-http-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: netty-resolver-dns-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: junit-jupiter-engine-6.0.3.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-vertx-latebound-mdc-provider-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: jakarta.activation-2.0.1.jar
+#11 66.42 [INFO] Resolved dependency: groovy-json-5.0.3.jar
+#11 66.42 [INFO] Resolved dependency: jackson-mapper-asl-1.9.11.jar
+#11 66.42 [INFO] Resolved dependency: httpclient-4.5.14.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-common-constraint-2.17.0.jar
+#11 66.42 [INFO] Resolved dependency: netty-codec-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: resteasy-reactive-common-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: vertx-web-4.5.27.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-health-api-4.3.0.jar
+#11 66.42 [INFO] Resolved dependency: maven-xml-impl-4.0.0-alpha-7.jar
+#11 66.42 [INFO] Resolved dependency: maven-resolver-impl-1.9.27.jar
+#11 66.42 [INFO] Resolved dependency: jakarta.xml.bind-api-3.0.1.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-junit-config-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-agroal-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: txw2-3.0.2.jar
+#11 66.42 [INFO] Resolved dependency: microprofile-context-propagation-api-1.3.jar
+#11 66.42 [INFO] Resolved dependency: microprofile-health-api-4.0.1.jar
+#11 66.42 [INFO] Resolved dependency: jansi-2.4.0.jar
+#11 66.42 [INFO] Resolved dependency: kotlinx-coroutines-core-jvm-1.10.2.jar
+#11 66.42 [INFO] Resolved dependency: maven-resolver-named-locks-1.9.27.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-beanbag-sisu-1.6.1.jar
+#11 66.42 [INFO] Resolved dependency: maven-model-builder-3.9.15.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-reactive-converter-api-3.0.3.jar
+#11 66.42 [INFO] Resolved dependency: netty-codec-http2-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: asm-tree-9.9.1.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-scheduler-kotlin-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-jsonp-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: microprofile-reactive-streams-operators-api-3.0.1.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-jdbc-h2-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: maven-resolver-spi-1.9.27.jar
+#11 66.42 [INFO] Resolved dependency: org.eclipse.sisu.inject-1.0.0.jar
+#11 66.42 [INFO] Resolved dependency: json-path-6.0.0.jar
+#11 66.42 [INFO] Resolved dependency: maven-api-meta-4.0.0-alpha-7.jar
+#11 66.42 [INFO] Resolved dependency: guice-5.1.0-classes.jar
+#11 66.42 [INFO] Resolved dependency: crac-1.5.0.jar
+#11 66.42 [INFO] Resolved dependency: johnzon-mapper-2.0.2.jar
+#11 66.42 [INFO] Resolved dependency: word-23.1.2.jar
+#11 66.42 [INFO] Resolved dependency: failureaccess-1.0.1.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-mutiny-vertx-uri-template-3.21.6.jar
+#11 66.42 [INFO] Resolved dependency: plexus-xml-4.0.2.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-junit-common-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-mutiny-vertx-auth-common-3.21.6.jar
+#11 66.42 [INFO] Resolved dependency: jackson-module-parameter-names-2.21.2.jar
+#11 66.42 [INFO] Resolved dependency: jdk-classfile-backport-26.jar
+#11 66.42 [INFO] Resolved dependency: slf4j-jboss-logmanager-2.0.2.Final.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-common-annotation-2.17.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-bootstrap-runner-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: vertx-uri-template-4.5.27.jar
+#11 66.42 [INFO] Resolved dependency: maven-resolver-provider-3.9.15.jar
+#11 66.42 [INFO] Resolved dependency: microprofile-openapi-api-4.1.1.jar
+#11 66.42 [INFO] Resolved dependency: jakarta.xml.bind-api-4.0.5.jar
+#11 66.42 [INFO] Resolved dependency: commons-codec-1.11.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-common-os-2.17.0.jar
+#11 66.42 [INFO] Resolved dependency: jackson-databind-2.21.2.jar
+#11 66.42 [INFO] Resolved dependency: simpleclient_tracer_otel_agent-0.16.0.jar
+#11 66.42 [INFO] Resolved dependency: httpmime-4.5.13.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-class-change-agent-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-micrometer-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-devservices-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-open-api-core-4.3.3.jar
+#11 66.42 [INFO] Resolved dependency: maven-resolver-transport-http-1.9.25.jar
+#11 66.42 [INFO] Resolved dependency: maven-plugin-api-3.9.15.jar
+#11 66.42 [INFO] Resolved dependency: maven-shared-utils-3.4.2.jar
+#11 66.42 [INFO] Resolved dependency: commons-codec-1.21.0.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-private-key-pem-parser-0.9.3.jar
+#11 66.42 [INFO] Resolved dependency: snakeyaml-2.6.jar
+#11 66.42 [INFO] Resolved dependency: junit-platform-commons-6.0.3.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-kubernetes-service-binding-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: netty-codec-haproxy-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: jakarta.resource-api-2.1.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-websockets-next-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-fs-util-1.3.0.jar
+#11 66.42 [INFO] Resolved dependency: scribejava-core-2.5.3.jar
+#11 66.42 [INFO] Resolved dependency: arc-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: netty-resolver-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: tagsoup-1.2.1.jar
+#11 66.42 [INFO] Resolved dependency: kotlinx-coroutines-jdk8-1.10.2.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-websockets-next-kotlin-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: commons-logging-jboss-logging-2.0.0.Final.jar
+#11 66.42 [INFO] Resolved dependency: byte-buddy-agent-1.18.8.jar
+#11 66.42 [INFO] Resolved dependency: jboss-threads-3.9.2.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-fault-tolerance-6.11.1.jar
+#11 66.42 [INFO] Resolved dependency: jackson-core-3.0.2.jar
+#11 66.42 [INFO] Resolved dependency: asm-9.9.1.jar
+#11 66.42 [INFO] Resolved dependency: resteasy-reactive-client-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: smallrye-common-cpu-2.17.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-smallrye-fault-tolerance-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: netty-buffer-4.1.133.Final.jar
+#11 66.42 [INFO] Resolved dependency: vertx-web-common-4.5.27.jar
+#11 66.42 [INFO] Resolved dependency: service-1.23.0.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-container-image-jib-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: jackson-core-2.17.1.jar
+#11 66.42 [INFO] Resolved dependency: jandex-gizmo2-3.5.3.jar
+#11 66.42 [INFO] Resolved dependency: junit-platform-engine-6.0.3.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-container-image-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-scheduler-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: mutiny-smallrye-context-propagation-3.1.1.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-vertx-utils-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: quarkus-core-deployment-3.35.4.jar
+#11 66.42 [INFO] Resolved dependency: kotlin-stdlib-2.3.21.jar
+#11 66.42 [INFO] Resolved dependency: jackson-dataformat-yaml-2.21.2.jar
+#11 66.42 [INFO] Resolved dependency: micrometer-registry-prometheus-simpleclient-1.16.5.jar
+#11 66.42 [INFO] Resolved dependency: reactive-streams-1.0.4.jar
+#11 66.42 [INFO] Resolved dependency: jackson-datatype-jdk8-2.21.2.jar
+#11 66.42 [INFO] Resolved dependency: commons-compress-1.28.0.jar
+#11 66.42 [INFO] Resolved dependency: agroal-narayana-3.0.1.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-mutiny-vertx-web-3.21.6.jar
+#11 66.43 [INFO] Resolved dependency: rest-assured-6.0.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-vertx-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: aopalliance-1.0.jar
+#11 66.43 [INFO] Resolved dependency: wildfly-common-2.0.1.jar
+#11 66.43 [INFO] Resolved dependency: plexus-interpolation-1.26.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-smallrye-health-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: readline-2.6.jar
+#11 66.43 [INFO] Resolved dependency: slf4j-api-2.0.17.jar
+#11 66.43 [INFO] Resolved dependency: jandex-3.5.3.jar
+#11 66.43 [INFO] Resolved dependency: wagon-provider-api-3.5.3.jar
+#11 66.43 [INFO] Resolved dependency: jackson-annotations-2.21.jar
+#11 66.43 [INFO] Resolved dependency: commons-lang3-3.20.0.jar
+#11 66.43 [INFO] Resolved dependency: maven-settings-builder-3.9.15.jar
+#11 66.43 [INFO] Resolved dependency: maven-artifact-3.9.15.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-health-4.3.0.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.json-api-2.1.3.jar
+#11 66.43 [INFO] Resolved dependency: vertx-auth-common-4.5.27.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-common-function-2.17.0.jar
+#11 66.43 [INFO] Resolved dependency: json-simple-1.1.1.jar
+#11 66.43 [INFO] Resolved dependency: mutiny-3.1.1.jar
+#11 66.43 [INFO] Resolved dependency: agroal-api-3.0.1.jar
+#11 66.43 [INFO] Resolved dependency: javax.annotation-api-1.3.2.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-jdbc-postgresql-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-flyway-postgresql-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-bootstrap-maven4-resolver-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: maven-resolver-connector-basic-1.9.27.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-scheduler-spi-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: gizmo-1.10.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-ide-launcher-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: commons-logging-1.2.jar
+#11 66.43 [INFO] Resolved dependency: opentest4j-1.3.0.jar
+#11 66.43 [INFO] Resolved dependency: netty-transport-native-unix-common-4.1.133.Final.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-core-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-tls-registry-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: jaxb-runtime-3.0.2.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-beanbag-1.6.1.jar
+#11 66.43 [INFO] Resolved dependency: maven-embedder-3.9.15.jar
+#11 66.43 [INFO] Resolved dependency: junit-jupiter-6.0.3.jar
+#11 66.43 [INFO] Resolved dependency: httpcore-4.4.13.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-common-ref-2.17.0.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-common-classloader-2.17.0.jar
+#11 66.43 [INFO] Resolved dependency: maven-resolver-api-1.9.27.jar
+#11 66.43 [INFO] Resolved dependency: maven-api-xml-4.0.0-alpha-7.jar
+#11 66.43 [INFO] Resolved dependency: protostream-6.0.6.jar
+#11 66.43 [INFO] Resolved dependency: simpleclient_tracer_common-0.16.0.jar
+#11 66.43 [INFO] Resolved dependency: rxjava-3.1.12.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-bootstrap-app-model-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-config-3.17.2.jar
+#11 66.43 [INFO] Resolved dependency: netty-handler-4.1.133.Final.jar
+#11 66.43 [INFO] Resolved dependency: commons-lang3-3.19.0.jar
+#11 66.43 [INFO] Resolved dependency: vertx-core-4.5.27.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-mutiny-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: HdrHistogram-2.2.2.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-open-api-model-4.3.3.jar
+#11 66.43 [INFO] Resolved dependency: micrometer-core-1.16.5.jar
+#11 66.43 [INFO] Resolved dependency: hamcrest-2.2.jar
+#11 66.43 [INFO] Resolved dependency: javax.inject-1.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-common-resource-2.17.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-arc-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-security-2.3.2.jar
+#11 66.43 [INFO] Resolved dependency: junit-platform-launcher-6.0.3.jar
+#11 66.43 [INFO] Resolved dependency: postgresql-42.7.11.jar
+#11 66.43 [INFO] Resolved dependency: brotli4j-1.23.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-websockets-next-spi-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: native-linux-x86_64-1.23.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-datasource-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: gizmo2-2.1.1.jar
+#11 66.43 [INFO] Resolved dependency: wagon-http-shared-3.5.3.jar
+#11 66.43 [INFO] Resolved dependency: gson-2.9.0.jar
+#11 66.43 [INFO] Resolved dependency: jaxb-core-3.0.2.jar
+#11 66.43 [INFO] Resolved dependency: jboss-logmanager-3.2.2.Final.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-context-propagation-api-2.3.0.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-fault-tolerance-mutiny-6.11.1.jar
+#11 66.43 [INFO] Resolved dependency: jackson-core-asl-1.9.11.jar
+#11 66.43 [INFO] Resolved dependency: plexus-classworlds-2.6.0.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-mutiny-vertx-core-3.21.6.jar
+#11 66.43 [INFO] Resolved dependency: maven-model-3.9.15.jar
+#11 66.43 [INFO] Resolved dependency: plexus-component-annotations-2.1.0.jar
+#11 66.43 [INFO] Resolved dependency: h2-2.4.240.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-mutiny-vertx-bridge-common-3.21.6.jar
+#11 66.43 [INFO] Resolved dependency: opentelemetry-common-1.60.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-test-common-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: junit-jupiter-params-6.0.3.jar
+#11 66.43 [INFO] Resolved dependency: guava-33.5.0-jre.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-context-propagation-2.3.0.jar
+#11 66.43 [INFO] Resolved dependency: aesh-2.8.2.jar
+#11 66.43 [INFO] Resolved dependency: plexus-utils-3.6.1.jar
+#11 66.43 [INFO] Resolved dependency: xml-path-6.0.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-rest-client-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-fault-tolerance-vertx-6.11.1.jar
+#11 66.43 [INFO] Resolved dependency: infinispan-counter-api-16.0.9.jar
+#11 66.43 [INFO] Resolved dependency: netty-codec-dns-4.1.133.Final.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.interceptor-api-2.2.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-bootstrap-core-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.enterprise.cdi-api-4.1.0.jar
+#11 66.43 [INFO] Resolved dependency: vertx-codegen-4.5.27.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-mutiny-vertx-web-common-3.21.6.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.json.bind-api-3.0.1.jar
+#11 66.43 [INFO] Resolved dependency: opentelemetry-context-1.60.1.jar
+#11 66.43 [INFO] Resolved dependency: opentelemetry-api-incubator-1.60.1-alpha.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-builder-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: resteasy-reactive-common-types-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: kotlinx-coroutines-core-1.10.2.jar
+#11 66.43 [INFO] Resolved dependency: netty-common-4.1.133.Final.jar
+#11 66.43 [INFO] Resolved dependency: opentelemetry-semconv-1.40.0.jar
+#11 66.43 [INFO] Resolved dependency: mutiny-zero-flow-adapters-1.1.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-rest-jackson-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: httpcore-4.4.16.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-rest-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-narayana-jta-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: junit-jupiter-api-6.0.3.jar
+#11 66.43 [INFO] Resolved dependency: maven-settings-3.9.15.jar
+#11 66.43 [INFO] Resolved dependency: asm-analysis-9.9.1.jar
+#11 66.43 [INFO] Resolved dependency: johnzon-core-2.0.2.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-scheduler-common-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-security-runtime-spi-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-virtual-threads-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-fault-tolerance-core-6.11.1.jar
+#11 66.43 [INFO] Resolved dependency: infinispan-core-16.1.4.jar
+#11 66.43 [INFO] Resolved dependency: plexus-cipher-2.0.jar
+#11 66.43 [INFO] Resolved dependency: narayana-jts-integration-7.3.4.Final.jar
+#11 66.43 [INFO] Resolved dependency: plexus-sec-dispatcher-2.0.jar
+#11 66.43 [INFO] Resolved dependency: jboss-transaction-spi-8.0.0.Final.jar
+#11 66.43 [INFO] Resolved dependency: mutiny-kotlin-3.1.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-value-registry-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.annotation-api-3.0.0.jar
+#11 66.43 [INFO] Resolved dependency: simpleclient-0.16.0.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-fault-tolerance-context-propagation-6.11.1.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.ws.rs-api-3.1.0.jar
+#11 66.43 [INFO] Resolved dependency: simpleclient_tracer_otel-0.16.0.jar
+#11 66.43 [INFO] Resolved dependency: wagon-file-3.5.3.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-common-vertx-context-2.17.0.jar
+#11 66.43 [INFO] Resolved dependency: jboss-invocation-2.0.1.Final.jar
+#11 66.43 [INFO] Resolved dependency: scribejava-apis-2.5.3.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-common-process-2.17.0.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.inject-api-2.0.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-credentials-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-bootstrap-json-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: asm-commons-9.9.1.jar
+#11 66.43 [INFO] Resolved dependency: resteasy-reactive-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: maven-repository-metadata-3.9.15.jar
+#11 66.43 [INFO] Resolved dependency: asm-util-9.9.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-proxy-registry-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: annotations-26.1.0.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-config-core-3.17.2.jar
+#11 66.43 [INFO] Resolved dependency: jctools-core-4.0.5.jar
+#11 66.43 [INFO] Resolved dependency: maven-resolver-util-1.9.27.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-smallrye-context-propagation-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: jakarta.activation-api-2.1.4.jar
+#11 66.43 [INFO] Resolved dependency: microprofile-rest-client-api-4.0.jar
+#11 66.43 [INFO] Resolved dependency: apiguardian-api-1.1.2.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-fault-tolerance-autoconfig-core-6.11.1.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-junit-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-netty-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: LatencyUtils-2.0.3.jar
+#11 66.43 [INFO] Resolved dependency: error_prone_annotations-2.48.0.jar
+#11 66.43 [INFO] Resolved dependency: quarkus-rest-kotlin-3.35.4.jar
+#11 66.43 [INFO] Resolved dependency: gson-2.13.2.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-fault-tolerance-api-6.11.1.jar
+#11 66.43 [INFO] Resolved dependency: agroal-pool-3.0.1.jar
+#11 66.43 [INFO] Resolved dependency: narayana-jta-7.3.4.Final.jar
+#11 66.43 [INFO] Resolved dependency: smallrye-mutiny-vertx-runtime-3.21.6.jar
+#11 66.43 [INFO] Resolved dependency: jackson-annotations-2.20.jar
+#11 66.43 [INFO] Resolved dependency: commons-cli-1.11.0.jar
+#11 66.43 [INFO] ------------------------------------------------------------------------
+#11 66.43 [INFO] BUILD SUCCESS
+#11 66.43 [INFO] ------------------------------------------------------------------------
+#11 66.44 [INFO] Total time:  01:01 min
+#11 66.44 [INFO] Finished at: 2026-06-26T19:05:47Z
+#11 66.44 [INFO] ------------------------------------------------------------------------
+#11 DONE 67.0s
+
+#12 [build 5/6] COPY src ./src
+#12 DONE 0.2s
+
+#13 [build 6/6] RUN mvn -B -ntp -Dmaven.test.skip=true -Dquarkus.swagger-ui.always-include=true package
+#13 2.513 [INFO] Scanning for projects...
+#13 5.454 [INFO] 
+#13 5.454 [INFO] ----------------------< com.example:core-service >----------------------
+#13 5.454 [INFO] Building core-service 1.0-SNAPSHOT
+#13 5.454 [INFO]   from pom.xml
+#13 5.461 [INFO] ------------------------------[ quarkus ]-------------------------------
+#13 8.599 [INFO] 
+#13 8.599 [INFO] --- enforcer:3.5.0:enforce (enforce-build-baseline) @ core-service ---
+#13 8.872 [INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+#13 8.873 [INFO] Rule 1: org.apache.maven.enforcer.rules.version.RequireMavenVersion passed
+#13 8.874 [INFO] 
+#13 8.874 [INFO] --- resources:3.3.1:resources (default-resources) @ core-service ---
+#13 9.001 [INFO] Copying 10 resources from src/main/resources to target/classes
+#13 9.019 [INFO] 
+#13 9.019 [INFO] --- quarkus:3.35.4:generate-code (default-generate-code) @ core-service ---
+#13 15.64 [INFO] 
+#13 15.64 [INFO] --- compiler:3.15.0:compile (default-compile) @ core-service ---
+#13 15.83 [INFO] Recompiling the module because of changed source code.
+#13 15.85 [INFO] Compiling 116 source files with javac [debug parameters release 21] to target/classes
+#13 19.53 [INFO] 
+#13 19.53 [INFO] --- resources:3.3.1:testResources (default-testResources) @ core-service ---
+#13 19.54 [INFO] Not copying test resources
+#13 19.54 [INFO] 
+#13 19.54 [INFO] --- quarkus:3.35.4:generate-code-tests (default-generate-code-tests) @ core-service ---
+#13 22.62 [INFO] 
+#13 22.62 [INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ core-service ---
+#13 22.64 [INFO] Not compiling test sources
+#13 22.64 [INFO] 
+#13 22.64 [INFO] --- surefire:3.5.4:test (default-test) @ core-service ---
+#13 22.81 [INFO] Tests are skipped.
+#13 22.82 [INFO] 
+#13 22.82 [INFO] --- quarkus:3.35.4:build (default-build) @ core-service ---
+#13 29.37 [INFO] [io.quarkus.deployment.QuarkusAugmentor] Quarkus augmentation completed in 6239ms
+#13 29.39 [INFO] ------------------------------------------------------------------------
+#13 29.39 [INFO] BUILD SUCCESS
+#13 29.39 [INFO] ------------------------------------------------------------------------
+#13 29.39 [INFO] Total time:  26.911 s
+#13 29.39 [INFO] Finished at: 2026-06-26T19:06:17Z
+#13 29.39 [INFO] ------------------------------------------------------------------------
+#13 DONE 29.8s
+
+#14 [runtime 3/6] COPY --from=build --chown=185 /workspace/target/quarkus-app/lib/ /deployments/lib/
+#14 DONE 0.3s
+
+#15 [runtime 4/6] COPY --from=build --chown=185 /workspace/target/quarkus-app/*.jar /deployments/
+#15 DONE 0.1s
+
+#16 [runtime 5/6] COPY --from=build --chown=185 /workspace/target/quarkus-app/app/ /deployments/app/
+#16 DONE 0.1s
+
+#17 [runtime 6/6] COPY --from=build --chown=185 /workspace/target/quarkus-app/quarkus/ /deployments/quarkus/
+#17 DONE 0.1s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 0.3s done
+#18 writing image sha256:11a4dc189c39e041e02414f5bea22e8eb122b0492d9f601d2072936b22c68247 done
+#18 naming to acrbrasallerprod.azurecr.io/core-service:pluggy-20260626160429 0.0s done
+#18 DONE 0.4s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/kt6eh0bh1nbz7cnw4b8lt20ld
+The push refers to repository [acrbrasallerprod.azurecr.io/core-service]
+3d642cd5f90e: Preparing
+ed26294e632b: Preparing
+68e886d39129: Preparing
+3abf8128633f: Preparing
+76f095c755b2: Preparing
+5bcf33c42a77: Preparing
+17ec1076344b: Preparing
+5bcf33c42a77: Waiting
+17ec1076344b: Waiting
+76f095c755b2: Pushed
+68e886d39129: Pushed
+ed26294e632b: Pushed
+5bcf33c42a77: Layer already exists
+17ec1076344b: Layer already exists
+3d642cd5f90e: Pushed
+3abf8128633f: Pushed
+pluggy-20260626160429: digest: sha256:8b180d1929780e0691a79813c358d6916eb80a0db1a5991cce59e31894545cf9 size: 1790
+
+/ Running ..
+| Running ..
+\ Running ..
+- Running ..
+/ Running ..
+Name          LatestRevisionName     ProvisioningState    RunningStatus
+------------  ---------------------  -------------------  ---------------
+core-service  core-service--0000016  Succeeded            Running

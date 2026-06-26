@@ -127,7 +127,7 @@ export async function createPluggyConnectTokenAction(): Promise<PluggyConnectTok
   if (!token) return handleExpired()
 
   try {
-    const res = await fetch(`${GATEWAY_URL}/api/core/open-finance/pluggy/connect-token`, {
+    const res = await fetch(`${GATEWAY_URL}/api/core/connectors/open-finance/pluggy/connect-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

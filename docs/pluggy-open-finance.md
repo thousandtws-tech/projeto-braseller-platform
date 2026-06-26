@@ -27,7 +27,7 @@ O usuário responsável pelo deploy deve substituir os placeholders por acessos 
 ### Criar Connect Token
 
 ```http
-POST /api/core/open-finance/pluggy/connect-token
+POST /api/core/connectors/open-finance/pluggy/connect-token
 Authorization: Bearer <jwt>
 Content-Type: application/json
 
@@ -45,7 +45,7 @@ Resposta:
 ### Webhook Pluggy
 
 ```http
-POST /api/core/open-finance/pluggy/webhooks
+POST /api/core/connectors/open-finance/pluggy/webhooks
 Content-Type: application/json
 ```
 
