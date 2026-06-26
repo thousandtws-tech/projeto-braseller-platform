@@ -3,7 +3,9 @@ import { Geist } from 'next/font/google'
 import { notFound } from 'next/navigation'
 
 import '../globals.css'
+import 'react-toastify/dist/ReactToastify.css'
 import { locales, isLocale } from '@/shared/i18n/config'
+import { ToastProvider } from '@/shared/ui/toast-provider'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -45,6 +47,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         {children}
+        <ToastProvider />
       </body>
     </html>
   )

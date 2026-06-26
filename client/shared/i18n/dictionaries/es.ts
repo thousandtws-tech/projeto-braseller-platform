@@ -195,7 +195,7 @@ const dictionary: Dictionary = {
       sessionExpired: 'Tu sesión ha expirado. Inicia sesión nuevamente para continuar.',
       noAccount: '¿No tienes una cuenta?',
       createAccount: 'Crear cuenta',
-      emailVerified: 'Correo verificado correctamente. Ahora ya puedes iniciar sesiÃ³n.',
+      emailVerified: 'Correo verificado correctamente. Ahora ya puedes iniciar sesión.',
       errors: {
         googleUnavailable: 'El inicio de sesión con Google no está disponible en este momento.',
         googleAccountNotRegistered: 'Esta cuenta de Google aún no está registrada. Crea la cuenta primero o inicia sesión con correo y contraseña.',
@@ -216,13 +216,13 @@ const dictionary: Dictionary = {
     },
     verifyCode: {
       title: 'Verifica tu correo',
-      subtitle: 'Confirma el cÃ³digo enviado para activar tu cuenta y completar el acceso.',
-      registeredHint: 'Enviamos un cÃ³digo de verificaciÃ³n al correo usado durante el registro.',
+      subtitle: 'Confirma el código enviado para activar tu cuenta y completar el acceso.',
+      registeredHint: 'Enviamos un código de verificación al correo usado durante el registro.',
       loginBlockedHint: 'Verifica tu correo antes de acceder a tu cuenta.',
-      missingEmail: 'No encontramos el correo de este flujo de verificaciÃ³n. Vuelve al registro para solicitar un nuevo cÃ³digo.',
+      missingEmail: 'No encontramos el correo de este flujo de verificación. Vuelve al registro para solicitar un nuevo código.',
       backToRegister: 'Volver al registro',
-      backToLoginPrefix: 'Â¿Ya tienes el cÃ³digo?',
-      backToLogin: 'Volver al inicio de sesiÃ³n',
+      backToLoginPrefix: '¿Ya tienes el código?',
+      backToLogin: 'Volver al inicio de sesión',
     },
     register: {
       title: 'Crea tu cuenta',

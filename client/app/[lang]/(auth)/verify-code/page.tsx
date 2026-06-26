@@ -24,7 +24,7 @@ export default async function VerifyCodePage({ params, searchParams }: Props) {
     return (
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Seguranca da conta</p>
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Segurança da conta</p>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">{dict.auth.verifyCode.title}</h1>
           <p className="text-sm leading-6 text-muted-foreground">{dict.auth.verifyCode.missingEmail}</p>
         </div>
@@ -39,7 +39,7 @@ export default async function VerifyCodePage({ params, searchParams }: Props) {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Seguranca da conta</p>
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Segurança da conta</p>
         <h1 className="text-3xl font-semibold tracking-[-0.04em]">{dict.auth.verifyCode.title}</h1>
         <p className="text-sm leading-6 text-muted-foreground">
           {dict.auth.verifyCode.subtitle}
@@ -60,7 +60,7 @@ export default async function VerifyCodePage({ params, searchParams }: Props) {
         </div>
       )}
 
-      <VerifyCodeForm email={email} />
+      <VerifyCodeForm email={email} registered={registered === '1'} />
 
       <p className="border-t border-border pt-6 text-center text-sm text-muted-foreground">
         {dict.auth.verifyCode.backToLoginPrefix}{' '}

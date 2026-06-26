@@ -193,7 +193,7 @@ const dictionary = {
       sessionExpired: 'Sua sessão expirou. Faça login novamente para continuar.',
       noAccount: 'Não tem uma conta?',
       createAccount: 'Criar conta',
-      emailVerified: 'E-mail verificado com sucesso. Agora vocÃª jÃ¡ pode acessar sua conta.',
+      emailVerified: 'E-mail verificado com sucesso. Agora você já pode acessar sua conta.',
       errors: {
         googleUnavailable: 'Login com Google indisponível no momento.',
         googleAccountNotRegistered: 'Essa conta Google ainda não está cadastrada. Crie a conta primeiro ou entre com e-mail e senha.',
@@ -214,12 +214,12 @@ const dictionary = {
     },
     verifyCode: {
       title: 'Verifique seu e-mail',
-      subtitle: 'Confirme o cÃ³digo enviado para ativar sua conta e concluir o acesso.',
-      registeredHint: 'Enviamos um cÃ³digo de verificaÃ§Ã£o para o e-mail informado no cadastro.',
+      subtitle: 'Confirme o código enviado para ativar sua conta e concluir o acesso.',
+      registeredHint: 'Enviamos um código de verificação para o e-mail informado no cadastro.',
       loginBlockedHint: 'Verifique seu e-mail antes de acessar sua conta.',
-      missingEmail: 'NÃ£o encontramos o e-mail desta verificaÃ§Ã£o. Volte ao cadastro para gerar um novo cÃ³digo.',
+      missingEmail: 'Não encontramos o e-mail desta verificação. Volte ao cadastro para gerar um novo código.',
       backToRegister: 'Voltar para o cadastro',
-      backToLoginPrefix: 'JÃ¡ recebeu ou lembrou do cÃ³digo?',
+      backToLoginPrefix: 'Já recebeu ou lembrou do código?',
       backToLogin: 'Voltar para o login',
     },
     register: {

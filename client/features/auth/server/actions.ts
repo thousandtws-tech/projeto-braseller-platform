@@ -39,42 +39,42 @@ async function readErrorPayload(response: Response): Promise<ApiErrorPayload> {
 
 function mapLoginError(code: string) {
   if (code === 'invalid_credentials') {
-    return 'Credenciais invalidas. Verifique e tente novamente.'
+    return 'Credenciais inválidas. Verifique e tente novamente.'
   }
   if (code === 'account_not_active') {
-    return 'Sua conta ainda nao esta disponivel para acesso.'
+    return 'Sua conta ainda não está disponível para acesso.'
   }
-  return 'Nao foi possivel concluir o login agora. Tente novamente.'
+  return 'Não foi possível concluir o login agora. Tente novamente.'
 }
 
 function mapRegisterError(code: string) {
   if (code === 'Could not register tenant') {
-    return 'Ja existe uma conta com este e-mail ou empresa.'
+    return 'Já existe uma conta com este e-mail ou empresa.'
   }
   return 'Erro ao criar conta. Tente novamente.'
 }
 
 function mapVerifyEmailError(code: string) {
   if (code === 'invalid_verification_code') {
-    return 'Codigo invalido. Confira o e-mail e tente novamente.'
+    return 'Código inválido. Confira o e-mail e tente novamente.'
   }
   if (code === 'verification_code_expired') {
-    return 'O codigo expirou. Solicite um novo envio para continuar.'
+    return 'O código expirou. Solicite um novo envio para continuar.'
   }
   if (code === 'email_already_verified') {
-    return 'Este e-mail ja foi verificado. Faça login para continuar.'
+    return 'Este e-mail já foi verificado. Faça login para continuar.'
   }
-  return 'Nao foi possivel validar o codigo agora. Tente novamente.'
+  return 'Não foi possível validar o código agora. Tente novamente.'
 }
 
 function mapResendVerificationError(code: string) {
   if (code === 'verification_code_recently_sent') {
-    return 'Aguarde alguns instantes antes de solicitar um novo codigo.'
+    return 'Aguarde alguns instantes antes de solicitar um novo código.'
   }
   if (code === 'email_already_verified') {
-    return 'Este e-mail ja foi verificado. Faça login para continuar.'
+    return 'Este e-mail já foi verificado. Faça login para continuar.'
   }
-  return 'Nao foi possivel reenviar o codigo agora. Tente novamente.'
+  return 'Não foi possível reenviar o código agora. Tente novamente.'
 }
 
 export async function loginAction(prevState: AuthState, formData: FormData): Promise<AuthState> {
