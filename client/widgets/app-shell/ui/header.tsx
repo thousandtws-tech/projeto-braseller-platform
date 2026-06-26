@@ -207,7 +207,6 @@ function ProfileDropdown({ user, dict, lang }: { user: UserSession; dict: Dictio
         <DropdownMenuGroup>
           <ProfileLink href={`/${lang}/configuracoes`} icon={UserRound}>{dict.header.profileMenu.profileSecurity}</ProfileLink>
           <ProfileLink href={`/${lang}/configuracoes`} icon={Building2}>{dict.header.profileMenu.fiscalData}</ProfileLink>
-          <ProfileLink href={`/${lang}/plano`} icon={CreditCard}>{dict.header.profileMenu.plan}</ProfileLink>
           <ProfileLink href={`/${lang}/configuracoes`} icon={Settings}>{dict.header.profileMenu.settings}</ProfileLink>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
