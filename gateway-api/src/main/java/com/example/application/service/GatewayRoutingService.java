@@ -46,6 +46,7 @@ public class GatewayRoutingService {
                 route,
                 request.remainingPath(),
                 request.queryParameters(),
+                request.headers(),
                 request.body()
         ));
     }

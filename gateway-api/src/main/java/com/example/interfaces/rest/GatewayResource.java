@@ -26,6 +26,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
@@ -39,6 +40,9 @@ public class GatewayResource {
 
     @Context
     UriInfo uriInfo;
+
+    @Context
+    HttpHeaders httpHeaders;
 
     @Inject
     public GatewayResource(GatewayRoutingService gatewayRoutingService) {
@@ -119,6 +123,7 @@ public class GatewayResource {
                 service,
                 path,
                 queryParameters(),
+                requestHeaders(),
                 body
         ));
         return toRestResponse(response);
@@ -137,6 +142,12 @@ public class GatewayResource {
         Map<String, List<String>> parameters = new LinkedHashMap<>();
         uriInfo.getQueryParameters().forEach((name, values) -> parameters.put(name, List.copyOf(values)));
         return parameters;
+    }
+
+    private Map<String, List<String>> requestHeaders() {
+        Map<String, List<String>> headers = new LinkedHashMap<>();
+        httpHeaders.getRequestHeaders().forEach((name, values) -> headers.put(name, List.copyOf(values)));
+        return headers;
     }
 
     @Schema(name = "GatewayOverview", description = "Status do gateway e rotas publicas disponiveis.")

@@ -10,6 +10,7 @@ public record DownstreamRequest(
         DownstreamRoute route,
         String remainingPath,
         Map<String, List<String>> queryParameters,
+        Map<String, List<String>> headers,
         String body) {
 
     public DownstreamRequest {
@@ -18,6 +19,7 @@ public record DownstreamRequest(
         }
         remainingPath = remainingPath == null ? "" : remainingPath;
         queryParameters = queryParameters == null ? Map.of() : Map.copyOf(queryParameters);
+        headers = headers == null ? Map.of() : Map.copyOf(headers);
     }
 
     public String downstreamPath() {

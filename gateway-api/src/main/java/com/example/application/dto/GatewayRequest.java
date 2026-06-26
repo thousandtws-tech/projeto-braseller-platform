@@ -9,6 +9,7 @@ public record GatewayRequest(
         String serviceSegment,
         String remainingPath,
         Map<String, List<String>> queryParameters,
+        Map<String, List<String>> headers,
         String body) {
 
     public GatewayRequest {
@@ -16,5 +17,6 @@ public record GatewayRequest(
         serviceSegment = serviceSegment == null ? "" : serviceSegment.trim();
         remainingPath = remainingPath == null ? "" : remainingPath.trim();
         queryParameters = queryParameters == null ? Map.of() : Map.copyOf(queryParameters);
+        headers = headers == null ? Map.of() : Map.copyOf(headers);
     }
 }

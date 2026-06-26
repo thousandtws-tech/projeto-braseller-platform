@@ -4,6 +4,7 @@ import io.quarkus.rest.client.reactive.Url;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -21,17 +22,17 @@ import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 @Produces(MediaType.WILDCARD)
 public interface DownstreamRestClient {
     @GET
-    Response get(@Url String targetUri);
+    Response get(@Url String targetUri, @HeaderParam("Authorization") String authorization);
 
     @POST
-    Response post(@Url String targetUri, String body);
+    Response post(@Url String targetUri, @HeaderParam("Authorization") String authorization, String body);
 
     @PUT
-    Response put(@Url String targetUri, String body);
+    Response put(@Url String targetUri, @HeaderParam("Authorization") String authorization, String body);
 
     @PATCH
-    Response patch(@Url String targetUri, String body);
+    Response patch(@Url String targetUri, @HeaderParam("Authorization") String authorization, String body);
 
     @DELETE
-    Response delete(@Url String targetUri);
+    Response delete(@Url String targetUri, @HeaderParam("Authorization") String authorization);
 }

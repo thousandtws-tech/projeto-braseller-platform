@@ -70,14 +70,23 @@ public class RestClientDownstreamServiceClient implements DownstreamServiceClien
 
     private Response send(DownstreamRequest request, URI targetUri) {
         String target = targetUri.toString();
+        String authorization = firstHeader(request, "authorization");
         return switch (request.method()) {
-            case "GET" -> restClient.get(target);
-            case "POST" -> restClient.post(target, request.body());
-            case "PUT" -> restClient.put(target, request.body());
-            case "PATCH" -> restClient.patch(target, request.body());
-            case "DELETE" -> restClient.delete(target);
+            case "GET" -> restClient.get(target, authorization);
+            case "POST" -> restClient.post(target, authorization, request.body());
+            case "PUT" -> restClient.put(target, authorization, request.body());
+            case "PATCH" -> restClient.patch(target, authorization, request.body());
+            case "DELETE" -> restClient.delete(target, authorization);
             default -> throw new IllegalStateException("Unsupported HTTP method already validated: " + request.method());
         };
+    }
+
+    private String firstHeader(DownstreamRequest request, String headerName) {
+        return request.headers().entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(headerName))
+                .flatMap(entry -> entry.getValue().stream())
+                .findFirst()
+                .orElse(null);
     }
 
     private URI buildTargetUri(DownstreamRequest request) {
