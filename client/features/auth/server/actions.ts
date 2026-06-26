@@ -193,7 +193,7 @@ export async function verifyEmailCodeAction(prevState: VerifyEmailState, formDat
   let redirectTo: string | null = null
 
   try {
-    const res = await fetch(`${GATEWAY_URL}/api/auth/verify-email`, {
+    const res = await fetch(`${GATEWAY_URL}/api/auth/email-verification/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
@@ -229,7 +229,7 @@ export async function resendEmailVerificationCodeAction(
   }
 
   try {
-    const res = await fetch(`${GATEWAY_URL}/api/auth/resend-email-verification`, {
+    const res = await fetch(`${GATEWAY_URL}/api/auth/email-verification/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -256,7 +256,7 @@ export async function requestPasswordRecoveryAction(
   if (!email) return { error: 'Informe seu e-mail.' }
 
   try {
-    const res = await fetch(`${GATEWAY_URL}/api/auth/forgot-password`, {
+    const res = await fetch(`${GATEWAY_URL}/api/auth/password-reset/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
