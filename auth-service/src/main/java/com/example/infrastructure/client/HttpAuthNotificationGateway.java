@@ -60,13 +60,15 @@ public class HttpAuthNotificationGateway implements AuthNotificationGateway {
     )
     @Fallback(fallbackMethod = "emailVerificationFallback")
     public void sendEmailVerificationCode(String email, String code, Instant expiresAt) {
-        String subject = "Confirme seu e-mail no BraSeller";
+        String subject = "Código de verificação BraSeller";
         String message = """
-                Ola,
+                Olá,
 
-                Use o codigo %s para confirmar seu e-mail no BraSeller.
+                Seu código de verificação é: %s
 
-                O codigo expira em %s e pode ser usado apenas uma vez. Se voce nao criou uma conta, ignore esta mensagem.
+                Ele expira em %s e pode ser usado apenas uma vez.
+
+                Se você não criou uma conta na BraSeller, ignore esta mensagem.
                 """.formatted(code, EXPIRATION_FORMATTER.format(expiresAt));
         send(new AuthEmailRequest(email, subject, message, "EMAIL_VERIFICATION"));
     }
@@ -79,13 +81,19 @@ public class HttpAuthNotificationGateway implements AuthNotificationGateway {
     )
     @Fallback(fallbackMethod = "passwordResetFallback")
     public void sendPasswordResetCode(String email, String code, Instant expiresAt) {
-        String subject = "Redefinicao de senha do BraSeller";
+        String subject = "Recuperação de senha BraSeller";
         String message = """
-                Ola,
+                Olá,
 
-                Recebemos uma solicitacao para redefinir sua senha no BraSeller. Use o codigo %s para criar uma nova senha.
+                Recebemos uma solicitação para redefinir sua senha na BraSeller.
 
-                O codigo expira em %s e pode ser usado apenas uma vez. Se voce nao solicitou esta alteracao, ignore esta mensagem.
+                Use o código abaixo para continuar:
+
+                %s
+
+                Ele expira em %s e pode ser usado apenas uma vez.
+
+                Se você não solicitou essa alteração, ignore esta mensagem.
                 """.formatted(code, EXPIRATION_FORMATTER.format(expiresAt));
         send(new AuthEmailRequest(email, subject, message, "PASSWORD_RESET"));
     }

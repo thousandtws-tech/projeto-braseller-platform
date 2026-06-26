@@ -103,7 +103,7 @@ export function ExpenseForm({ onSuccess, dict }: ExpenseFormProps) {
             <SelectGroup>
               <SelectItem value="">{dict.expenses.form.fields.categoryPlaceholder}</SelectItem>
               {CATEGORY_VALUES.map((c) => (
-                <SelectItem key={c} value={c}>{dict.dre.categories[c]}</SelectItem>
+                <SelectItem key={c} value={c}>{dict.expenses.categories[c]}</SelectItem>
               ))}
             </SelectGroup>
           </SelectContent>

@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
-  CreditCard,
   Landmark,
   LayoutDashboard,
   LogOut,

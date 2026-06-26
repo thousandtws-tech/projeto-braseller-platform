@@ -18,7 +18,7 @@ interface Props {
 
 export function ExpenseRow({ expense, readOnly = false, dict }: Props) {
   const [isPending, startTransition] = useTransition()
-  const label = dict.dre.categories[expense.category as keyof typeof dict.dre.categories] ?? expense.category
+  const label = dict.expenses.categories[expense.category as keyof typeof dict.expenses.categories] ?? expense.category
 
   function handleDelete() {
     if (!confirm(dict.expenses.row.confirmDelete)) return

@@ -8,7 +8,6 @@ import {
   Building2,
   Calculator,
   ChevronDown,
-  CreditCard,
   Landmark,
   LayoutDashboard,
   LogOut,

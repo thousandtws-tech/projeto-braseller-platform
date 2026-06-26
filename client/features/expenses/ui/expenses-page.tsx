@@ -118,7 +118,7 @@ export default async function DespesasPage({ params, searchParams }: Props) {
         <Metric
           label="Maior categoria"
           value={mainCategory ? formatCurrency(mainCategory[1]) : '—'}
-          helper={mainCategory ? dict.dre.categories[mainCategory[0] as keyof typeof dict.dre.categories] ?? mainCategory[0] : 'Sem dados'}
+          helper={mainCategory ? dict.expenses.categories[mainCategory[0] as keyof typeof dict.expenses.categories] ?? mainCategory[0] : 'Sem dados'}
           icon={FileText}
         />
       </section>
@@ -135,7 +135,7 @@ export default async function DespesasPage({ params, searchParams }: Props) {
         <section className="flex flex-wrap gap-2">
           {categories.slice(0, 5).map(([key, amount]) => (
             <div key={key} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
-              <Badge variant="secondary">{dict.dre.categories[key as keyof typeof dict.dre.categories] ?? key}</Badge>
+              <Badge variant="secondary">{dict.expenses.categories[key as keyof typeof dict.expenses.categories] ?? key}</Badge>
               <span className="text-xs font-semibold tabular-nums">{formatCurrency(amount)}</span>
             </div>
           ))}
@@ -157,7 +157,7 @@ export default async function DespesasPage({ params, searchParams }: Props) {
                   : dict.expenses.subtitleEmpty}
             </p>
           </div>
-          {category ? <Badge variant="outline">{dict.dre.categories[category as keyof typeof dict.dre.categories] ?? category}</Badge> : null}
+          {category ? <Badge variant="outline">{dict.expenses.categories[category as keyof typeof dict.expenses.categories] ?? category}</Badge> : null}
         </CardHeader>
         <CardContent className="p-0">
           {loadError ? (

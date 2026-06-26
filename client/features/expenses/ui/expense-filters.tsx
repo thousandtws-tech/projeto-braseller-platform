@@ -118,7 +118,7 @@ export function ExpenseFilters({ from, to, category, dict, lang }: ExpenseFilter
             <SelectItem value="">{dict.expenses.filters.allCategories}</SelectItem>
             {CATEGORY_VALUES.map((c) => (
               <SelectItem key={c} value={c}>
-                {dict.dre.categories[c]}
+                {dict.expenses.categories[c]}
               </SelectItem>
             ))}
           </SelectGroup>

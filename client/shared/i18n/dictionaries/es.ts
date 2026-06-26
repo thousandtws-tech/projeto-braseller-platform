@@ -352,6 +352,16 @@ const dictionary: Dictionary = {
       currentMonth: 'Mes actual',
       allCategories: 'Todas las categorías',
     },
+    categories: {
+      OPERATIONAL: 'Operacional',
+      PACKAGING: 'Embalajes',
+      SUPPLIES: 'Materiales e insumos',
+      LABOR: 'Mano de obra y servicios',
+      BANK_FEE: 'Comisiones bancarias',
+      SHIPPING: 'Fletes y entregas',
+      TAX: 'Impuestos y tasas',
+      OTHER: 'Otros gastos',
+    },
     form: {
       readOnlyTitle: 'El contador tiene acceso de solo lectura',
       newExpense: 'Nuevo Gasto',

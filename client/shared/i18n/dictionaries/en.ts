@@ -352,6 +352,16 @@ const dictionary: Dictionary = {
       currentMonth: 'Current month',
       allCategories: 'All categories',
     },
+    categories: {
+      OPERATIONAL: 'Operational',
+      PACKAGING: 'Packaging',
+      SUPPLIES: 'Materials and supplies',
+      LABOR: 'Labor and services',
+      BANK_FEE: 'Bank fees',
+      SHIPPING: 'Shipping and delivery',
+      TAX: 'Taxes and duties',
+      OTHER: 'Other expenses',
+    },
     form: {
       readOnlyTitle: 'Accountant has read-only access',
       newExpense: 'New Expense',

@@ -1,5 +1,7 @@
 package com.example.application.service;
 
+import com.example.application.command.AuthEmailCommand;
+import com.example.application.command.ApiIntegrationAlertCommand;
 import com.example.application.command.EmailVerificationNotificationCommand;
 import com.example.application.command.MonthlyClosingNotificationCommand;
 import com.example.application.command.MlPaymentReleaseNotificationCommand;
@@ -154,10 +156,10 @@ public class NotificationService {
         String code = requireText(command.code(), "code");
 
         String recipientName = blankToNull(command.recipientName());
-        String title = "Codigo de verificacao Brasaller";
+        String title = "Código de verificação BraSeller";
         String message = recipientName == null
-                ? "Seu codigo de verificacao e " + code + ". Ele expira em " + command.expiresAt() + "."
-                : recipientName + ", seu codigo de verificacao e " + code + ". Ele expira em " + command.expiresAt() + ".";
+                ? "Seu código de verificação é " + code + ". Ele expira em " + command.expiresAt() + "."
+                : recipientName + ", seu código de verificação é " + code + ". Ele expira em " + command.expiresAt() + ".";
 
         NotificationMessage notification = repository.save(new NotificationMessage(
                 UUID.randomUUID().toString(),
@@ -169,7 +171,8 @@ public class NotificationService {
                 NotificationChannel.EMAIL,
                 NotificationStatus.UNREAD,
                 null,
-                Instant.now()
+                Instant.now(),
+                "INFO"
         ));
 
         try {
@@ -181,6 +184,68 @@ public class NotificationService {
         }
 
         return notification;
+    }
+
+    public void sendAuthEmail(AuthEmailCommand command) {
+        String recipientEmail = requireText(command.recipientEmail(), "recipientEmail");
+        String subject = requireText(command.subject(), "subject");
+        String message = requireText(command.message(), "message");
+
+        NotificationMessage notification = new NotificationMessage(
+                UUID.randomUUID().toString(),
+                "auth-transactional",
+                NotificationType.EMAIL_VERIFICATION,
+                subject,
+                message,
+                recipientEmail,
+                NotificationChannel.EMAIL,
+                NotificationStatus.ARCHIVED,
+                null,
+                Instant.now(),
+                "INFO"
+        );
+
+        emailSender.send(notification);
+    }
+
+    public Optional<NotificationMessage> recordApiIntegrationAlert(ApiIntegrationAlertCommand command) {
+        String tenantId = requireText(command.tenantId(), "tenantId");
+        String integrationName = defaultText(command.integrationName(), "Integração externa");
+        String failureType = defaultText(command.failureType(), "Falha de integração");
+        String endpoint = blankToNull(command.endpoint());
+        String impact = blankToNull(command.impact());
+        String actionTaken = blankToNull(command.actionTaken());
+        String severity = defaultText(command.severity(), "WARNING").toUpperCase(Locale.ROOT);
+
+        String title = "Falha na integração " + integrationName;
+        StringBuilder message = new StringBuilder(failureType);
+        if (endpoint != null) {
+            message.append(" em ").append(endpoint);
+        }
+        if (impact != null) {
+            message.append(". Impacto: ").append(impact);
+        }
+        if (actionTaken != null) {
+            message.append(". Ação realizada: ").append(actionTaken);
+        }
+        message.append('.');
+
+        NotificationMessage notification = repository.save(new NotificationMessage(
+                firstNonBlank(command.eventId(), UUID.randomUUID().toString()),
+                tenantId,
+                NotificationType.API_INTEGRATION_ALERT,
+                title,
+                message.toString(),
+                blankToNull(command.recipientEmail()),
+                NotificationChannel.IN_APP,
+                NotificationStatus.UNREAD,
+                null,
+                command.occurredAt() == null ? Instant.now() : command.occurredAt(),
+                severity
+        ));
+
+        deliverByEmail(notification, repository.getPreference(tenantId));
+        return Optional.of(notification);
     }
 
     private NotificationMessage createAndDeliver(
@@ -200,7 +265,8 @@ public class NotificationService {
                 NotificationChannel.IN_APP,
                 NotificationStatus.UNREAD,
                 null,
-                Instant.now()
+                Instant.now(),
+                "INFO"
         ));
 
         deliverByEmail(notification, preference);
