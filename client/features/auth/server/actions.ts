@@ -88,6 +88,7 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
 
   let redirectTo: string | null = null
   let accessToken: string | null = null
+  let refreshToken: string | null = null
 
   try {
     const res = await fetch(`${GATEWAY_URL}/api/auth/login`, {
@@ -107,8 +108,9 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
         return { error: mapLoginError(code) }
       }
     } else {
-      const data = await res.json() as LoginResponse
+      const data = await res.json() as { accessToken?: string; access_token?: string; refreshToken?: string; refresh_token?: string }
       accessToken = data.accessToken ?? data.access_token ?? null
+      refreshToken = data.refreshToken ?? data.refresh_token ?? null
 
       if (!accessToken) {
         return { error: 'Resposta inválida do servidor de autenticação.' }
@@ -134,6 +136,16 @@ export async function loginAction(prevState: AuthState, formData: FormData): Pro
     maxAge: 60 * 60 * 24,
     path: '/',
   })
+
+  if (refreshToken) {
+    store.set('br_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    })
+  }
 
   redirect(await localePath('/dashboard'))
 }
@@ -306,5 +318,6 @@ export async function lookupCompanyByCnpjAction(cnpj: string): Promise<CompanyLo
 export async function logoutAction(): Promise<void> {
   const store = await cookies()
   store.delete(COOKIE_NAME)
+  store.delete('br_refresh_token')
   redirect(await localePath('/login'))
 }

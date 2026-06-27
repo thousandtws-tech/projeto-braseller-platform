@@ -35,14 +35,12 @@ import type { Locale } from '@/shared/i18n/config'
 
 import { MarketplaceLogo, normalizeMarketplaceName } from './marketplace-brand'
 import { OAuthSubmitButton } from './oauth-submit-button'
-import { PluggyConnectButton } from './pluggy-connect-button'
 
 interface Marketplace {
   name: string
   displayName: string
   connectionType: 'OAuth' | 'API' | 'Open Finance'
   oauth?: boolean
-  pluggy?: boolean
   fields: {
     name: string
     label: string
@@ -78,13 +76,6 @@ function getMarketplaces(dict: Dictionary): Marketplace[] {
         { name: 'seller_id', ...dict.connectors.fields.sellerId },
         { name: 'refresh_token', ...dict.connectors.fields.refreshToken, type: 'password' },
       ],
-    },
-    {
-      name: 'pluggy-open-finance',
-      displayName: 'Open Finance',
-      connectionType: 'Open Finance',
-      pluggy: true,
-      fields: [],
     },
   ]
 }
@@ -142,9 +133,7 @@ export function AddMarketplaceDialog({
                   })}
                 </DialogTitle>
                 <DialogDescription className="mt-1">
-                  {selected.pluggy
-                    ? 'Conecte contas bancárias via Pluggy Connect com consentimento Open Finance.'
-                    : selected.oauth
+                  {selected.oauth
                     ? dict.connectors.dialog.oauthDescription
                     : dict.connectors.addMarketplaceDialog.credentialDescription}
                 </DialogDescription>
@@ -200,8 +189,6 @@ export function AddMarketplaceDialog({
               </div>
             )}
           </div>
-        ) : selected.pluggy ? (
-          <PluggyConnectButton onCancel={() => handleOpenChange(false)} />
         ) : selected.oauth ? (
           <OAuthConnection
             marketplace={selected}

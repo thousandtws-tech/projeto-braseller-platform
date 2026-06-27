@@ -37,8 +37,6 @@ import com.example.domain.model.StoredUserCredentials;
 import com.example.domain.model.TenantCompanyProfile;
 import com.example.domain.model.TenantContext;
 import com.example.domain.model.UserView;
-import com.example.infrastructure.keycloak.KeycloakAdminClient;
-import com.example.infrastructure.keycloak.KeycloakIntegrationException;
 import com.example.infrastructure.persistence.RepositoryException;
 
 import jakarta.annotation.PostConstruct;
@@ -61,9 +59,6 @@ public class UserIdentityService {
 
     @Inject
     InternalServiceAuthorizer internalServiceAuthorizer;
-
-    @Inject
-    KeycloakAdminClient keycloakAdminClient;
 
     @Inject
     EmailVerificationSender emailVerificationSender;
@@ -140,23 +135,11 @@ public class UserIdentityService {
         Optional<UserView> existingUser = userIdentityRepository.findUserByEmail(email);
         String accountantUserId = existingUser.map(UserView::id).orElseGet(() -> UUID.randomUUID().toString());
 
-        Optional<String> keycloakSubject = Optional.empty();
-        if (existingUser.isEmpty()) {
-            try {
-                keycloakSubject = keycloakAdminClient.createAccountantUser(
-                        accountantUserId, command.tenantId(), email, firstName, lastName, rawPassword);
-            } catch (KeycloakIntegrationException exception) {
-                throw new ValidationException("Falha ao criar usuario no Keycloak: " + exception.getMessage());
-            }
-        }
+        String provider = existingUser.map(UserView::provider).orElse("PASSWORD");
+        String providerSubject = existingUser.map(UserView::providerSubject).orElse(null);
+        String status = existingUser.map(UserView::status).orElse("INVITED");
 
-        String provider = existingUser.map(UserView::provider).orElse(keycloakSubject.isPresent() ? "KEYCLOAK" : "PASSWORD");
-        String providerSubject = existingUser.map(UserView::providerSubject).orElse(keycloakSubject.orElse(null));
-        String status = existingUser.map(UserView::status).orElse(keycloakSubject.isPresent() ? STATUS_ACTIVE : "INVITED");
-
-        String passwordHash = keycloakSubject.isPresent()
-                ? "KEYCLOAK_MANAGED_" + UUID.randomUUID()
-                : passwordHasher.hash(rawPassword);
+        String passwordHash = passwordHasher.hash(rawPassword);
 
         try {
             return userIdentityRepository.grantAccountantAccess(

@@ -76,23 +76,6 @@ export default async function ExtratoPage({ params }: Props) {
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{dict.bank.header.subtitle}</p>
       </header>
 
-      <Card className="border-emerald-500/25 bg-emerald-500/5">
-        <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-              <ShieldCheck className="size-5" />
-            </div>
-            <div>
-              <p className="font-medium">Extrato vinculado ao Open Finance</p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                As transações bancárias conectadas pela API Pluggy/Open Finance serão exibidas aqui assim que a conta for autorizada e sincronizada. A importação OFX continua disponível como alternativa manual.
-              </p>
-            </div>
-          </div>
-          <Badge variant="secondary">Pluggy API</Badge>
-        </CardContent>
-      </Card>
-
       <section className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card xl:grid-cols-4">
         <Metric label="Entradas identificadas" value={formatCurrency(totalCredits)} helper={`${credits.length} créditos`} icon={ArrowDownLeft} />
         <Metric label={dict.bank.sidebar.totalExpenses} value={formatCurrency(totalExpenses)} helper={`${debits.length} débitos`} icon={ArrowUpRight} />

@@ -1,3 +1,0 @@
-CREATE INDEX idx_billing_subscriptions_tenant_status ON billing_subscriptions(tenant_id, status);
-CREATE INDEX idx_billing_subscriptions_plan ON billing_subscriptions(plan_code);
-CREATE INDEX idx_billing_webhook_events_tenant ON billing_webhook_events(tenant_id);

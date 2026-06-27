@@ -14,7 +14,6 @@ import com.example.application.exception.IdentityGatewayException;
 import com.example.application.exception.ValidationException;
 import com.example.application.service.AuthChallengeService;
 import com.example.application.service.AuthenticationService;
-import com.example.application.service.KeycloakOAuthService;
 import com.example.domain.model.AuthChallengeAccepted;
 import com.example.domain.model.AuthTokenSet;
 import com.example.domain.model.CodeValidationResult;
@@ -45,9 +44,6 @@ public class AuthResource {
     AuthenticationService authenticationService;
 
     @Inject
-    KeycloakOAuthService keycloakOAuthService;
-
-    @Inject
     AuthChallengeService authChallengeService;
 
     @GET
@@ -60,7 +56,7 @@ public class AuthResource {
 
     @POST
     @Path("/register")
-    @Operation(summary = "Cadastrar vendedor", description = "Cria tenant/usuario pendente, cria o usuario no Keycloak e envia codigo de verificacao de e-mail.")
+    @Operation(summary = "Cadastrar vendedor", description = "Cria tenant/usuario pendente e envia codigo de verificacao de e-mail.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RegisterRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "202", description = "Cadastro criado e aguardando verificacao de e-mail.",
@@ -122,7 +118,7 @@ public class AuthResource {
 
     @POST
     @Path("/email-verification/verify")
-    @Operation(summary = "Validar codigo de verificacao de e-mail", description = "Consome codigo valido, marca usuario como ativo/verificado e sincroniza Keycloak.")
+    @Operation(summary = "Validar codigo de verificacao de e-mail", description = "Consome codigo valido e marca usuario como ativo/verificado.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = CodeRequest.class)))
     public Response verifyEmail(CodeRequest request) {
         try {
@@ -170,7 +166,7 @@ public class AuthResource {
 
     @POST
     @Path("/password-reset/reset")
-    @Operation(summary = "Redefinir senha", description = "Consome codigo valido e redefine senha local/Keycloak.")
+    @Operation(summary = "Redefinir senha", description = "Consome codigo valido e redefine senha local.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ResetPasswordRequest.class)))
     public Response resetPassword(ResetPasswordRequest request) {
         try {
@@ -188,7 +184,7 @@ public class AuthResource {
 
     @POST
     @Path("/login")
-    @Operation(summary = "Login", description = "Autentica e-mail/senha no Keycloak e emite access token da plataforma + refresh token Keycloak.")
+    @Operation(summary = "Login", description = "Autentica e-mail/senha e emite access token da plataforma.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = LoginRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Login realizado.",
@@ -216,7 +212,7 @@ public class AuthResource {
 
     @POST
     @Path("/refresh")
-    @Operation(summary = "Renovar access token", description = "Renova a sessao no Keycloak e emite novo access token da plataforma.")
+    @Operation(summary = "Renovar access token", description = "Renova a sessao e emite novo access token da plataforma.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RefreshRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Token renovado.",
@@ -240,7 +236,7 @@ public class AuthResource {
 
     @POST
     @Path("/logout")
-    @Operation(summary = "Logout", description = "Revoga a sessao/refresh token no Keycloak.")
+    @Operation(summary = "Logout", description = "Revoga a sessao/refresh token.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = RefreshRequest.class)))
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Resultado da revogacao.",
@@ -257,49 +253,6 @@ public class AuthResource {
             return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
         } catch (AuthenticationException exception) {
             return Response.status(Response.Status.UNAUTHORIZED).entity(new RestError(exception.getMessage())).build();
-        }
-    }
-
-    @GET
-    @Path("/oauth/google/authorize-url")
-    @Operation(summary = "Gerar URL OAuth Google", description = "Retorna a URL de autorizacao do Keycloak com kc_idp_hint=google.")
-    @APIResponses({
-            @APIResponse(responseCode = "200", description = "URL de autorizacao gerada.",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = GoogleAuthorizeUrlResponse.class))),
-            @APIResponse(responseCode = "501", description = "OAuth Keycloak/Google nao configurado.",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
-    })
-    public Response googleAuthorizeUrl() {
-        try {
-            return Response.ok(new GoogleAuthorizeUrlResponse(keycloakOAuthService.googleAuthorizationUrl())).build();
-        } catch (FeatureNotConfiguredException exception) {
-            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
-        }
-    }
-
-    @POST
-    @Path("/oauth/google/callback")
-    @Operation(summary = "Login/cadastro OAuth Google", description = "Troca no Keycloak o code recebido pelo broker Google. Se o e-mail ja existir, faz login; se nao existir, cria tenant/usuario usando tenantName.")
-    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = GoogleCallbackRequest.class)))
-    @APIResponses({
-            @APIResponse(responseCode = "200", description = "Login ou cadastro Google realizado.",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = AuthTokenSet.class))),
-            @APIResponse(responseCode = "401", description = "Code ou identidade Google invalida.",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class))),
-            @APIResponse(responseCode = "501", description = "OAuth Keycloak/Google nao configurado.",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RestError.class)))
-    })
-    public Response googleCallback(GoogleCallbackRequest request) {
-        try {
-            return Response.ok(keycloakOAuthService.googleCallback(request.code(), request.tenantName())).build();
-        } catch (FeatureNotConfiguredException exception) {
-            return Response.status(Response.Status.NOT_IMPLEMENTED).entity(new RestError(exception.getMessage())).build();
-        } catch (ValidationException exception) {
-            return badRequest(exception.getMessage());
-        } catch (AuthenticationException exception) {
-            return Response.status(Response.Status.UNAUTHORIZED).entity(new RestError(exception.getMessage())).build();
-        } catch (IdentityGatewayException exception) {
-            return identityGatewayFailure(exception);
         }
     }
 
@@ -348,7 +301,7 @@ public class AuthResource {
     ) {
     }
 
-    @Schema(name = "AuthLoginRequest", description = "Credenciais de e-mail/senha autenticadas no Keycloak.")
+    @Schema(name = "AuthLoginRequest", description = "Credenciais de e-mail/senha.")
     public record LoginRequest(String email, String password) {
     }
 
@@ -368,20 +321,12 @@ public class AuthResource {
     public record SimpleMessage(String message) {
     }
 
-    @Schema(name = "AuthRefreshRequest", description = "Refresh token emitido pelo Keycloak e retornado pelo auth-service.")
+    @Schema(name = "AuthRefreshRequest", description = "Refresh token retornado pelo auth-service.")
     public record RefreshRequest(String refreshToken) {
     }
 
     @Schema(name = "AuthLogoutResponse", description = "Resultado da tentativa de revogacao de refresh token.")
     public record LogoutResponse(boolean revoked) {
-    }
-
-    @Schema(name = "GoogleAuthorizeUrlResponse", description = "URL para iniciar OAuth Google.")
-    public record GoogleAuthorizeUrlResponse(String authorizeUrl) {
-    }
-
-    @Schema(name = "GoogleCallbackRequest", description = "Code retornado pelo broker Google do Keycloak. tenantName e obrigatorio apenas para primeiro cadastro.")
-    public record GoogleCallbackRequest(String code, String tenantName) {
     }
 
 }
